@@ -9,16 +9,21 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Configuration
-// When deploying, this should be replaced with your Cloud Run Service URL
-// e.g. "https://ai-arda-tr-xyz-uc.a.run.app"
-const API_BASE_URL = "https://ai-arda-tr-api-599610058688.asia-northeast1.run.app";
+// Replace this with your actual Cloud Run Service URL
+const API_BASE_URL = "https://ai-arda-tr-api-134914104276.asia-northeast1.run.app";
 
 function getApiEndpoint() {
-    // If we have a configured base URL, use it (for GitHub Pages)
+    // 1. If running on localhost, ALWAYS use local backend (relative path)
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        return "/api/chat";
+    }
+
+    // 2. If running on GitHub Pages (or elsewhere), use the Cloud Run URL
     if (API_BASE_URL) {
         return `${API_BASE_URL}/api/chat`;
     }
-    // Fallback to relative path (for local development where backend serves frontend)
+    
+    // 3. Fallback to relative path
     return "/api/chat";
 }
 

@@ -96,7 +96,7 @@ func callGemini(userMessage string) (string, error) {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-1.5-flash") // 1.5-flash is the stable one in this SDK
+	model := client.GenerativeModel("gemini-2.5-flash")
 	model.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{
 			genai.Text("You are Arda's Resume Bot. You are cynical, sarcastic, into heavy metal, and Linux. You answer questions about Arda's career."),
