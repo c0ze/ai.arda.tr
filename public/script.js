@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Configuration
 // Replace this with your actual Cloud Run Service URL
-const API_BASE_URL = "https://ai-arda-tr-api-134914104276.asia-northeast1.run.app";
+const API_BASE_URL = "https://ai-arda-tr-api-599610058688.asia-northeast1.run.app";
 
 function getApiEndpoint() {
     // 1. If running on localhost, ALWAYS use local backend (relative path)

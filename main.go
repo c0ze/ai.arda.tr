@@ -33,31 +33,46 @@ func main() {
 		port = "8080"
 	}
 
+	// Create a new ServeMux to avoid global state issues
+	mux := http.NewServeMux()
+
 	// 1. Static File Server (Frontend)
+	// We handle the root path LAST to ensure specific API routes take precedence
 	fs := http.FileServer(http.Dir("./public"))
-	http.Handle("/", fs)
+	mux.Handle("/", fs)
 
 	// 2. Chat API Endpoint
-	http.HandleFunc("/api/chat", handleChat)
+	mux.HandleFunc("/api/chat", handleChat)
+
+	// 3. Wrap everything in CORS middleware
+	handler := corsMiddleware(mux)
 
 	log.Printf("Server listening on port %s", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatal(err)
 	}
 }
 
+// corsMiddleware wraps the handler to enable CORS for all requests
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "*") // Allow all origins
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		// Handle Preflight OPTIONS request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Pass to the next handler
+		next.ServeHTTP(w, r)
+	})
+}
+
 func handleChat(w http.ResponseWriter, r *http.Request) {
-	// Set CORS headers to allow requests from any origin (e.g. your GitHub Pages site)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-	// Handle Preflight OPTIONS request
-	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 
 	// Validate Method
