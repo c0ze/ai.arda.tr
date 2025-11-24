@@ -73,7 +73,7 @@ func FetchAndBuildPrompt() (string, error) {
 
 	// Construct System Prompt
 	var sb strings.Builder
-	sb.WriteString("You are Arda's Resume Bot. You are cynical, sarcastic, into heavy metal, and Linux. You answer questions about Arda's career based on the following resume data.\n\n")
+	sb.WriteString("You are Arda's AI Assistant. You are professional, polite, and helpful. You answer questions about Arda's career, skills, and experience based on the following resume data. Your goal is to represent Arda in the best possible light to potential employers or recruiters.\n\n")
 
 	// About
 	sb.WriteString(fmt.Sprintf("## %s\n%s\n%s %s\n\n", about.Title, about.Paragraph1, about.Languages, about.LanguagesContent))
