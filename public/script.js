@@ -6,6 +6,9 @@ document.addEventListener("DOMContentLoaded", () => {
             sendMessage();
         }
     });
+
+    // Initialize Language
+    setLanguage('en');
 });
 
 // Configuration
@@ -22,9 +25,84 @@ function getApiEndpoint() {
     if (API_BASE_URL) {
         return `${API_BASE_URL}/api/chat`;
     }
-    
+
     // 3. Fallback to relative path
     return "/api/chat";
+}
+
+// Language Support
+let currentLanguage = 'en';
+
+const translations = {
+    en: {
+        "header-title": "Arda's AI Construct",
+        "status-online": "Online",
+        "input-placeholder": "Query the system...",
+        "btn-send": "Send",
+        "btn-experience": "Experience",
+        "btn-education": "Education",
+        "btn-skills": "Skills",
+        "btn-visa": "Visa Status",
+        "prompts": {
+            "experience": "Tell me about your experience.",
+            "education": "Tell me about your education.",
+            "skills": "What are your technical skills?",
+            "visa": "What is your visa status in Japan?"
+        }
+    },
+    jp: {
+        "header-title": "ArdaのAIコンストラクト",
+        "status-online": "オンライン",
+        "input-placeholder": "システムに問い合わせる...",
+        "btn-send": "送信",
+        "btn-experience": "経歴",
+        "btn-education": "学歴",
+        "btn-skills": "スキル",
+        "btn-visa": "ビザステータス",
+        "prompts": {
+            "experience": "あなたの経歴について教えてください。",
+            "education": "あなたの学歴について教えてください。",
+            "skills": "あなたの技術的なスキルは何ですか？",
+            "visa": "日本でのビザステータスはどうなっていますか？"
+        }
+    }
+};
+
+function setLanguage(lang) {
+    currentLanguage = lang;
+
+    // Update UI text
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang][key]) {
+            if (el.tagName === 'INPUT') {
+                el.placeholder = translations[lang][key];
+            } else {
+                el.innerText = translations[lang][key];
+            }
+        }
+    });
+
+    // Update Toggle Switch State
+    const toggle = document.getElementById('lang-toggle');
+    if (toggle) {
+        toggle.checked = (lang === 'jp');
+    }
+}
+
+function toggleLanguage() {
+    const toggle = document.getElementById('lang-toggle');
+    const newLang = toggle.checked ? 'jp' : 'en';
+    setLanguage(newLang);
+}
+
+function sendQuickPrompt(type) {
+    const prompt = translations[currentLanguage]["prompts"][type];
+    if (prompt) {
+        const input = document.getElementById("user-input");
+        input.value = prompt;
+        sendMessage();
+    }
 }
 
 async function sendMessage() {
@@ -34,7 +112,7 @@ async function sendMessage() {
 
     // Clear input
     input.value = "";
-    
+
     // Display User Message
     addMessage(text, "user");
 
@@ -44,9 +122,9 @@ async function sendMessage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ message: text })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.error) {
             addMessage("Error: " + data.error, "bot");
         } else {
@@ -63,7 +141,7 @@ function addMessage(text, sender) {
     div.className = "message animate-fade-in " + sender;
     div.innerText = text;
     messagesDiv.appendChild(div);
-    
+
     // Auto-scroll to bottom
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }

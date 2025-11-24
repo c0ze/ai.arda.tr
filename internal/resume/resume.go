@@ -114,5 +114,9 @@ func FetchAndBuildPrompt() (string, error) {
 		sb.WriteString(fmt.Sprintf("- **%s** (%s)\n  %s\n", proj.Title, proj.Technologies, proj.Description))
 	}
 
+	// Visa Status (Hardcoded for now)
+	sb.WriteString("\n## Visa Status\n")
+	sb.WriteString("Permanent Resident (Japan)\n")
+
 	return sb.String(), nil
 }

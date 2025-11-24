@@ -5,23 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arda's AI Construct</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
-    <div id="chat-container">
-        <header id="chat-header">
-            <h1>Arda's AI Construct</h1>
-            <div class="status-indicator">
-                <span class="status-dot"></span>
-                <span class="status-text">Online</span>
+    <div id="app-container">
+        <main id="chat-container">
+            <header id="chat-header">
+                <h1 data-i18n="header-title">Arda's AI Construct</h1>
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text" data-i18n="status-online">Online</span>
+                </div>
+            </header>
+            <div id="messages"></div>
+            <div id="input-area">
+                <input type="text" id="user-input" placeholder="Query the system..." autofocus data-i18n="input-placeholder">
+                <button onclick="sendMessage()" data-i18n="btn-send">Send</button>
             </div>
-        </header>
-        <div id="messages"></div>
-        <div id="input-area">
-            <input type="text" id="user-input" placeholder="Query the system..." autofocus>
-            <button onclick="sendMessage()">Send</button>
-        </div>
+        </main>
+
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <h2>Quick Access</h2>
+            </div>
+            <div class="quick-buttons">
+                <button onclick="sendQuickPrompt('experience')" data-i18n="btn-experience">Experience</button>
+                <button onclick="sendQuickPrompt('education')" data-i18n="btn-education">Education</button>
+                <button onclick="sendQuickPrompt('skills')" data-i18n="btn-skills">Skills</button>
+                <button onclick="sendQuickPrompt('visa')" data-i18n="btn-visa">Visa Status</button>
+            </div>
+            <div class="language-toggle">
+                <span class="toggle-label">EN</span>
+                <label class="switch">
+                    <input type="checkbox" id="lang-toggle" onchange="toggleLanguage()">
+                    <span class="slider"></span>
+                </label>
+                <span class="toggle-label">JP</span>
+            </div>
+        </aside>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>
