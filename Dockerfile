@@ -8,6 +8,9 @@ COPY . .
 # Resolve dependencies (since we couldn't run go get locally)
 RUN go mod tidy
 
+# Fetch resume data
+RUN go run main.go -fetch
+
 # Build Binary
 # CGO_ENABLED=0 ensures a static binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o server main.go
@@ -19,6 +22,7 @@ WORKDIR /
 # Copy Binary and Static Assets
 COPY --from=builder /app/server /server
 COPY --from=builder /app/public /public
+COPY --from=builder /app/data /data
 
 # Cloud Run expects 8080 by default
 EXPOSE 8080

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -12,14 +13,40 @@ import (
 )
 
 func main() {
+	fetchMode := flag.Bool("fetch", false, "Fetch resume data and exit")
+	flag.Parse()
+
 	// Load .env file if it exists
 	_ = godotenv.Load()
 
-	// Fetch resume data at startup
-	systemPrompt, err := resume.FetchAndBuildPrompt()
+	dataDir := "./data"
+
+	// Handle Fetch Mode
+	if *fetchMode {
+		log.Println("Fetching resume data...")
+		if err := resume.FetchToDisk(dataDir); err != nil {
+			log.Fatalf("Failed to fetch resume data: %v", err)
+		}
+		log.Println("Resume data fetched successfully.")
+		return
+	}
+
+	// Ensure data exists
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		log.Println("Data directory not found. Fetching data...")
+		if err := resume.FetchToDisk(dataDir); err != nil {
+			log.Printf("Warning: Failed to fetch resume data: %v", err)
+		}
+	}
+
+	// Load Resume Data
+	resumeData, err := resume.LoadFromDisk(dataDir)
+	var systemPrompt string
 	if err != nil {
-		log.Printf("Warning: Failed to fetch resume data: %v", err)
+		log.Printf("Warning: Failed to load resume data: %v", err)
 		systemPrompt = "You are Arda's Resume Bot. I couldn't load the resume data, so I'm a bit useless right now."
+	} else {
+		systemPrompt = resume.BuildPrompt(resumeData)
 	}
 
 	// Initialize Gemini Service

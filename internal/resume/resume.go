@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -15,28 +17,34 @@ var (
 	baseURL = "https://raw.githubusercontent.com/c0ze/resume/main/content/en/"
 )
 
-// FetchAndBuildPrompt fetches resume data and constructs the system prompt
-func FetchAndBuildPrompt() (string, error) {
+type ResumeData struct {
+	About      models.About
+	Experience models.Experience
+	Projects   models.Projects
+	Skills     models.Skills
+	Education  models.Education
+}
+
+// FetchToDisk fetches resume data from GitHub and saves it to the specified directory
+func FetchToDisk(outputDir string) error {
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %v", outputDir, err)
+	}
+
 	var wg sync.WaitGroup
 	errChan := make(chan error, 5)
 
-	var about models.About
-	var experience models.Experience
-	var projects models.Projects
-	var skills models.Skills
-	var education models.Education
-
-	files := map[string]interface{}{
-		"about.json":      &about,
-		"experience.json": &experience,
-		"projects.json":   &projects,
-		"skills.json":     &skills,
-		"education.json":  &education,
+	files := []string{
+		"about.json",
+		"experience.json",
+		"projects.json",
+		"skills.json",
+		"education.json",
 	}
 
-	for filename, target := range files {
+	for _, filename := range files {
 		wg.Add(1)
-		go func(f string, t interface{}) {
+		go func(f string) {
 			defer wg.Done()
 			url := baseURL + f
 			resp, err := http.Get(url)
@@ -57,37 +65,67 @@ func FetchAndBuildPrompt() (string, error) {
 				return
 			}
 
-			if err := json.Unmarshal(body, t); err != nil {
-				errChan <- fmt.Errorf("failed to parse %s: %v", f, err)
+			outputPath := filepath.Join(outputDir, f)
+			if err := os.WriteFile(outputPath, body, 0644); err != nil {
+				errChan <- fmt.Errorf("failed to write %s: %v", f, err)
 				return
 			}
-		}(filename, target)
+		}(filename)
 	}
 
 	wg.Wait()
 	close(errChan)
 
 	if len(errChan) > 0 {
-		return "", <-errChan
+		return <-errChan
+	}
+	return nil
+}
+
+// LoadFromDisk reads resume data from the specified directory
+func LoadFromDisk(inputDir string) (*ResumeData, error) {
+	data := &ResumeData{}
+	files := map[string]interface{}{
+		"about.json":      &data.About,
+		"experience.json": &data.Experience,
+		"projects.json":   &data.Projects,
+		"skills.json":     &data.Skills,
+		"education.json":  &data.Education,
 	}
 
-	// Construct System Prompt
+	for filename, target := range files {
+		path := filepath.Join(inputDir, filename)
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %v", path, err)
+		}
+
+		if err := json.Unmarshal(body, target); err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %v", path, err)
+		}
+	}
+
+	return data, nil
+}
+
+// BuildPrompt constructs the system prompt from the loaded resume data
+func BuildPrompt(data *ResumeData) string {
 	var sb strings.Builder
 	sb.WriteString("You are Arda's AI Assistant. You are professional, polite, and helpful. You answer questions about Arda's career, skills, and experience based on the following resume data. Your goal is to represent Arda in the best possible light to potential employers or recruiters.\n\n")
 
 	// About
-	sb.WriteString(fmt.Sprintf("## %s\n%s\n%s %s\n\n", about.Title, about.Paragraph1, about.Languages, about.LanguagesContent))
+	sb.WriteString(fmt.Sprintf("## %s\n%s\n%s %s\n\n", data.About.Title, data.About.Paragraph1, data.About.Languages, data.About.LanguagesContent))
 
 	// Skills
-	sb.WriteString(fmt.Sprintf("## %s\n", skills.Title))
-	for _, s := range skills.TechnicalSkills {
+	sb.WriteString(fmt.Sprintf("## %s\n", data.Skills.Title))
+	for _, s := range data.Skills.TechnicalSkills {
 		sb.WriteString(fmt.Sprintf("- %s\n", s))
 	}
 	sb.WriteString("\n")
 
 	// Experience
-	sb.WriteString(fmt.Sprintf("## %s\n", experience.Title))
-	for _, job := range experience.Jobs {
+	sb.WriteString(fmt.Sprintf("## %s\n", data.Experience.Title))
+	for _, job := range data.Experience.Jobs {
 		sb.WriteString(fmt.Sprintf("- **%s at %s** [%s]:\n", job.Title, job.Company, job.Period))
 		for _, resp := range job.Responsibilities {
 			sb.WriteString(fmt.Sprintf("  %s\n", resp))
@@ -96,8 +134,8 @@ func FetchAndBuildPrompt() (string, error) {
 	}
 
 	// Education
-	sb.WriteString(fmt.Sprintf("## %s\n", education.Title))
-	for _, edu := range education.Entries {
+	sb.WriteString(fmt.Sprintf("## %s\n", data.Education.Title))
+	for _, edu := range data.Education.Entries {
 		sb.WriteString(fmt.Sprintf("- **%s**, %s (%s). %s\n", edu.Degree, edu.Institution, edu.Period, edu.Description))
 		if edu.AdditionalInfo != nil {
 			sb.WriteString(fmt.Sprintf("  **%s**\n", edu.AdditionalInfo.Title))
@@ -109,8 +147,8 @@ func FetchAndBuildPrompt() (string, error) {
 	sb.WriteString("\n")
 
 	// Projects
-	sb.WriteString(fmt.Sprintf("## %s\n", projects.Title))
-	for _, proj := range projects.Entries {
+	sb.WriteString(fmt.Sprintf("## %s\n", data.Projects.Title))
+	for _, proj := range data.Projects.Entries {
 		sb.WriteString(fmt.Sprintf("- **%s** (%s)\n  %s\n", proj.Title, proj.Technologies, proj.Description))
 	}
 
@@ -122,5 +160,5 @@ func FetchAndBuildPrompt() (string, error) {
 	sb.WriteString("\n## About this Bot\n")
 	sb.WriteString("This bot is an AI construct designed to represent Arda. It is built with Go (Golang) for the backend and vanilla HTML/JS for the frontend. It uses Google's Gemini API for reasoning. Fun fact: This entire project was 'vibe coded' with Gemini 3 in a single weekend. You can view the source code at: https://github.com/c0ze/ai.arda.tr\n")
 
-	return sb.String(), nil
+	return sb.String()
 }
