@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/c0ze/ai-resume-bot/internal/gemini"
 	"github.com/c0ze/ai-resume-bot/internal/models"
@@ -51,8 +53,28 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 // CorsMiddleware wraps the handler to enable CORS for all requests
 func CorsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers
-		w.Header().Set("Access-Control-Allow-Origin", "*") // Allow all origins
+		allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+		origin := r.Header.Get("Origin")
+
+		// Default to * if not set (for backward compatibility/dev)
+		if allowedOrigins == "" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else {
+			// Check if the origin is allowed
+			origins := strings.Split(allowedOrigins, ",")
+			allowed := false
+			for _, o := range origins {
+				if strings.TrimSpace(o) == origin || strings.TrimSpace(o) == "*" {
+					allowed = true
+					break
+				}
+			}
+
+			if allowed {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			}
+		}
+
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
