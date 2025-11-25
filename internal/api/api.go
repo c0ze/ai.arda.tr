@@ -61,7 +61,7 @@ func CorsMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 		} else {
 			// Check if the origin is allowed
-			origins := strings.Split(allowedOrigins, ",")
+			origins := strings.Split(allowedOrigins, ";")
 			allowed := false
 			for _, o := range origins {
 				if strings.TrimSpace(o) == origin || strings.TrimSpace(o) == "*" {
