@@ -139,19 +139,31 @@ async function sendMessage() {
     }
 }
 
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
 function addMessage(text, sender) {
     const messagesDiv = document.getElementById("messages");
     const div = document.createElement("div");
     div.className = "message animate-fade-in " + sender;
 
-    // Convert markdown links and plain URLs to clickable links
-    let html = text
-        // 1. Convert markdown links: [text](url)
+    // 1. Escape HTML first to prevent XSS
+    let safeText = escapeHtml(text);
+
+    // 2. Convert markdown links and plain URLs to clickable links
+    let html = safeText
+        // Convert markdown links: [text](url)
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-        // 2. Convert plain URLs that aren't already part of an anchor tag (from step 1)
+        // Convert plain URLs that aren't already part of an anchor tag
         .replace(/(?<!href="|">)(https?:\/\/[^\s<)\]]+)/g, function (match) {
-            // Check if this URL was already handled by the markdown regex (it would be inside an href)
-            // The negative lookbehind (?<!href="|">) handles most cases, but let's be safe
             return '<a href="' + match + '" target="_blank" rel="noopener noreferrer">' + match + '</a>';
         })
         // 3. Convert newlines to <br>
