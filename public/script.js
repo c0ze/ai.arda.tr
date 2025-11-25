@@ -43,11 +43,13 @@ const translations = {
         "btn-education": "Education",
         "btn-skills": "Skills",
         "btn-visa": "Visa Status",
+        "btn-about-bot": "About this Bot",
         "prompts": {
             "experience": "Tell me about your experience.",
             "education": "Tell me about your education.",
             "skills": "What are your technical skills?",
-            "visa": "What is your visa status in Japan?"
+            "visa": "What is your visa status in Japan?",
+            "about_bot": "Tell me about this bot, its architecture, and how it was built."
         }
     },
     jp: {
@@ -59,11 +61,13 @@ const translations = {
         "btn-education": "学歴",
         "btn-skills": "スキル",
         "btn-visa": "ビザステータス",
+        "btn-about-bot": "このボットについて",
         "prompts": {
             "experience": "あなたの経歴について教えてください。",
             "education": "あなたの学歴について教えてください。",
             "skills": "あなたの技術的なスキルは何ですか？",
-            "visa": "日本でのビザステータスはどうなっていますか？"
+            "visa": "日本でのビザステータスはどうなっていますか？",
+            "about_bot": "このボットのアーキテクチャと、どのように構築されたか教えてください。"
         }
     }
 };
@@ -139,7 +143,21 @@ function addMessage(text, sender) {
     const messagesDiv = document.getElementById("messages");
     const div = document.createElement("div");
     div.className = "message animate-fade-in " + sender;
-    div.innerText = text;
+
+    // Convert markdown links and plain URLs to clickable links
+    let html = text
+        // 1. Convert markdown links: [text](url)
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+        // 2. Convert plain URLs that aren't already part of an anchor tag (from step 1)
+        .replace(/(?<!href="|">)(https?:\/\/[^\s<)\]]+)/g, function (match) {
+            // Check if this URL was already handled by the markdown regex (it would be inside an href)
+            // The negative lookbehind (?<!href="|">) handles most cases, but let's be safe
+            return '<a href="' + match + '" target="_blank" rel="noopener noreferrer">' + match + '</a>';
+        })
+        // 3. Convert newlines to <br>
+        .replace(/\n/g, '<br>');
+
+    div.innerHTML = html;
     messagesDiv.appendChild(div);
 
     // Auto-scroll to bottom

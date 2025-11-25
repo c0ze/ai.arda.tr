@@ -118,5 +118,9 @@ func FetchAndBuildPrompt() (string, error) {
 	sb.WriteString("\n## Visa Status\n")
 	sb.WriteString("Permanent Resident (Japan)\n")
 
+	// About this Bot
+	sb.WriteString("\n## About this Bot\n")
+	sb.WriteString("This bot is an AI construct designed to represent Arda. It is built with Go (Golang) for the backend and vanilla HTML/JS for the frontend. It uses Google's Gemini API for reasoning. Fun fact: This entire project was 'vibe coded' with Gemini 3 in a single weekend. You can view the source code at: https://github.com/c0ze/ai.arda.tr\n")
+
 	return sb.String(), nil
 }
