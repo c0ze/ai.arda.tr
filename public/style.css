@@ -5,6 +5,9 @@
     --radius-lg: 1rem;
     --radius-xl: 1.5rem;
     --max-width: 48rem;
+
+    /* Global Scale */
+    font-size: 120%;
 }
 
 /* Dark mode (default) */
