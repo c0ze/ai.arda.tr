@@ -34,7 +34,7 @@ func (s *Service) GenerateContent(ctx context.Context, userMessage string) (stri
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-3.5-flash")
+	model := client.GenerativeModel("gemini-3-flash-preview")
 
 	s.promptMutex.RLock()
 	currentPrompt := s.systemPrompt
