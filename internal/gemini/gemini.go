@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"context"
+	"os"
 	"sync"
 
 	"github.com/google/generative-ai-go/genai"
@@ -39,6 +40,12 @@ func (s *Service) GenerateContent(ctx context.Context, userMessage string) (stri
 	s.promptMutex.RLock()
 	currentPrompt := s.systemPrompt
 	s.promptMutex.RUnlock()
+
+	// Append job requirements if available
+	// We ignore errors here as the file might not exist yet
+	if reqData, err := os.ReadFile("data/job_requirements.md"); err == nil {
+		currentPrompt += "\n\n" + string(reqData)
+	}
 
 	model.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{
