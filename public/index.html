@@ -5,47 +5,115 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arda's AI Construct</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
-    <div id="app-container">
-        <main id="chat-container">
-            <header id="chat-header">
+    <div id="app">
+        <!-- Header -->
+        <header id="header">
+            <div class="header-left">
                 <h1 data-i18n="header-title">Arda's AI Construct</h1>
-                <div class="status-indicator">
-                    <span class="status-dot"></span>
-                    <span class="status-text" data-i18n="status-online">Online</span>
+            </div>
+            <div class="header-right">
+                <div class="language-toggle">
+                    <span class="toggle-label">EN</span>
+                    <label class="switch">
+                        <input type="checkbox" id="lang-toggle" onchange="toggleLanguage()">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="toggle-label">JP</span>
                 </div>
-            </header>
-            <div id="messages"></div>
-            <div id="input-area">
-                <input type="text" id="user-input" placeholder="Query the system..." autofocus data-i18n="input-placeholder">
-                <button onclick="sendMessage()" data-i18n="btn-send">Send</button>
+            </div>
+        </header>
+
+        <!-- Main Chat Area -->
+        <main id="chat-area">
+            <div id="messages-container">
+                <div id="messages"></div>
+            </div>
+
+            <!-- Welcome Screen (shown when no messages) -->
+            <div id="welcome-screen">
+                <div class="welcome-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                        <line x1="9" y1="9" x2="9.01" y2="9"/>
+                        <line x1="15" y1="9" x2="15.01" y2="9"/>
+                    </svg>
+                </div>
+                <h2 data-i18n="welcome-title">Hi, I'm Arda's AI Assistant</h2>
+                <p data-i18n="welcome-subtitle">Ask me anything about Arda's experience, skills, or background.</p>
+            </div>
+
+            <!-- Quick Topic Buttons -->
+            <div id="quick-topics">
+                <button class="topic-btn" onclick="sendQuickPrompt('experience')">
+                    <span class="topic-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                        </svg>
+                    </span>
+                    <span data-i18n="btn-experience">Experience</span>
+                </button>
+                <button class="topic-btn" onclick="sendQuickPrompt('education')">
+                    <span class="topic-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                            <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                        </svg>
+                    </span>
+                    <span data-i18n="btn-education">Education</span>
+                </button>
+                <button class="topic-btn" onclick="sendQuickPrompt('skills')">
+                    <span class="topic-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="16 18 22 12 16 6"/>
+                            <polyline points="8 6 2 12 8 18"/>
+                        </svg>
+                    </span>
+                    <span data-i18n="btn-skills">Skills</span>
+                </button>
+                <button class="topic-btn" onclick="sendQuickPrompt('visa')">
+                    <span class="topic-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                    </span>
+                    <span data-i18n="btn-visa">Visa Status</span>
+                </button>
+                <button class="topic-btn" onclick="sendQuickPrompt('about_bot')">
+                    <span class="topic-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                    </span>
+                    <span data-i18n="btn-about-bot">About this Bot</span>
+                </button>
             </div>
         </main>
 
-        <aside id="sidebar">
-            <div class="sidebar-header">
-                <h2>Quick Access</h2>
+        <!-- Input Area -->
+        <footer id="input-footer">
+            <div id="input-wrapper">
+                <input type="text" id="user-input" placeholder="Message Arda's AI..." autofocus data-i18n="input-placeholder">
+                <button id="send-btn" onclick="sendMessage()" aria-label="Send message">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"/>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                </button>
             </div>
-            <div class="quick-buttons">
-                <button onclick="sendQuickPrompt('experience')" data-i18n="btn-experience">Experience</button>
-                <button onclick="sendQuickPrompt('education')" data-i18n="btn-education">Education</button>
-                <button onclick="sendQuickPrompt('skills')" data-i18n="btn-skills">Skills</button>
-                <button onclick="sendQuickPrompt('visa')" data-i18n="btn-visa">Visa Status</button>
-                <button onclick="sendQuickPrompt('about_bot')" data-i18n="btn-about-bot">About this Bot</button>
-            </div>
-            <div class="language-toggle">
-                <span class="toggle-label">EN</span>
-                <label class="switch">
-                    <input type="checkbox" id="lang-toggle" onchange="toggleLanguage()">
-                    <span class="slider"></span>
-                </label>
-                <span class="toggle-label">JP</span>
-            </div>
-        </aside>
+            <p class="input-hint">Arda's AI can make mistakes. Consider verifying important information.</p>
+        </footer>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=5"></script>
 </body>
 </html>

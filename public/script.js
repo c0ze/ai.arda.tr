@@ -36,9 +36,9 @@ let currentLanguage = 'en';
 const translations = {
     en: {
         "header-title": "Arda's AI Construct",
-        "status-online": "Online",
-        "input-placeholder": "Query the system...",
-        "btn-send": "Send",
+        "welcome-title": "Hi, I'm Arda's AI Assistant",
+        "welcome-subtitle": "Ask me anything about Arda's experience, skills, or background.",
+        "input-placeholder": "Message Arda's AI...",
         "btn-experience": "Experience",
         "btn-education": "Education",
         "btn-skills": "Skills",
@@ -54,9 +54,9 @@ const translations = {
     },
     jp: {
         "header-title": "ArdaのAIコンストラクト",
-        "status-online": "オンライン",
-        "input-placeholder": "システムに問い合わせる...",
-        "btn-send": "送信",
+        "welcome-title": "こんにちは、ArdaのAIアシスタントです",
+        "welcome-subtitle": "Ardaの経験、スキル、経歴について何でも聞いてください。",
+        "input-placeholder": "メッセージを入力...",
         "btn-experience": "経歴",
         "btn-education": "学歴",
         "btn-skills": "スキル",
@@ -109,6 +109,24 @@ function sendQuickPrompt(type) {
     }
 }
 
+function updateUIState() {
+    const messagesDiv = document.getElementById("messages");
+    const messagesContainer = document.getElementById("messages-container");
+    const welcomeScreen = document.getElementById("welcome-screen");
+    const quickTopics = document.getElementById("quick-topics");
+
+    const hasMessages = messagesDiv.children.length > 0;
+
+    if (hasMessages) {
+        messagesContainer.classList.add("has-messages");
+        welcomeScreen.classList.add("hidden");
+        // Keep quick topics visible but move them visually
+    } else {
+        messagesContainer.classList.remove("has-messages");
+        welcomeScreen.classList.remove("hidden");
+    }
+}
+
 async function sendMessage() {
     const input = document.getElementById("user-input");
     const text = input.value.trim();
@@ -120,6 +138,12 @@ async function sendMessage() {
     // Display User Message
     addMessage(text, "user");
 
+    // Update UI to show messages
+    updateUIState();
+
+    // Show typing indicator
+    const typingId = showTypingIndicator();
+
     try {
         const response = await fetch(getApiEndpoint(), {
             method: "POST",
@@ -129,13 +153,49 @@ async function sendMessage() {
 
         const data = await response.json();
 
+        // Remove typing indicator
+        removeTypingIndicator(typingId);
+
         if (data.error) {
             addMessage("Error: " + data.error, "bot");
         } else {
             addMessage(data.reply, "bot");
         }
     } catch (e) {
+        removeTypingIndicator(typingId);
         addMessage("System Malfunction: Network Error", "bot");
+    }
+}
+
+function showTypingIndicator() {
+    const messagesDiv = document.getElementById("messages");
+    const div = document.createElement("div");
+    const id = "typing-" + Date.now();
+    div.id = id;
+    div.className = "message bot animate-fade-in";
+    div.innerHTML = `
+        <div class="message-avatar">A</div>
+        <div class="message-content">
+            <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    `;
+    messagesDiv.appendChild(div);
+
+    // Auto-scroll to bottom
+    const container = document.getElementById("messages-container");
+    container.scrollTop = container.scrollHeight;
+
+    return id;
+}
+
+function removeTypingIndicator(id) {
+    const indicator = document.getElementById(id);
+    if (indicator) {
+        indicator.remove();
     }
 }
 
@@ -169,9 +229,19 @@ function addMessage(text, sender) {
         // 3. Convert newlines to <br>
         .replace(/\n/g, '<br>');
 
-    div.innerHTML = html;
+    // Build message with avatar
+    const avatar = sender === 'bot' ? 'A' : 'Y';
+    div.innerHTML = `
+        <div class="message-avatar">${avatar}</div>
+        <div class="message-content">${html}</div>
+    `;
+
     messagesDiv.appendChild(div);
 
     // Auto-scroll to bottom
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    const container = document.getElementById("messages-container");
+    container.scrollTop = container.scrollHeight;
+
+    // Update UI state
+    updateUIState();
 }
