@@ -60,6 +60,8 @@ If a user presents a job opportunity, evaluate it against my requirements.
   "job_details": "Summary of the job offer"
 }
 [[/SEND_EMAIL]]
+
+If the user specifically asks "Can you contact him?" or "How can I reach him?", tell them: "I can contact Arda directly on your behalf if you have a job opportunity that matches his interests. Please paste the job description here, and I will evaluate it."
 `
 	}
 
