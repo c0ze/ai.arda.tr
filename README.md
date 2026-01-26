@@ -1,6 +1,6 @@
 # AI Resume Bot (ai.arda.tr)
 
-A sarcastic, heavy metal-loving AI chatbot that answers questions about Arda's career. It uses Google's Gemini 2.5 Flash model.
+A sarcastic, heavy metal-loving AI chatbot that answers questions about Arda's career. It uses Google's Gemini 3 Flash model.
 
 ## Architecture
 
