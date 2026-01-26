@@ -273,25 +273,30 @@ function addMessage(text, sender) {
     const div = document.createElement("div");
     div.className = "message animate-fade-in " + sender;
 
-    // 1. Escape HTML first to prevent XSS
-    let safeText = escapeHtml(text);
+    // 1. Convert markdown to HTML using marked.js
+    let rawHtml = marked.parse(text);
 
-    // 2. Convert markdown links and plain URLs to clickable links
-    let html = safeText
-        // Convert markdown links: [text](url)
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-        // Convert plain URLs that aren't already part of an anchor tag
-        .replace(/(?<!href="|">)(https?:\/\/[^\s<)\]]+)/g, function (match) {
-            return '<a href="' + match + '" target="_blank" rel="noopener noreferrer">' + match + '</a>';
-        })
-        // 3. Convert newlines to <br>
-        .replace(/\n/g, '<br>');
+    // 2. Sanitize the HTML using DOMPurify
+    let safeHtml = DOMPurify.sanitize(rawHtml);
+
+    // 3. Make links open in new tab
+    // DOMPurify can be configured to add target="_blank", or we can do a quick replace if simple
+    // A more robust way with DOMPurify:
+    safeHtml = DOMPurify.sanitize(rawHtml, {
+        ADD_ATTR: ['target'],
+        FOR_TAGS: ['a'] // ensure we can add target to a tags
+    });
+
+    // Manually add target="_blank" if not present (simple regex approach on the safe HTML)
+    // Or configure detailed DOMPurify hooks. Let's stick to a simple replace for now 
+    // to ensure external links open in new tab, similar to previous regex behavior.
+    safeHtml = safeHtml.replace(/<a href/g, '<a target="_blank" rel="noopener noreferrer" href');
 
     // Build message with avatar
     const avatar = sender === 'bot' ? 'A' : 'Y';
     div.innerHTML = `
         <div class="message-avatar">${avatar}</div>
-        <div class="message-content">${html}</div>
+        <div class="message-content">${safeHtml}</div>
     `;
 
     messagesDiv.appendChild(div);
