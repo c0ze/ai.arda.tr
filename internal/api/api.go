@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/smtp"
 	"os"
 	"strings"
 
@@ -37,8 +38,8 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Invoke AI
-	reply, err := h.GeminiService.GenerateContent(r.Context(), req.Message)
+	// Invoked AI
+	reply, err := h.GeminiService.GenerateContent(r.Context(), req.Message, req.History)
 	if err != nil {
 		log.Printf("Gemini API Error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -46,8 +47,75 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check for [[SEND_EMAIL]] tag
+	if strings.Contains(reply, "[[SEND_EMAIL]]") {
+		// Extract JSON
+		start := strings.Index(reply, "[[SEND_EMAIL]]")
+		end := strings.Index(reply, "[[/SEND_EMAIL]]")
+		if start != -1 && end != -1 {
+			jsonStr := reply[start+len("[[SEND_EMAIL]]") : end]
+
+			// Try to send email
+			if err := h.sendEmail(jsonStr); err != nil {
+				log.Printf("Failed to send email: %v", err)
+				// We don't fail the request, just log it.
+				// Optionally append a warning to the user reply.
+			} else {
+				log.Println("Email notification sent successfully")
+			}
+
+			// Remote the tag from the reply shown to user
+			reply = strings.Replace(reply, reply[start:end+len("[[/SEND_EMAIL]]")], "", 1)
+			reply += "\n\n(Note: I have sent the email to Arda with your details.)"
+		}
+	}
+
 	// Return Success
 	json.NewEncoder(w).Encode(models.ChatResponse{Reply: reply})
+}
+
+func (h *Handler) sendEmail(jsonStr string) error {
+	var data struct {
+		Name       string `json:"name"`
+		Email      string `json:"email"`
+		Org        string `json:"org"`
+		Analysis   string `json:"analysis"`
+		JobDetails string `json:"job_details"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return err
+	}
+
+	gmailUser := os.Getenv("GMAIL_USER")
+	gmailPass := os.Getenv("GMAIL_APP_PASSWORD")
+	contactAddr := os.Getenv("CONTACT_ADDRESS")
+
+	if gmailUser == "" || gmailPass == "" {
+		return nil // Email not configured, skip
+	}
+
+	// Default to sending to self if contact address is not set
+	toAddr := gmailUser
+	if contactAddr != "" {
+		toAddr = contactAddr
+	}
+
+	auth := smtp.PlainAuth("", gmailUser, gmailPass, "smtp.gmail.com")
+
+	to := []string{toAddr}
+	msg := []byte("To: " + toAddr + "\r\n" +
+		"Subject: New Job Opportunity via AI Bot\r\n" +
+		"\r\n" +
+		"Hello,\r\n\r\n" +
+		"Today I got an interesting position from " + data.Name + " from " + data.Org + ".\r\n\r\n" +
+		"Here are the details:\r\n" + data.JobDetails + "\r\n\r\n" +
+		"My Analysis:\r\n" + data.Analysis + "\r\n\r\n" +
+		"You can reach them via " + data.Email + "\r\n\r\n" +
+		"Best regards,\r\n" +
+		"Arda's AI Assistant\r\n")
+
+	return smtp.SendMail("smtp.gmail.com:587", auth, gmailUser, to, msg)
 }
 
 // CorsMiddleware wraps the handler to enable CORS for all requests

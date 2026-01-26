@@ -28,7 +28,7 @@ DEPLOY_CMD="gcloud run deploy $SERVICE_NAME \
   --source . \
   --region $REGION \
   --allow-unauthenticated \
-  --set-env-vars \"GEMINI_API_KEY=$GEMINI_API_KEY,ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}\""
+  --set-env-vars \"GEMINI_API_KEY=$GEMINI_API_KEY,ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*},GMAIL_USER=${GMAIL_USER},GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD},CONTACT_ADDRESS=${CONTACT_ADDRESS}\""
 
 # Add Project ID if specified
 if [ -n "$PROJECT_ID" ]; then

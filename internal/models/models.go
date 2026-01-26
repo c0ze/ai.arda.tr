@@ -1,8 +1,14 @@
 package models
 
 // Request payload structure
+type ChatMessage struct {
+	Role    string `json:"role"` // "user" or "model"
+	Content string `json:"content"`
+}
+
 type ChatRequest struct {
-	Message string `json:"message"`
+	Message string        `json:"message"`
+	History []ChatMessage `json:"history"`
 }
 
 // Response payload structure
