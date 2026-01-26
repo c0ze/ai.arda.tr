@@ -12,6 +12,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Initialize Theme (check localStorage or system preference)
     initTheme();
+
+    // Initialize Language (this will also show the welcome message)
+    setLanguage('en');
 });
 
 // Theme Support
@@ -73,6 +76,7 @@ const translations = {
         "btn-skills": "Skills",
         "btn-visa": "Visa Status",
         "btn-about-bot": "About this Bot",
+        "welcome-msg": "Hello, I am Arda's assistant. You can use me to learn about Arda's skills, experience, education, and interested opportunities. If you have an interesting position, I can contact Arda on your behalf as well.",
         "prompts": {
             "experience": "Tell me about your experience.",
             "education": "Tell me about your education.",
@@ -91,6 +95,7 @@ const translations = {
         "btn-skills": "スキル",
         "btn-visa": "ビザステータス",
         "btn-about-bot": "このボットについて",
+        "welcome-msg": "こんにちは、Ardaのアシスタントです。Ardaのスキル、経験、学歴、興味のある機会について私に聞いてください。もし興味深いポジションがあれば、あなたに代わってArdaに連絡することもできます。",
         "prompts": {
             "experience": "あなたの経歴について教えてください。",
             "education": "あなたの学歴について教えてください。",
@@ -102,7 +107,15 @@ const translations = {
 };
 
 function setLanguage(lang) {
+    if (currentLanguage === lang) return; // Avoid reset if same language
     currentLanguage = lang;
+
+    // Reset Context
+    chatHistory = [];
+    const messagesDiv = document.getElementById("messages");
+    messagesDiv.innerHTML = "";
+    document.getElementById("messages-container").classList.remove("has-messages");
+    document.getElementById("welcome-screen").classList.remove("hidden");
 
     // Update UI text
     document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -121,6 +134,9 @@ function setLanguage(lang) {
     if (toggle) {
         toggle.checked = (lang === 'jp');
     }
+
+    // Show initial localized greeting
+    addMessage(translations[lang]["welcome-msg"], "bot");
 }
 
 function toggleLanguage() {
@@ -156,6 +172,9 @@ function updateUIState() {
     }
 }
 
+// Chat History
+let chatHistory = [];
+
 async function sendMessage() {
     const input = document.getElementById("user-input");
     const text = input.value.trim();
@@ -167,6 +186,9 @@ async function sendMessage() {
     // Display User Message
     addMessage(text, "user");
 
+    // Add to history
+    chatHistory.push({ role: "user", content: text });
+
     // Update UI to show messages
     updateUIState();
 
@@ -177,7 +199,10 @@ async function sendMessage() {
         const response = await fetch(getApiEndpoint(), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text })
+            body: JSON.stringify({
+                message: text,
+                history: chatHistory.slice(0, -1) // Send history excluding current message
+            })
         });
 
         const data = await response.json();
@@ -187,8 +212,12 @@ async function sendMessage() {
 
         if (data.error) {
             addMessage("Error: " + data.error, "bot");
+            // Remove user message from history on error to keep sync? 
+            // Or just keep it. For now keeping it is fine.
         } else {
             addMessage(data.reply, "bot");
+            // Add bot reply to history
+            chatHistory.push({ role: "model", content: data.reply });
         }
     } catch (e) {
         removeTypingIndicator(typingId);
@@ -236,7 +265,7 @@ function escapeHtml(text) {
         '"': '&quot;',
         "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    return text.replace(/[&<>"']/g, function (m) { return map[m]; });
 }
 
 function addMessage(text, sender) {
