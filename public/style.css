@@ -1,5 +1,14 @@
 :root {
-    /* Claude-inspired color palette */
+    /* Shared design tokens */
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.5rem;
+    --max-width: 48rem;
+}
+
+/* Dark mode (default) */
+[data-theme="dark"] {
     --bg-primary: #1a1a1a;
     --bg-secondary: #2a2a2a;
     --bg-tertiary: #3a3a3a;
@@ -19,15 +28,66 @@
     --user-bubble: #4a4a4a;
     --bot-bubble: #2a2a2a;
 
-    --radius-sm: 0.5rem;
-    --radius-md: 0.75rem;
-    --radius-lg: 1rem;
-    --radius-xl: 1.5rem;
-
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
 
-    --max-width: 48rem;
+/* Light mode */
+[data-theme="light"] {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f7f7f8;
+    --bg-tertiary: #ececee;
+    --bg-hover: #e5e5e7;
+
+    --text-primary: #1a1a1a;
+    --text-secondary: #6b6b6b;
+    --text-muted: #9a9a9a;
+
+    --accent: #c4956a;
+    --accent-hover: #b8875c;
+    --accent-subtle: rgba(196, 149, 106, 0.12);
+
+    --border: #e5e5e7;
+    --border-light: #d5d5d7;
+
+    --user-bubble: #d4a574;
+    --bot-bubble: #f7f7f8;
+
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Dracula Pro mode */
+[data-theme="dracula"] {
+    --bg-primary: #22212C;
+    --bg-secondary: #2a2936;
+    --bg-tertiary: #454158;
+    --bg-hover: #504C67;
+
+    --text-primary: #F8F8F2;
+    --text-secondary: #a8a5b8;
+    --text-muted: #6272a4;
+
+    --accent: #9580FF;
+    --accent-hover: #AA99FF;
+    --accent-subtle: rgba(149, 128, 255, 0.15);
+
+    --border: #454158;
+    --border-light: #504C67;
+
+    --user-bubble: #9580FF;
+    --bot-bubble: #2a2936;
+
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.5);
+
+    /* Dracula accent colors for variety */
+    --dracula-purple: #9580FF;
+    --dracula-pink: #FF80BF;
+    --dracula-cyan: #80FFEA;
+    --dracula-green: #8AFF80;
+    --dracula-yellow: #FFFF80;
+    --dracula-red: #FF9580;
 }
 
 * {
@@ -79,6 +139,45 @@ body {
     display: flex;
     align-items: center;
     gap: 1rem;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.theme-toggle svg {
+    width: 18px;
+    height: 18px;
+    display: none;
+}
+
+/* Show appropriate icon for each theme */
+[data-theme="dark"] .theme-toggle .icon-moon {
+    display: block;
+}
+
+[data-theme="light"] .theme-toggle .icon-sun {
+    display: block;
+}
+
+[data-theme="dracula"] .theme-toggle .icon-dracula {
+    display: block;
 }
 
 /* Language Toggle */
@@ -302,6 +401,11 @@ input:checked + .slider:before {
 .message.user .message-content {
     background-color: var(--user-bubble);
     border-bottom-right-radius: var(--radius-sm);
+}
+
+[data-theme="light"] .message.user .message-content,
+[data-theme="dracula"] .message.user .message-content {
+    color: #ffffff;
 }
 
 .message.bot .message-content {

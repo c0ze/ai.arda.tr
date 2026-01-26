@@ -9,7 +9,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Initialize Language
     setLanguage('en');
+
+    // Initialize Theme (check localStorage or system preference)
+    initTheme();
 });
+
+// Theme Support
+const themes = ['dark', 'light', 'dracula'];
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme && themes.includes(savedTheme)) {
+        setTheme(savedTheme);
+    } else {
+        // Check system preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setTheme(prefersDark ? 'dark' : 'light');
+    }
+}
+
+function setTheme(theme) {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.body.getAttribute('data-theme');
+    const currentIndex = themes.indexOf(currentTheme);
+    const nextIndex = (currentIndex + 1) % themes.length;
+    setTheme(themes[nextIndex]);
+}
 
 // Configuration
 // Replace this with your actual Cloud Run Service URL
