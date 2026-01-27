@@ -44,7 +44,7 @@ func (s *Service) GenerateContent(ctx context.Context, userMessage string, histo
 
 	// Append job requirements if available
 	// We ignore errors here as the file might not exist yet
-	if reqData, err := os.ReadFile("data/job_requirements.md"); err == nil {
+	if reqData, err := os.ReadFile("job_requirements.md"); err == nil {
 		currentPrompt += "\n\n" + string(reqData)
 		currentPrompt += `
 

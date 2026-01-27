@@ -23,6 +23,7 @@ WORKDIR /
 COPY --from=builder /app/server /server
 COPY --from=builder /app/public /public
 COPY --from=builder /app/data /data
+COPY --from=builder /app/job_requirements.md /job_requirements.md
 
 # Cloud Run expects 8080 by default
 EXPOSE 8080
