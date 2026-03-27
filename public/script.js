@@ -75,11 +75,11 @@ const translations = {
         "btn-about-bot": "About this Bot",
         "welcome-msg": "Hello, I am Arda's assistant. You can use me to learn about Arda's skills, experience, education, and interested opportunities. If you have an interesting position, I can contact Arda on your behalf as well.",
         "prompts": {
-            "experience": "Tell me about your experience.",
-            "education": "Tell me about your education.",
-            "skills": "What are your technical skills?",
-            "visa": "What is your visa status in Japan?",
-            "about_bot": "Tell me about this bot, its architecture, and how it was built."
+            "experience": "Tell me about Arda's experience.",
+            "education": "Tell me about Arda's education.",
+            "skills": "What are Arda's technical skills?",
+            "visa": "What is Arda's visa status in Japan?",
+            "about_bot": "Tell me about Arda's AI assistant, its architecture, and how it was built."
         }
     },
     jp: {
@@ -94,11 +94,11 @@ const translations = {
         "btn-about-bot": "このボットについて",
         "welcome-msg": "こんにちは、Ardaのアシスタントです。Ardaのスキル、経験、学歴、興味のある機会について私に聞いてください。もし興味深いポジションがあれば、あなたに代わってArdaに連絡することもできます。",
         "prompts": {
-            "experience": "あなたの経歴について教えてください。",
-            "education": "あなたの学歴について教えてください。",
-            "skills": "あなたの技術的なスキルは何ですか？",
-            "visa": "日本でのビザステータスはどうなっていますか？",
-            "about_bot": "このボットのアーキテクチャと、どのように構築されたか教えてください。"
+            "experience": "Ardaの経歴について教えてください。",
+            "education": "Ardaの学歴について教えてください。",
+            "skills": "Ardaの技術的なスキルは何ですか？",
+            "visa": "Ardaの日本でのビザステータスはどうなっていますか？",
+            "about_bot": "ArdaのAIアシスタント、そのアーキテクチャ、そしてどのように構築されたか教えてください。"
         }
     }
 };
