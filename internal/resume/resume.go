@@ -76,8 +76,12 @@ func FetchToDisk(outputDir string) error {
 	wg.Wait()
 	close(errChan)
 
-	if len(errChan) > 0 {
-		return <-errChan
+	var errs []string
+	for err := range errChan {
+		errs = append(errs, err.Error())
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("fetch errors: %s", strings.Join(errs, "; "))
 	}
 	return nil
 }

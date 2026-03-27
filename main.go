@@ -16,7 +16,7 @@ func main() {
 	fetchMode := flag.Bool("fetch", false, "Fetch resume data and exit")
 	flag.Parse()
 
-	// Load .env file if it exists
+	// Load .env file if it exists (optional, ignored in production)
 	_ = godotenv.Load()
 
 	dataDir := "./data"
@@ -31,11 +31,20 @@ func main() {
 		return
 	}
 
+	// Validate required environment variables
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		log.Fatal("GEMINI_API_KEY environment variable is required")
+	}
+	if os.Getenv("ALLOWED_ORIGINS") == "" {
+		log.Fatal("ALLOWED_ORIGINS environment variable is required")
+	}
+
 	// Ensure data exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
 		log.Println("Data directory not found. Fetching data...")
 		if err := resume.FetchToDisk(dataDir); err != nil {
-			log.Printf("Warning: Failed to fetch resume data: %v", err)
+			log.Fatalf("Failed to fetch resume data: %v", err)
 		}
 	}
 
@@ -43,15 +52,15 @@ func main() {
 	resumeData, err := resume.LoadFromDisk(dataDir)
 	var systemPrompt string
 	if err != nil {
-		log.Printf("Warning: Failed to load resume data: %v", err)
-		systemPrompt = "You are Arda's Resume Bot. I couldn't load the resume data, so I'm a bit useless right now."
-	} else {
-		systemPrompt = resume.BuildPrompt(resumeData)
+		log.Fatalf("Failed to load resume data: %v", err)
 	}
+	systemPrompt = resume.BuildPrompt(resumeData)
 
 	// Initialize Gemini Service
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	geminiService := gemini.NewService(apiKey, systemPrompt)
+	geminiService, err := gemini.NewService(apiKey, systemPrompt)
+	if err != nil {
+		log.Fatalf("Failed to initialize Gemini service: %v", err)
+	}
 
 	// Initialize API Handler
 	apiHandler := api.NewHandler(geminiService)
@@ -66,7 +75,6 @@ func main() {
 	mux := http.NewServeMux()
 
 	// 1. Static File Server (Frontend)
-	// We handle the root path LAST to ensure specific API routes take precedence
 	fs := http.FileServer(http.Dir("./public"))
 	mux.Handle("/", fs)
 

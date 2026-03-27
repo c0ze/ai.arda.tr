@@ -42,6 +42,7 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse Body
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB limit
 	var req models.ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -82,6 +83,12 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(models.ChatResponse{Reply: reply})
 }
 
+func sanitizeEmailField(s string) string {
+	s = strings.ReplaceAll(s, "\r", "")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return s
+}
+
 func (h *Handler) sendEmail(jsonStr string) error {
 	var data struct {
 		Name       string `json:"name"`
@@ -111,15 +118,21 @@ func (h *Handler) sendEmail(jsonStr string) error {
 
 	auth := smtp.PlainAuth("", gmailUser, gmailPass, "smtp.gmail.com")
 
+	name := sanitizeEmailField(data.Name)
+	org := sanitizeEmailField(data.Org)
+	email := sanitizeEmailField(data.Email)
+	analysis := sanitizeEmailField(data.Analysis)
+	jobDetails := sanitizeEmailField(data.JobDetails)
+
 	to := []string{toAddr}
 	msg := []byte("To: " + toAddr + "\r\n" +
 		"Subject: New Job Opportunity via AI Bot\r\n" +
 		"\r\n" +
 		"Hello,\r\n\r\n" +
-		"Today I got an interesting position from " + data.Name + " from " + data.Org + ".\r\n\r\n" +
-		"Here are the details:\r\n" + data.JobDetails + "\r\n\r\n" +
-		"My Analysis:\r\n" + data.Analysis + "\r\n\r\n" +
-		"You can reach them via " + data.Email + "\r\n\r\n" +
+		"Today I got an interesting position from " + name + " from " + org + ".\r\n\r\n" +
+		"Here are the details:\r\n" + jobDetails + "\r\n\r\n" +
+		"My Analysis:\r\n" + analysis + "\r\n\r\n" +
+		"You can reach them via " + email + "\r\n\r\n" +
 		"Best regards,\r\n" +
 		"Arda's AI Assistant\r\n")
 
@@ -142,28 +155,18 @@ func extractEmailPayload(reply string) (string, string, error) {
 	return cleanReply, jsonStr, nil
 }
 
-// CorsMiddleware wraps the handler to enable CORS for all requests
+// CorsMiddleware wraps the handler to enable CORS for all requests.
+// ALLOWED_ORIGINS must be set; the server refuses to start without it (enforced in main).
 func CorsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 		origin := r.Header.Get("Origin")
 
-		// Default to * if not set (for backward compatibility/dev)
-		if allowedOrigins == "" {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-		} else {
-			// Check if the origin is allowed
-			origins := strings.Split(allowedOrigins, ";")
-			allowed := false
-			for _, o := range origins {
-				if strings.TrimSpace(o) == origin || strings.TrimSpace(o) == "*" {
-					allowed = true
-					break
-				}
-			}
-
-			if allowed {
+		origins := strings.Split(allowedOrigins, ";")
+		for _, o := range origins {
+			if strings.TrimSpace(o) == origin {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
+				break
 			}
 		}
 

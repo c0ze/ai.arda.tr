@@ -11,42 +11,29 @@ import (
 )
 
 type Service struct {
+	client       *genai.Client
 	apiKey       string
 	systemPrompt string
 	promptMutex  sync.RWMutex
 }
 
-func NewService(apiKey string, initialPrompt string) *Service {
-	return &Service{
+func NewService(apiKey string, initialPrompt string) (*Service, error) {
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	if err != nil {
+		return nil, err
+	}
+
+	svc := &Service{
+		client:       client,
 		apiKey:       apiKey,
 		systemPrompt: initialPrompt,
 	}
-}
 
-func (s *Service) SetSystemPrompt(prompt string) {
-	s.promptMutex.Lock()
-	defer s.promptMutex.Unlock()
-	s.systemPrompt = prompt
-}
-
-func (s *Service) GenerateContent(ctx context.Context, userMessage string, history []models.ChatMessage) (string, error) {
-	client, err := genai.NewClient(ctx, option.WithAPIKey(s.apiKey))
-	if err != nil {
-		return "", err
-	}
-	defer client.Close()
-
-	model := client.GenerativeModel("gemini-3-flash-preview")
-
-	s.promptMutex.RLock()
-	currentPrompt := s.systemPrompt
-	s.promptMutex.RUnlock()
-
-	// Append job requirements if available
-	// We ignore errors here as the file might not exist yet
+	// Cache job requirements at startup if available
 	if reqData, err := os.ReadFile("job_requirements.md"); err == nil {
-		currentPrompt += "\n\n" + string(reqData)
-		currentPrompt += `
+		svc.systemPrompt += "\n\n" + string(reqData)
+		svc.systemPrompt += `
 
 If a user presents a job opportunity, evaluate it against my requirements.
 1. If it's a good match, tell the user I'm interested and ask them to provide their Name, Email, and Organization so I can contact Arda.
@@ -64,6 +51,22 @@ If a user presents a job opportunity, evaluate it against my requirements.
 If the user specifically asks "Can you contact him?" or "How can I reach him?", tell them: "I can contact Arda directly on your behalf if you have a job opportunity that matches his interests. Please paste the job description here, and I will evaluate it."
 `
 	}
+
+	return svc, nil
+}
+
+func (s *Service) SetSystemPrompt(prompt string) {
+	s.promptMutex.Lock()
+	defer s.promptMutex.Unlock()
+	s.systemPrompt = prompt
+}
+
+func (s *Service) GenerateContent(ctx context.Context, userMessage string, history []models.ChatMessage) (string, error) {
+	model := s.client.GenerativeModel("gemini-3-flash-preview")
+
+	s.promptMutex.RLock()
+	currentPrompt := s.systemPrompt
+	s.promptMutex.RUnlock()
 
 	model.SystemInstruction = &genai.Content{
 		Parts: []genai.Part{
