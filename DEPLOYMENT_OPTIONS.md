@@ -18,14 +18,25 @@ You have two main ways to deploy the Go backend.
       --source . \
       --platform managed \
       --region asia-northeast1 \
+      --project YOUR_PROJECT_ID \
       --allow-unauthenticated \
-      --set-env-vars GEMINI_API_KEY=your_key_here
+      --set-env-vars "GEMINI_API_KEY=your_key_here,ALLOWED_ORIGINS=https://ai.arda.tr;http://localhost:8080"
     ```
+    `ALLOWED_ORIGINS` is required by the app at startup.
 
 3.  **Finalize:**
     - Copy the URL provided in the output.
     - Paste it into `public/script.js` as the `API_BASE_URL`.
     - Push the change to `public/script.js` to update the live frontend.
+
+### Helper Script
+
+The included `cloud_deploy.sh` helper reads `.env` and requires:
+- `GCP_PROJECT_ID`
+- `GEMINI_API_KEY`
+- `ALLOWED_ORIGINS`
+
+It also checks the currently active `gcloud` project and switches it to `GCP_PROJECT_ID` from `.env` before deploying, then still passes `--project` explicitly to `gcloud run deploy`.
 
 ---
       # --allow-unauthenticated is REQUIRED because your frontend is a public website.

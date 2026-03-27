@@ -28,6 +28,7 @@ A sarcastic, heavy metal-loving AI chatbot that answers questions about Arda's c
     GEMINI_API_KEY=your_actual_key
     GCP_PROJECT_ID=your_project_id
     GCP_REGION=asia-northeast1
+    ALLOWED_ORIGINS=https://ai.arda.tr;http://localhost:8080
     ```
 
 3.  **Install the pinned Go toolchain via mise:**
@@ -39,6 +40,7 @@ A sarcastic, heavy metal-loving AI chatbot that answers questions about Arda's c
     ```bash
     go run main.go
     ```
+    `ALLOWED_ORIGINS` is required at startup, even for local development.
 
 5.  **Run the Frontend:**
     Open `public/index.html` in your browser. (Note: For local development, `public/script.js` defaults to `/api/chat`, so you might need to serve the frontend via the Go server or update the script to point to `http://localhost:8080`).
@@ -48,6 +50,7 @@ A sarcastic, heavy metal-loving AI chatbot that answers questions about Arda's c
 ### 1. Deploy Backend (Cloud Run)
 
 We use a helper script that reads from your `.env` file.
+It requires `GCP_PROJECT_ID`, `GEMINI_API_KEY`, and `ALLOWED_ORIGINS`, and it sets `gcloud` to the `.env` project before deploying so you do not accidentally target the wrong project.
 
 ```bash
 chmod +x cloud_deploy.sh

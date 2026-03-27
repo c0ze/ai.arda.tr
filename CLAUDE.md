@@ -10,7 +10,7 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 
 - **Backend**: Go 1.26.1 web server with Gemini AI integration
 - **Frontend**: Vanilla HTML/CSS/JavaScript (no frameworks)
-- **AI**: Google Gemini 3.5 Flash model
+- **AI**: Google Gemini 3 Flash Preview (`gemini-3-flash-preview`)
 - **Deployment**: Docker container on Google Cloud Run (backend), GitHub Pages (frontend)
 
 ## Project Structure
@@ -37,7 +37,7 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 # Install the pinned local toolchain
 mise install
 
-# Run locally (requires GEMINI_API_KEY in .env)
+# Run locally (requires GEMINI_API_KEY and ALLOWED_ORIGINS in .env)
 go run main.go
 
 # Fetch resume data only (for build-time caching)
@@ -47,14 +47,15 @@ go run main.go -fetch
 docker build -t ai-resume-bot .
 
 # Run Docker container
-docker run -p 8080:8080 -e GEMINI_API_KEY=your_key ai-resume-bot
+docker run -p 8080:8080 -e GEMINI_API_KEY=your_key -e ALLOWED_ORIGINS=http://localhost:8080 ai-resume-bot
 ```
 
 ## Environment Variables
 
 - `GEMINI_API_KEY` - Required. Google Gemini API key
+- `GCP_PROJECT_ID` - Required for `cloud_deploy.sh` so deployments target the intended GCP project
 - `PORT` - Optional. Server port (default: 8080)
-- `ALLOWED_ORIGINS` - Optional. Semicolon-separated list of allowed CORS origins (default: *)
+- `ALLOWED_ORIGINS` - Required. Semicolon-separated list of allowed CORS origins
 
 ## Tooling
 
@@ -79,6 +80,7 @@ docker run -p 8080:8080 -e GEMINI_API_KEY=your_key ai-resume-bot
 ### CORS
 - Origins are validated against `ALLOWED_ORIGINS` env var
 - Uses semicolon (`;`) as delimiter for multiple origins
+- `cloud_deploy.sh` refuses to deploy if `ALLOWED_ORIGINS` is missing
 
 ## Deployment
 
