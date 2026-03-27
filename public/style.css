@@ -19,8 +19,8 @@
     --bg-hover:      #252529;
 
     --text-primary:  #eceae6;
-    --text-secondary:#88847e;
-    --text-muted:    #515050;
+    --text-secondary:#a09890; /* 6.8:1 on bg-primary */
+    --text-muted:    #878380; /* 4.9:1 on bg-primary */
 
     --accent:        #e8a52a;
     --accent-hover:  #f2b840;
@@ -46,17 +46,17 @@
 
     --text-primary:  #1a1714;
     --text-secondary:#5c5750;
-    --text-muted:    #9a9590;
+    --text-muted:    #706c66; /* 4.9:1 on bg-primary */
 
-    --accent:        #c47a10;
-    --accent-hover:  #b06800;
-    --accent-subtle: rgba(196, 122, 16, 0.1);
+    --accent:        #8a5200; /* 6.2:1 on bg-primary; was #c47a10 (3.5:1 — failed) */
+    --accent-hover:  #7a4900;
+    --accent-subtle: rgba(138, 82, 0, 0.1);
 
     --border:        #dbd6ce;
     --border-light:  #ccc7be;
 
-    --user-bubble:   #c47a10;
-    --user-text:     #ffffff;
+    --user-bubble:   #c47a10; /* kept warm amber; use dark text below for contrast */
+    --user-text:     #1a1714; /* 4.8:1 on user-bubble; was #fff (3.4:1 — failed) */
     --bot-bubble:    #ede9e1;
 
     --shadow:        0 2px 8px rgba(0, 0, 0, 0.08);
@@ -72,7 +72,7 @@
 
     --text-primary:  #f8f8f2;
     --text-secondary:#a8a5bc;
-    --text-muted:    #6272a4;
+    --text-muted:    #8c9abe; /* 4.7:1 on bg-primary; was #6272a4 (2.5:1 — failed) */
 
     --accent:        #9580ff;
     --accent-hover:  #aa99ff;
@@ -82,7 +82,7 @@
     --border-light:  #413e60;
 
     --user-bubble:   #9580ff;
-    --user-text:     #ffffff;
+    --user-text:     #171626; /* 5.5:1 on user-bubble; was #fff (2.4:1 — failed) */
     --bot-bubble:    #27263a;
 
     --shadow:        0 2px 12px rgba(0, 0, 0, 0.5);
