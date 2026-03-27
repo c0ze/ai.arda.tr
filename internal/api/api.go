@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"net/smtp"
@@ -15,6 +16,15 @@ import (
 type Handler struct {
 	GeminiService *gemini.Service
 }
+
+var errEmailNotConfigured = errors.New("email delivery is not configured")
+
+const (
+	sendEmailStartTag     = "[[SEND_EMAIL]]"
+	sendEmailEndTag       = "[[/SEND_EMAIL]]"
+	contactFailureMessage = "I couldn't reach Arda at this moment. Please try again later or reach him through the contact details on his website, resume, or LinkedIn."
+	contactSuccessSuffix  = "\n\n(Note: I have sent the email to Arda with your details.)"
+)
 
 func NewHandler(geminiService *gemini.Service) *Handler {
 	return &Handler{
@@ -48,26 +58,24 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for [[SEND_EMAIL]] tag
-	if strings.Contains(reply, "[[SEND_EMAIL]]") {
-		// Extract JSON
-		start := strings.Index(reply, "[[SEND_EMAIL]]")
-		end := strings.Index(reply, "[[/SEND_EMAIL]]")
-		if start != -1 && end != -1 {
-			jsonStr := reply[start+len("[[SEND_EMAIL]]") : end]
-
-			// Try to send email
-			if err := h.sendEmail(jsonStr); err != nil {
-				log.Printf("Failed to send email: %v", err)
-				// We don't fail the request, just log it.
-				// Optionally append a warning to the user reply.
-			} else {
-				log.Println("Email notification sent successfully")
-			}
-
-			// Remote the tag from the reply shown to user
-			reply = strings.Replace(reply, reply[start:end+len("[[/SEND_EMAIL]]")], "", 1)
-			reply += "\n\n(Note: I have sent the email to Arda with your details.)"
+	if strings.Contains(reply, sendEmailStartTag) || strings.Contains(reply, sendEmailEndTag) {
+		cleanReply, jsonStr, err := extractEmailPayload(reply)
+		if err != nil {
+			log.Printf("Failed to parse email payload: %v", err)
+			w.WriteHeader(http.StatusBadGateway)
+			json.NewEncoder(w).Encode(models.ChatResponse{Error: contactFailureMessage})
+			return
 		}
+
+		if err := h.sendEmail(jsonStr); err != nil {
+			log.Printf("Failed to send email: %v", err)
+			w.WriteHeader(http.StatusBadGateway)
+			json.NewEncoder(w).Encode(models.ChatResponse{Error: contactFailureMessage})
+			return
+		}
+
+		log.Println("Email notification sent successfully")
+		reply = cleanReply + contactSuccessSuffix
 	}
 
 	// Return Success
@@ -92,7 +100,7 @@ func (h *Handler) sendEmail(jsonStr string) error {
 	contactAddr := os.Getenv("CONTACT_ADDRESS")
 
 	if gmailUser == "" || gmailPass == "" {
-		return nil // Email not configured, skip
+		return errEmailNotConfigured
 	}
 
 	// Default to sending to self if contact address is not set
@@ -116,6 +124,22 @@ func (h *Handler) sendEmail(jsonStr string) error {
 		"Arda's AI Assistant\r\n")
 
 	return smtp.SendMail("smtp.gmail.com:587", auth, gmailUser, to, msg)
+}
+
+func extractEmailPayload(reply string) (string, string, error) {
+	start := strings.Index(reply, sendEmailStartTag)
+	end := strings.Index(reply, sendEmailEndTag)
+	if start == -1 || end == -1 || end < start {
+		return "", "", errors.New("invalid SEND_EMAIL tag block")
+	}
+
+	jsonStr := strings.TrimSpace(reply[start+len(sendEmailStartTag) : end])
+	if jsonStr == "" {
+		return "", "", errors.New("empty SEND_EMAIL payload")
+	}
+
+	cleanReply := strings.TrimSpace(reply[:start] + reply[end+len(sendEmailEndTag):])
+	return cleanReply, jsonStr, nil
 }
 
 // CorsMiddleware wraps the handler to enable CORS for all requests

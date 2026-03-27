@@ -6,7 +6,7 @@ Objective: Develop and deploy a serverless AI chatbot (ai-resume-bot) that serve
 Domain: ai.arda.tr (Managed via Cloud Run mapping)
 Stack:
 
-Runtime: Go 1.23+
+Runtime: Go 1.26.1+
 
 Cloud Provider: Google Cloud Platform (Cloud Run)
 
@@ -20,7 +20,7 @@ Architecture: Single-container monolith (Static file server + API Proxy)
 
 Ensure the following tools are installed and authenticated:
 
-Go: Version 1.23 or higher.
+Go: Version 1.26.1 or higher.
 
 Docker: For local container builds.
 
@@ -171,7 +171,7 @@ Role: Multi-stage build to create a minimal, secure production image using distr
 File: Dockerfile
 
 # Stage 1: Builder
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26.1-alpine AS builder
 WORKDIR /app
 
 # Dependency Caching

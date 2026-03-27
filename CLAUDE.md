@@ -8,7 +8,7 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 
 ## Architecture
 
-- **Backend**: Go 1.23 web server with Gemini AI integration
+- **Backend**: Go 1.26.1 web server with Gemini AI integration
 - **Frontend**: Vanilla HTML/CSS/JavaScript (no frameworks)
 - **AI**: Google Gemini 3.5 Flash model
 - **Deployment**: Docker container on Google Cloud Run (backend), GitHub Pages (frontend)
@@ -34,6 +34,9 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 ## Common Commands
 
 ```bash
+# Install the pinned local toolchain
+mise install
+
 # Run locally (requires GEMINI_API_KEY in .env)
 go run main.go
 
@@ -52,6 +55,11 @@ docker run -p 8080:8080 -e GEMINI_API_KEY=your_key ai-resume-bot
 - `GEMINI_API_KEY` - Required. Google Gemini API key
 - `PORT` - Optional. Server port (default: 8080)
 - `ALLOWED_ORIGINS` - Optional. Semicolon-separated list of allowed CORS origins (default: *)
+
+## Tooling
+
+- Local Go version is pinned in `.mise.toml`
+- Docker builds use `golang:1.26.1-alpine`
 
 ## Key Implementation Details
 

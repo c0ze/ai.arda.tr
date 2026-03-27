@@ -7,9 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Initialize Language
-    setLanguage('en');
-
     // Initialize Theme (check localStorage or system preference)
     initTheme();
 
@@ -107,7 +104,6 @@ const translations = {
 };
 
 function setLanguage(lang) {
-    if (currentLanguage === lang) return; // Avoid reset if same language
     currentLanguage = lang;
 
     // Reset Context
@@ -211,7 +207,7 @@ async function sendMessage() {
         removeTypingIndicator(typingId);
 
         if (data.error) {
-            addMessage("Error: " + data.error, "bot");
+            addMessage(data.error, "bot");
             // Remove user message from history on error to keep sync? 
             // Or just keep it. For now keeping it is fine.
         } else {

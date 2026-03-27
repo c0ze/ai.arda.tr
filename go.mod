@@ -1,6 +1,6 @@
 module github.com/c0ze/ai-resume-bot
 
-go 1.23.0
+go 1.26.1
 
 require (
 	github.com/google/generative-ai-go v0.19.0

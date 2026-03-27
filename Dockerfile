@@ -1,12 +1,13 @@
 # Stage 1: Builder
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26.1-alpine AS builder
 WORKDIR /app
 
-# Copy all files including go.mod and main.go
-COPY . .
+# Cache dependencies separately from the source tree.
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Resolve dependencies (since we couldn't run go get locally)
-RUN go mod tidy
+# Copy the application source.
+COPY . .
 
 # Fetch resume data
 RUN go run main.go -fetch

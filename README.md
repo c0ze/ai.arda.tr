@@ -10,6 +10,7 @@ A sarcastic, heavy metal-loving AI chatbot that answers questions about Arda's c
 
 ## Prerequisites
 
+*   `mise` installed with Go `1.26.1` available locally.
 *   Google Cloud Project with Cloud Run enabled.
 *   Gemini API Key.
 *   `gcloud` CLI installed and authenticated.
@@ -29,12 +30,17 @@ A sarcastic, heavy metal-loving AI chatbot that answers questions about Arda's c
     GCP_REGION=asia-northeast1
     ```
 
-3.  **Run the Backend:**
+3.  **Install the pinned Go toolchain via mise:**
+    ```bash
+    mise install
+    ```
+
+4.  **Run the Backend:**
     ```bash
     go run main.go
     ```
 
-4.  **Run the Frontend:**
+5.  **Run the Frontend:**
     Open `public/index.html` in your browser. (Note: For local development, `public/script.js` defaults to `/api/chat`, so you might need to serve the frontend via the Go server or update the script to point to `http://localhost:8080`).
 
 ## Deployment
