@@ -108,7 +108,7 @@ html, body {
 body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -135,11 +135,11 @@ body {
 }
 
 .header-left h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 600;
     color: var(--text-primary);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -309,12 +309,12 @@ input:checked + .slider::before {
 }
 
 #welcome-screen h2 {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Inter', sans-serif;
     font-size: 1.5rem;
     font-weight: 700;
     margin-bottom: 0.625rem;
     color: var(--text-primary);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
 }
 
 /* Blinking cursor after the welcome heading */
@@ -365,7 +365,7 @@ input:checked + .slider::before {
     border: 1px solid var(--border-light);
     border-radius: var(--radius-xl);
     color: var(--text-secondary);
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     font-size: 0.8125rem;
     font-weight: 500;
     cursor: pointer;
@@ -490,10 +490,11 @@ input:checked + .slider::before {
 }
 .message-content strong { font-weight: 600; }
 .message-content h1, .message-content h2, .message-content h3 {
-    font-family: 'Syne', sans-serif;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
     margin-bottom: 0.5em;
     margin-top: 0.75em;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
 }
 
 /* ─── Input Footer ────────────────────────────── */
@@ -527,7 +528,7 @@ input:checked + .slider::before {
     border: none;
     color: var(--text-primary);
     font-size: 0.9375rem;
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     outline: none;
     padding: 0.625rem 0;
 }
