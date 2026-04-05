@@ -54,14 +54,17 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 # Install pinned erlang/rebar/gleam toolchain from .mise.toml
 mise install
 
-# Build the Lustre frontend bundle (once, or after any frontend/ change)
-cd frontend && gleam deps download && gleam run -m lustre/dev build --minify --outdir=../public && cd ..
-
 # Local dev: requires GEMINI_API_KEY + ALLOWED_ORIGINS in .env at repo root
 gleam deps download
-gleam run                   # HTTP server on $PORT (default 8080)
+gleam run                   # builds Lustre bundle into ./public then boots HTTP server on $PORT (default 8080)
 gleam run -- fetch          # refresh resume JSON into ./data
 gleam test                  # pure-logic tests (backend only)
+
+# `gleam run` detects frontend/gleam.toml and shells out to
+# `gleam run -m lustre/dev build --minify --outdir=../public` inside frontend/
+# before starting the server. In the production Docker runtime stage the
+# frontend/ tree is absent, so the check is a no-op and the bundle is baked
+# in by an earlier build stage.
 
 # Build Docker image
 docker build -t ai-resume-bot .

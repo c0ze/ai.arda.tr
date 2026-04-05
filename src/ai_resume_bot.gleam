@@ -83,6 +83,8 @@ fn run_fetch() -> Nil {
 // ---------------------------------------------------------------------------
 
 fn run_server() -> Nil {
+  maybe_build_frontend()
+
   let api_key = require_env("GEMINI_API_KEY")
   let allowed_origins_raw = require_env("ALLOWED_ORIGINS")
   let allowed_origins = parse_origins(allowed_origins_raw)
@@ -232,6 +234,35 @@ fn ensure_data_dir() -> Nil {
   }
 }
 
+/// Build the Lustre frontend bundle into ./public if the `frontend/` sub-project
+/// is present. This lets `gleam run` be a single command in local dev: the
+/// backend compiles the frontend before starting the HTTP server. In the
+/// production Docker image the `frontend/` directory is not copied into the
+/// runtime stage, so this check is a no-op and we rely on the Dockerfile's
+/// earlier build stage to have already produced the bundle.
+fn maybe_build_frontend() -> Nil {
+  case simplifile.is_file("frontend/gleam.toml") {
+    Ok(True) -> {
+      logging.log(logging.Info, "Building Lustre frontend bundle...")
+      let cmd = "gleam run -m lustre/dev build --minify --outdir=../public"
+      case shell("frontend", cmd) {
+        Ok(_) ->
+          logging.log(logging.Info, "Frontend build complete.")
+        Error(code) -> {
+          logging.log(
+            logging.Error,
+            "Frontend build failed with exit code "
+              <> int.to_string(code)
+              <> ". Aborting startup.",
+          )
+          halt_flush(1)
+        }
+      }
+    }
+    _ -> Nil
+  }
+}
+
 fn maybe_append_job_requirements(base: String) -> String {
   case simplifile.read(job_requirements_path) {
     Ok(contents) -> base <> "\n\n" <> contents <> job_requirements_suffix
@@ -247,3 +278,6 @@ fn halt(code: Int) -> Nil
 // exit to actually reach the terminal.
 @external(erlang, "ai_resume_bot_ffi", "halt_flush")
 fn halt_flush(code: Int) -> Nil
+
+@external(erlang, "ai_resume_bot_ffi", "shell")
+fn shell(cwd: String, cmd: String) -> Result(Nil, Int)

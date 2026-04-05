@@ -35,24 +35,16 @@ A chatbot that answers questions about Arda's career, backed by Google's Gemini 
    ```
    Real process env vars always override `.env` values.
 
-3. **Build the Lustre frontend bundle once:**
-   ```sh
-   cd frontend
-   gleam deps download
-   gleam run -m lustre/dev build --minify --outdir=../public
-   cd ..
-   ```
-   This writes `public/frontend.js` and a generated `public/index.html` that references it. Re-run whenever you change anything under [frontend/src/](frontend/src/). During active frontend development you can instead use `gleam run -m lustre/dev start` from inside `frontend/` for an HMR dev server — it proxies `/api` to `http://localhost:8080` (see `[tools.lustre.dev]` in [frontend/gleam.toml](frontend/gleam.toml)).
-
-4. **Run the backend:**
+3. **Run the backend (also builds the frontend):**
    ```sh
    gleam deps download
-   gleam run                # boot HTTP server on $PORT (default 8080)
+   gleam run                # builds the Lustre bundle into ./public, then boots HTTP server on $PORT (default 8080)
    gleam run -- fetch       # just refresh resume JSON under ./data and exit
    gleam test               # pure-logic tests (prompt + email extraction)
    ```
+   `gleam run` detects [frontend/gleam.toml](frontend/gleam.toml) and runs `lustre/dev build --minify --outdir=../public` as a prerequisite. In the production Docker image the `frontend/` tree is not copied into the runtime stage, so this check is a no-op there and the bundle is produced by an earlier Docker stage instead. For HMR-style dev you can still run `gleam run -m lustre/dev start` from inside [frontend/](frontend/) — it proxies `/api` to `http://localhost:8080` (see `[tools.lustre.dev]` in [frontend/gleam.toml](frontend/gleam.toml)).
 
-5. **Open the app:**
+4. **Open the app:**
 
    http://localhost:8080/ — the Gleam backend serves the Lustre-built bundle from [public/](public/) and the API on the same port. The frontend auto-detects `localhost` and uses the same-origin `/api/chat`, so no config is needed.
 
