@@ -1,32 +1,53 @@
-# Stage 1: Builder
-FROM golang:1.26.1-alpine AS builder
-WORKDIR /app
+##
+## Stage 1: Build the Erlang release using the official Gleam image.
+##
+## The Gleam image ships with Erlang/OTP + rebar3 + gleam preinstalled,
+## so we only need to resolve deps and run `gleam export erlang-shipment`.
+##
+FROM ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine AS builder
+
+WORKDIR /build
 
 # Cache dependencies separately from the source tree.
-COPY go.mod go.sum ./
-RUN go mod download
+COPY gleam.toml manifest.toml* ./
+RUN gleam deps download
 
 # Copy the application source.
-COPY . .
+COPY src ./src
+COPY test ./test
 
-# Fetch resume data
-RUN go run main.go -fetch
+# Fetch the resume JSON at build time so the runtime image does not need
+# outbound access to GitHub at boot.
+RUN gleam run -- fetch
 
-# Build Binary
-# CGO_ENABLED=0 ensures a static binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o server main.go
+# Build a self-contained Erlang release tree under /build/build/erlang-shipment
+RUN gleam export erlang-shipment
 
-# Stage 2: Runtime
-FROM gcr.io/distroless/static-debian12
-WORKDIR /
+##
+## Stage 2: Minimal runtime image.
+##
+## We need a runtime that has Erlang available. Distroless does not ship
+## Erlang, so we use erlang-alpine (tiny, ~60MB) and copy only the shipment.
+##
+FROM erlang:27-alpine
 
-# Copy Binary and Static Assets
-COPY --from=builder /app/server /server
-COPY --from=builder /app/public /public
-COPY --from=builder /app/data /data
-COPY --from=builder /app/job_requirements.md /job_requirements.md
+WORKDIR /app
+
+# Copy the Gleam/Erlang shipment.
+COPY --from=builder /build/build/erlang-shipment /app
+
+# Resume data fetched at build time.
+COPY --from=builder /build/data /app/data
+
+# Static frontend assets (served by wisp.serve_static).
+COPY public /app/public
+
+# Optional job-requirements rider appended to the system prompt at startup.
+COPY job_requirements.md /app/job_requirements.md
+
+ENV PUBLIC_DIR=/app/public
 
 # Cloud Run expects 8080 by default
 EXPOSE 8080
 
-ENTRYPOINT ["/server"]
+ENTRYPOINT ["/app/entrypoint.sh", "run"]

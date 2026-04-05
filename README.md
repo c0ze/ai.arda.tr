@@ -1,80 +1,82 @@
 # AI Resume Bot (ai.arda.tr)
 
-A sarcastic, heavy metal-loving AI chatbot that answers questions about Arda's career. It uses Google's Gemini 3 Flash Preview model.
+A chatbot that answers questions about Arda's career, backed by Google's Gemini API.
 
 ## Architecture
 
-*   **Frontend:** Static HTML/JS/CSS hosted on **GitHub Pages**.
-*   **Backend:** Go (Golang) API hosted on **Google Cloud Run** (Tokyo Region).
-*   **AI Model:** Google Gemini 3 Flash Preview (`gemini-3-flash-preview`).
+- **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist), hosted on **Google Cloud Run** (Tokyo).
+- **Frontend**: Static HTML/CSS/JS in [public/](public/), served by the Gleam backend locally and by **GitHub Pages** in production.
+- **AI Model**: Google Gemini (`gemini-3-flash-preview` by default, configurable via `GEMINI_MODEL`).
 
 ## Prerequisites
 
-*   `mise` installed with Go `1.26.1` available locally.
-*   Google Cloud Project with Cloud Run enabled.
-*   Gemini API Key.
-*   `gcloud` CLI installed and authenticated.
+- [mise](https://mise.jdx.dev/) — installs the pinned Erlang/OTP, rebar3, and Gleam toolchain via [.mise.toml](.mise.toml).
+- A Google Gemini API key.
+- `gcloud` CLI (only for deployment).
 
 ## Local Development
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/ai.arda.tr.git
-    cd ai.arda.tr
-    ```
+1. **Install the toolchain:**
+   ```sh
+   mise install
+   ```
 
-2.  **Create a `.env` file:**
-    ```env
-    GEMINI_API_KEY=your_actual_key
-    GCP_PROJECT_ID=your_project_id
-    GCP_REGION=asia-northeast1
-    ALLOWED_ORIGINS=https://ai.arda.tr;http://localhost:8080
-    ```
+2. **Create a `.env` file at the repo root:**
+   ```env
+   GEMINI_API_KEY=your_actual_key
+   ALLOWED_ORIGINS=https://ai.arda.tr;http://localhost:8080
+   # Optional:
+   # PORT=8080
+   # LOG_REQUESTS=true              # per-request logs, off in prod by default
+   # GEMINI_MODEL=gemini-3-flash-preview
+   # GMAIL_USER=...                 # contact-email handoff (optional)
+   # GMAIL_APP_PASSWORD=...
+   # CONTACT_ADDRESS=...
+   ```
+   Real process env vars always override `.env` values.
 
-3.  **Install the pinned Go toolchain via mise:**
-    ```bash
-    mise install
-    ```
+3. **Run the backend:**
+   ```sh
+   gleam deps download
+   gleam run                # boot HTTP server on $PORT (default 8080)
+   gleam run -- fetch       # just refresh resume JSON under ./data and exit
+   gleam test               # pure-logic tests (prompt + email extraction)
+   ```
 
-4.  **Run the Backend:**
-    ```bash
-    go run main.go
-    ```
-    `ALLOWED_ORIGINS` is required at startup, even for local development.
+4. **Open the app:**
 
-5.  **Run the Frontend:**
-    Open `public/index.html` in your browser. (Note: For local development, `public/script.js` defaults to `/api/chat`, so you might need to serve the frontend via the Go server or update the script to point to `http://localhost:8080`).
+   http://localhost:8080/ — the Gleam backend serves the frontend from [public/](public/) and the API on the same port. [public/script.js](public/script.js) auto-detects `localhost` and uses the same-origin `/api/chat`, so no frontend config is needed.
 
 ## Deployment
 
-### 1. Deploy Backend (Cloud Run)
+### Backend — Cloud Run
 
-We use a helper script that reads from your `.env` file.
-It requires `GCP_PROJECT_ID`, `GEMINI_API_KEY`, and `ALLOWED_ORIGINS`, and it sets `gcloud` to the `.env` project before deploying so you do not accidentally target the wrong project.
-
-```bash
+```sh
 chmod +x cloud_deploy.sh
 ./cloud_deploy.sh
 ```
 
-**Important:**
-*   This deploys publicly (`--allow-unauthenticated`) so the frontend can access it.
-*   Copy the **Service URL** from the output.
+Reads `GCP_PROJECT_ID`, `GEMINI_API_KEY`, `ALLOWED_ORIGINS`, and optional `GMAIL_*` / `CONTACT_ADDRESS` from `.env`, then runs `gcloud run deploy --source .` against the Gleam [Dockerfile](Dockerfile).
 
-### 2. Deploy Frontend (GitHub Pages)
+The resume JSON is fetched at build time and baked into the image. The static frontend in [public/](public/) is also baked in, so the single Cloud Run service can serve both.
 
-1.  Open `public/script.js`.
-2.  Update `API_BASE_URL` with your Cloud Run Service URL:
-    ```javascript
-    const API_BASE_URL = "https://ai-arda-tr-api-xyz.a.run.app";
-    ```
-3.  Push changes to GitHub:
-    ```bash
-    git add public/script.js
-    git commit -m "Update API endpoint"
-    git push origin main
-    ```
-4.  The GitHub Actions workflow will automatically deploy to `ai.arda.tr`.
+### Frontend — GitHub Pages
+
+The static bundle in [public/](public/) is deployed to GitHub Pages by [.github/workflows/deploy-ui.yml](.github/workflows/deploy-ui.yml). For production, [public/script.js](public/script.js) uses the hard-coded Cloud Run URL in `API_BASE_URL`.
+
+## Environment Variables
+
+| Var | Required | Default | Purpose |
+|---|---|---|---|
+| `GEMINI_API_KEY` | yes | — | Google Gemini API key |
+| `ALLOWED_ORIGINS` | yes | — | Semicolon-delimited CORS allowlist |
+| `PORT` | no | `8080` | HTTP listen port |
+| `PUBLIC_DIR` | no | `./public` | Static asset directory |
+| `GEMINI_MODEL` | no | `gemini-3-flash-preview` | Gemini model id |
+| `LOG_REQUESTS` | no | off | `true`/`1`/`yes`/`on` enables per-request logs |
+| `GMAIL_USER` | no | — | SMTP user for contact-email handoff |
+| `GMAIL_APP_PASSWORD` | no | — | SMTP app password |
+| `CONTACT_ADDRESS` | no | `GMAIL_USER` | Recipient of contact emails |
 
 ## License
 

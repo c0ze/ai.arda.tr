@@ -1,0 +1,13 @@
+.env
+.git
+.github
+.claude
+.mise.toml
+build/
+*.beam
+*.ez
+erl_crash.dump
+recovered_env.txt
+GLEAM_MIGRATION_PLAN.md
+DEPLOYMENT_OPTIONS.md
+DNS_SETUP.md
