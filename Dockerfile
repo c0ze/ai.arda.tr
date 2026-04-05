@@ -1,8 +1,28 @@
 ##
-## Stage 1: Build the Erlang release using the official Gleam image.
+## Stage 1: Build the Lustre frontend bundle.
 ##
-## The Gleam image ships with Erlang/OTP + rebar3 + gleam preinstalled,
-## so we only need to resolve deps and run `gleam export erlang-shipment`.
+## lustre_dev_tools downloads Bun on first run, so we need a writeable
+## $HOME and network access during the build.
+##
+FROM ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine AS frontend
+
+WORKDIR /frontend
+RUN apk add --no-cache bash libstdc++
+
+# Cache deps separately from the source tree.
+COPY frontend/gleam.toml frontend/manifest.toml* ./
+RUN gleam deps download
+
+# Source + static assets the build step reads/copies.
+COPY frontend/src ./src
+COPY public /public
+
+# Emit the minified bundle + generated index.html into /public so the
+# backend can serve it at runtime.
+RUN gleam run -m lustre/dev build --minify --outdir=/public
+
+##
+## Stage 2: Build the Gleam backend as an Erlang release.
 ##
 FROM ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine AS builder
 
@@ -24,10 +44,7 @@ RUN gleam run -- fetch
 RUN gleam export erlang-shipment
 
 ##
-## Stage 2: Minimal runtime image.
-##
-## We need a runtime that has Erlang available. Distroless does not ship
-## Erlang, so we use erlang-alpine (tiny, ~60MB) and copy only the shipment.
+## Stage 3: Minimal runtime image.
 ##
 FROM erlang:27-alpine
 
@@ -39,8 +56,9 @@ COPY --from=builder /build/build/erlang-shipment /app
 # Resume data fetched at build time.
 COPY --from=builder /build/data /app/data
 
-# Static frontend assets (served by wisp.serve_static).
-COPY public /app/public
+# Static frontend assets (including the Lustre-built bundle) served by
+# wisp.serve_static.
+COPY --from=frontend /public /app/public
 
 # Optional job-requirements rider appended to the system prompt at startup.
 COPY job_requirements.md /app/job_requirements.md

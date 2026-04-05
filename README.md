@@ -5,7 +5,7 @@ A chatbot that answers questions about Arda's career, backed by Google's Gemini 
 ## Architecture
 
 - **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist), hosted on **Google Cloud Run** (Tokyo).
-- **Frontend**: Static HTML/CSS/JS in [public/](public/), served by the Gleam backend locally and by **GitHub Pages** in production.
+- **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript, sources in [frontend/](frontend/). The build emits a minified bundle into [public/](public/) (alongside the hand-written [public/style.css](public/style.css)), which is served by the Gleam backend locally and by **GitHub Pages** in production.
 - **AI Model**: Google Gemini (`gemini-3-flash-preview` by default, configurable via `GEMINI_MODEL`).
 
 ## Prerequisites
@@ -35,7 +35,16 @@ A chatbot that answers questions about Arda's career, backed by Google's Gemini 
    ```
    Real process env vars always override `.env` values.
 
-3. **Run the backend:**
+3. **Build the Lustre frontend bundle once:**
+   ```sh
+   cd frontend
+   gleam deps download
+   gleam run -m lustre/dev build --minify --outdir=../public
+   cd ..
+   ```
+   This writes `public/frontend.js` and a generated `public/index.html` that references it. Re-run whenever you change anything under [frontend/src/](frontend/src/). During active frontend development you can instead use `gleam run -m lustre/dev start` from inside `frontend/` for an HMR dev server — it proxies `/api` to `http://localhost:8080` (see `[tools.lustre.dev]` in [frontend/gleam.toml](frontend/gleam.toml)).
+
+4. **Run the backend:**
    ```sh
    gleam deps download
    gleam run                # boot HTTP server on $PORT (default 8080)
@@ -43,9 +52,9 @@ A chatbot that answers questions about Arda's career, backed by Google's Gemini 
    gleam test               # pure-logic tests (prompt + email extraction)
    ```
 
-4. **Open the app:**
+5. **Open the app:**
 
-   http://localhost:8080/ — the Gleam backend serves the frontend from [public/](public/) and the API on the same port. [public/script.js](public/script.js) auto-detects `localhost` and uses the same-origin `/api/chat`, so no frontend config is needed.
+   http://localhost:8080/ — the Gleam backend serves the Lustre-built bundle from [public/](public/) and the API on the same port. The frontend auto-detects `localhost` and uses the same-origin `/api/chat`, so no config is needed.
 
 ## Deployment
 
@@ -56,13 +65,13 @@ chmod +x cloud_deploy.sh
 ./cloud_deploy.sh
 ```
 
-Reads `GCP_PROJECT_ID`, `GEMINI_API_KEY`, `ALLOWED_ORIGINS`, and optional `GMAIL_*` / `CONTACT_ADDRESS` from `.env`, then runs `gcloud run deploy --source .` against the Gleam [Dockerfile](Dockerfile).
+Reads `GCP_PROJECT_ID`, `GEMINI_API_KEY`, `ALLOWED_ORIGINS`, and optional `GMAIL_*` / `CONTACT_ADDRESS` from `.env`, then runs `gcloud run deploy --source .` against the multi-stage [Dockerfile](Dockerfile): stage 1 builds the Lustre bundle, stage 2 compiles the Gleam backend into an Erlang release, stage 3 is the slim runtime image.
 
-The resume JSON is fetched at build time and baked into the image. The static frontend in [public/](public/) is also baked in, so the single Cloud Run service can serve both.
+The resume JSON is fetched at build time and baked into the image. The built frontend bundle is also baked in, so the single Cloud Run service can serve both.
 
 ### Frontend — GitHub Pages
 
-The static bundle in [public/](public/) is deployed to GitHub Pages by [.github/workflows/deploy-ui.yml](.github/workflows/deploy-ui.yml). For production, [public/script.js](public/script.js) uses the hard-coded Cloud Run URL in `API_BASE_URL`.
+[.github/workflows/deploy-ui.yml](.github/workflows/deploy-ui.yml) installs the Gleam toolchain, runs `lustre/dev build --minify --outdir=../public` from [frontend/](frontend/), and publishes [public/](public/) to GitHub Pages. In production the frontend hits the hard-coded Cloud Run URL (see `cloud_run_base` in [frontend/src/frontend.gleam](frontend/src/frontend.gleam)).
 
 ## Environment Variables
 

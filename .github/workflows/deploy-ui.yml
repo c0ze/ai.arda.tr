@@ -25,6 +25,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Install the Erlang + Gleam toolchain to build the Lustre frontend.
+      - name: Setup Erlang/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.0"
+          gleam-version: "1.15.2"
+          rebar3-version: "3"
+
+      - name: Build Lustre frontend
+        working-directory: frontend
+        run: |
+          gleam deps download
+          gleam run -m lustre/dev build --minify --outdir=../public
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 

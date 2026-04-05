@@ -9,7 +9,7 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 ## Architecture
 
 - **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist)
-- **Frontend**: Vanilla HTML/CSS/JavaScript in [public/](public/), served by the Gleam backend locally and by GitHub Pages in production
+- **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript in [frontend/](frontend/); build output lands in [public/](public/), served by the Gleam backend locally and by GitHub Pages in production
 - **AI**: Google Gemini (`gemini-3-flash-preview` by default, configurable via `GEMINI_MODEL`)
 - **Deployment**: Docker container on Google Cloud Run (backend), GitHub Pages (frontend)
 
@@ -34,7 +34,14 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │       └── dotenv.gleam    # Minimal .env loader (real env vars win)
 ├── test/
 │   └── ai_resume_bot_test.gleam     # gleeunit tests (prompt + email)
-├── public/                 # Static frontend (served by Wisp, or GitHub Pages)
+├── frontend/               # Lustre (Gleam -> JS) frontend project
+│   ├── gleam.toml          # target = "javascript", [tools.lustre.*] config
+│   └── src/
+│       ├── frontend.gleam  # Lustre app: init/update/view, API effect, FFI
+│       ├── frontend/i18n.gleam    # EN/JP translations + quick-prompt strings
+│       ├── frontend/icons.gleam   # Inline SVG icons (via element.unsafe_raw_html)
+│       └── ffi.mjs         # localStorage, matchMedia, marked+DOMPurify, scroll
+├── public/                 # Hand-written style.css + favicon + CNAME + built Lustre bundle
 ├── data/                   # Resume JSON fetched from c0ze/resume
 ├── Dockerfile              # BEAM release on erlang:27-alpine
 ├── cloud_deploy.sh         # gcloud run deploy wrapper, reads .env
@@ -47,11 +54,14 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 # Install pinned erlang/rebar/gleam toolchain from .mise.toml
 mise install
 
+# Build the Lustre frontend bundle (once, or after any frontend/ change)
+cd frontend && gleam deps download && gleam run -m lustre/dev build --minify --outdir=../public && cd ..
+
 # Local dev: requires GEMINI_API_KEY + ALLOWED_ORIGINS in .env at repo root
 gleam deps download
 gleam run                   # HTTP server on $PORT (default 8080)
 gleam run -- fetch          # refresh resume JSON into ./data
-gleam test                  # pure-logic tests
+gleam test                  # pure-logic tests (backend only)
 
 # Build Docker image
 docker build -t ai-resume-bot .
