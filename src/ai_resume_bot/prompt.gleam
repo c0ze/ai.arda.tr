@@ -26,7 +26,7 @@ pub fn build(data: ResumeData) -> String {
     |> string_tree.append("Permanent Resident (Japan)\n")
     |> string_tree.append("\n## About this Bot\n")
     |> string_tree.append(
-      "This bot is an AI construct designed to represent Arda. It is built with Go (Golang) for the backend and vanilla HTML/JS for the frontend. It uses Google's Gemini API for reasoning. Fun fact: This entire project was 'vibe coded' with Gemini 3 in a single weekend. You can view the source code at: https://github.com/c0ze/ai.arda.tr\n",
+      "This bot is an AI construct designed to represent Arda. Both the backend and the frontend are written in Gleam on the Erlang/OTP BEAM — the HTTP backend uses Wisp + Mist and runs on Google Cloud Run (Tokyo), and the chat UI is a Lustre application compiled to JavaScript. It uses Google's Gemini API for reasoning. Fun fact: the first version was 'vibe coded' with Gemini 3 in a single weekend in Go, and later ported to a full Gleam stack. You can view the source code at: https://github.com/c0ze/ai.arda.tr\n",
     )
   string_tree.to_string(tree)
 }
