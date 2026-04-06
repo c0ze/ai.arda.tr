@@ -65,7 +65,7 @@ COPY --from=builder /build/data /app/data
 
 # Static frontend assets (including the Lustre-built bundle) served by
 # wisp.serve_static.
-COPY --from=frontend /public /app/public
+COPY --from=frontend /app/public /app/public
 
 # Optional job-requirements rider appended to the system prompt at startup.
 COPY job_requirements.md /app/job_requirements.md
