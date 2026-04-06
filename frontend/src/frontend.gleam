@@ -3,24 +3,28 @@
 //// Shape mirrors the old `public/script.js`:
 ////   - theme (dark / light / dracula) persisted in localStorage
 ////   - language toggle (en / jp) with translated strings + quick prompts
-////   - chat history sent with each request to `/api/chat`
+////   - chat history sent with each request to `/api/chat/stream` (SSE)
 ////   - markdown rendered through marked.js + DOMPurify (loaded from CDN
 ////     globals in `index.html` and invoked through `ffi.mjs`)
+////
+//// Streaming: The frontend POSTs to `/api/chat/stream` and receives SSE
+//// events: `thinking` → `chunk`* → `done`. During "thinking" a pulsing
+//// animation plays. Chunks are appended progressively with markdown
+//// rendered live.
 
 import frontend/i18n.{type Language, type Strings, En, Jp}
 import frontend/icons
-import gleam/dynamic/decode
 import gleam/int
+import gleam/json
 import gleam/list
 import gleam/string
 import lustre
-import shared.{ChatMessage as WireMessage, ChatRequest}
+import shared
 import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
-import rsvp
 
 // ---------------------------------------------------------------------------
 // Config
@@ -50,6 +54,16 @@ pub type ChatMessage {
   ChatMessage(id: Int, sender: Sender, text: String)
 }
 
+/// Tracks the current state of a streaming response.
+pub type StreamState {
+  /// No request in flight.
+  Idle
+  /// Waiting for the first token from Gemini.
+  Thinking
+  /// Receiving text chunks. `bot_msg_id` is the message being built.
+  Streaming(bot_msg_id: Int)
+}
+
 pub type Model {
   Model(
     theme: Theme,
@@ -57,7 +71,7 @@ pub type Model {
     input: String,
     history: List(ChatMessage),
     next_id: Int,
-    sending: Bool,
+    stream_state: StreamState,
   )
 }
 
@@ -71,7 +85,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       input: "",
       history: [],
       next_id: 0,
-      sending: False,
+      stream_state: Idle,
     )
   reset_with_welcome(model, En)
 }
@@ -87,7 +101,7 @@ pub type Msg {
   UserPressedKey(String)
   UserClickedSend
   UserPickedPrompt(String)
-  ApiReplied(Result(String, rsvp.Error))
+  StreamEventReceived(String)
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -116,15 +130,67 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
     UserPickedPrompt(prompt) -> send_current(Model(..model, input: prompt))
 
-    ApiReplied(Ok(reply)) -> {
-      let #(model, _) = push(model, Bot, reply)
-      #(Model(..model, sending: False), scroll_to_bottom())
-    }
+    StreamEventReceived(json_str) -> handle_stream_event(model, json_str)
+  }
+}
 
-    ApiReplied(Error(_)) -> {
-      let #(model, _) = push(model, Bot, "System Malfunction: Network Error")
-      #(Model(..model, sending: False), scroll_to_bottom())
-    }
+fn handle_stream_event(
+  model: Model,
+  json_str: String,
+) -> #(Model, Effect(Msg)) {
+  case json.parse(json_str, shared.stream_event_decoder()) {
+    Error(_) -> #(model, effect.none())
+    Ok(evt) ->
+      case evt {
+        shared.StreamThinking -> {
+          // Add a placeholder bot message with thinking indicator
+          let #(model, bot_id) = push(model, Bot, "")
+          #(
+            Model(..model, stream_state: Streaming(bot_msg_id: bot_id)),
+            scroll_to_bottom(),
+          )
+        }
+
+        shared.StreamChunk(text) -> {
+          case model.stream_state {
+            Streaming(bot_msg_id) -> {
+              let model = append_to_message(model, bot_msg_id, text)
+              #(model, scroll_to_bottom())
+            }
+            _ -> #(model, effect.none())
+          }
+        }
+
+        shared.StreamDone(text) -> {
+          case model.stream_state {
+            Streaming(bot_msg_id) -> {
+              // Replace with the final complete text (may include email
+              // success suffix from the server).
+              let model = replace_message_text(model, bot_msg_id, text)
+              #(Model(..model, stream_state: Idle), scroll_to_bottom())
+            }
+            _ -> {
+              let #(model, _) = push(model, Bot, text)
+              #(Model(..model, stream_state: Idle), scroll_to_bottom())
+            }
+          }
+        }
+
+        shared.StreamError(message) -> {
+          let error_text =
+            "System Malfunction: " <> message
+          case model.stream_state {
+            Streaming(bot_msg_id) -> {
+              let model = replace_message_text(model, bot_msg_id, error_text)
+              #(Model(..model, stream_state: Idle), scroll_to_bottom())
+            }
+            _ -> {
+              let #(model, _) = push(model, Bot, error_text)
+              #(Model(..model, stream_state: Idle), scroll_to_bottom())
+            }
+          }
+        }
+      }
   }
 }
 
@@ -136,7 +202,7 @@ fn reset_with_welcome(model: Model, lang: Language) -> #(Model, Effect(Msg)) {
       language: lang,
       history: [],
       next_id: 0,
-      sending: False,
+      stream_state: Idle,
       input: "",
     )
   let #(with_welcome, _) = push(cleared, Bot, s.welcome_msg)
@@ -145,17 +211,17 @@ fn reset_with_welcome(model: Model, lang: Language) -> #(Model, Effect(Msg)) {
 
 fn send_current(model: Model) -> #(Model, Effect(Msg)) {
   let text = string.trim(model.input)
-  case text == "" || model.sending {
+  let is_busy = model.stream_state != Idle
+  case text == "" || is_busy {
     True -> #(model, effect.none())
     False -> {
       let #(with_user, _) = push(model, User, text)
       // History sent to the backend is everything BEFORE the new user message,
       // matching the old script.js slice(0, -1) behaviour.
-      let #(history_before_user, _) =
-        split_last(with_user.history)
-      let effect = call_api(text, history_before_user)
+      let #(history_before_user, _) = split_last(with_user.history)
+      let effect = call_api_stream(text, history_before_user)
       #(
-        Model(..with_user, input: "", sending: True),
+        Model(..with_user, input: "", stream_state: Thinking),
         effect.batch([effect, scroll_to_bottom()]),
       )
     }
@@ -173,6 +239,28 @@ fn push(
     Model(..model, history: list.append(model.history, [msg]), next_id: id + 1),
     id,
   )
+}
+
+fn append_to_message(model: Model, msg_id: Int, text: String) -> Model {
+  let history =
+    list.map(model.history, fn(m) {
+      case m.id == msg_id {
+        True -> ChatMessage(..m, text: m.text <> text)
+        False -> m
+      }
+    })
+  Model(..model, history: history)
+}
+
+fn replace_message_text(model: Model, msg_id: Int, text: String) -> Model {
+  let history =
+    list.map(model.history, fn(m) {
+      case m.id == msg_id {
+        True -> ChatMessage(..m, text: text)
+        False -> m
+      }
+    })
+  Model(..model, history: history)
 }
 
 fn split_last(items: List(a)) -> #(List(a), Bool) {
@@ -195,20 +283,26 @@ fn next_theme(theme: Theme) -> Theme {
 // Effects
 // ---------------------------------------------------------------------------
 
-fn call_api(text: String, history: List(ChatMessage)) -> Effect(Msg) {
+fn call_api_stream(
+  text: String,
+  history: List(ChatMessage),
+) -> Effect(Msg) {
   let wire_history =
     list.map(history, fn(m) {
-      WireMessage(role: role_of(m.sender), content: m.text)
+      shared.ChatMessage(role: role_of(m.sender), content: m.text)
     })
-  let body = shared.chat_request_to_json(ChatRequest(
-    message: text,
-    history: wire_history,
-  ))
-  let response_decoder =
-    shared.chat_response_decoder()
-    |> decode.map(fn(resp) { resp.reply })
-  let handler = rsvp.expect_json(response_decoder, ApiReplied)
-  rsvp.post(api_endpoint(), body, handler)
+  let body =
+    shared.chat_request_to_json(shared.ChatRequest(
+      message: text,
+      history: wire_history,
+    ))
+    |> json.to_string
+
+  effect.from(fn(dispatch) {
+    do_stream_chat(stream_endpoint(), body, fn(json_str) {
+      dispatch(StreamEventReceived(json_str))
+    })
+  })
 }
 
 fn role_of(sender: Sender) -> String {
@@ -218,10 +312,10 @@ fn role_of(sender: Sender) -> String {
   }
 }
 
-fn api_endpoint() -> String {
+fn stream_endpoint() -> String {
   case is_localhost() {
-    True -> "/api/chat"
-    False -> cloud_run_base <> "/api/chat"
+    True -> "/api/chat/stream"
+    False -> cloud_run_base <> "/api/chat/stream"
   }
 }
 
@@ -304,25 +398,58 @@ fn messages_container(model: Model, has_messages: Bool) -> Element(Msg) {
     True -> "has-messages"
     False -> ""
   }
-  let tail = case model.sending {
-    True -> [view_typing()]
-    False -> []
+  let tail = case model.stream_state {
+    Thinking -> [view_thinking()]
+    _ -> []
   }
   html.div(
     [attribute.id("messages-container"), attribute.class(cls)],
     [
       html.div(
         [attribute.id("messages")],
-        list.append(list.map(model.history, view_message), tail),
+        list.append(
+          list.map(model.history, fn(msg) {
+            view_message(msg, model.stream_state)
+          }),
+          tail,
+        ),
       ),
     ],
   )
 }
 
-fn view_message(msg: ChatMessage) -> Element(Msg) {
+fn view_message(msg: ChatMessage, stream_state: StreamState) -> Element(Msg) {
   let #(sender_class, avatar) = case msg.sender {
     User -> #("user", "Y")
     Bot -> #("bot", "A")
+  }
+  // If this is the bot message currently being streamed and text is empty,
+  // show the thinking indicator inside the message bubble
+  let is_streaming_this = case stream_state {
+    Streaming(id) if id == msg.id -> True
+    _ -> False
+  }
+  let content = case is_streaming_this && msg.text == "" {
+    True ->
+      html.div([attribute.class("message-content")], [
+        html.div([attribute.class("thinking-indicator")], [
+          html.span([attribute.class("thinking-text")], [
+            html.text("Thinking"),
+          ]),
+          html.span([attribute.class("thinking-dots")], [
+            html.span([], []),
+            html.span([], []),
+            html.span([], []),
+          ]),
+        ]),
+      ])
+    False ->
+      element.unsafe_raw_html(
+        "",
+        "div",
+        [attribute.class("message-content")],
+        render_markdown(msg.text),
+      )
   }
   html.div(
     [
@@ -331,24 +458,22 @@ fn view_message(msg: ChatMessage) -> Element(Msg) {
     ],
     [
       html.div([attribute.class("message-avatar")], [html.text(avatar)]),
-      element.unsafe_raw_html(
-        "",
-        "div",
-        [attribute.class("message-content")],
-        render_markdown(msg.text),
-      ),
+      content,
     ],
   )
 }
 
-fn view_typing() -> Element(Msg) {
+fn view_thinking() -> Element(Msg) {
   html.div([attribute.class("message bot animate-fade-in")], [
     html.div([attribute.class("message-avatar")], [html.text("A")]),
     html.div([attribute.class("message-content")], [
-      html.div([attribute.class("typing-indicator")], [
-        html.span([], []),
-        html.span([], []),
-        html.span([], []),
+      html.div([attribute.class("thinking-indicator")], [
+        html.span([attribute.class("thinking-text")], [html.text("Thinking")]),
+        html.span([attribute.class("thinking-dots")], [
+          html.span([], []),
+          html.span([], []),
+          html.span([], []),
+        ]),
       ]),
     ]),
   ])
@@ -481,6 +606,13 @@ fn do_scroll_to_bottom(selector: String) -> Nil
 
 @external(javascript, "./ffi.mjs", "is_localhost")
 fn is_localhost() -> Bool
+
+@external(javascript, "./ffi.mjs", "stream_chat")
+fn do_stream_chat(
+  url: String,
+  body: String,
+  on_event: fn(String) -> Nil,
+) -> Nil
 
 // ---------------------------------------------------------------------------
 // Bootstrap

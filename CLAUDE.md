@@ -102,12 +102,16 @@ docker run -p 8080:8080 \
 4. `prompt.build` compiles the system prompt; if `job_requirements.md` exists, it is appended along with the `[[SEND_EMAIL]]` instructions.
 
 ### API
-- `POST /api/chat` → `{"message": "...", "history": [...]}` → `{"reply": "..."}`.
+- `POST /api/chat` → `{"message": "...", "history": [...]}` → `{"reply": "..."}` (non-streaming).
+- `POST /api/chat/stream` → same request body → SSE stream of `{type, ...}` events (streaming).
+  - SSE events: `thinking` → `chunk` (text delta) → `done` (full reply) or `error`.
+  - Handled at the raw Mist level (Wisp cannot do streaming responses).
 - `GET /*` → static files from `PUBLIC_DIR`.
 - Error shapes: 400 `Invalid JSON`, 500 `Internal AI Error`, 502 contact-email failure.
 
 ### Gemini Client
 - Direct REST calls to `generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`.
+- Streaming variant uses `streamGenerateContent?alt=sse` via Erlang FFI (`ai_resume_bot_stream_ffi.erl`).
 - No SDK dependency. System instruction passed via `system_instruction`, history as `contents`.
 
 ### Contact Email Handoff

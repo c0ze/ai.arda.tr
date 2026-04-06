@@ -10,9 +10,12 @@ import ai_resume_bot/gemini
 import ai_resume_bot/prompt
 import ai_resume_bot/resume
 import ai_resume_bot/server.{Config}
+import ai_resume_bot/stream_handler.{StreamConfig}
 import argv
 import envoy
 import gleam/erlang/process
+import gleam/http
+import gleam/http/request
 import gleam/int
 import gleam/io
 import gleam/list
@@ -155,13 +158,33 @@ fn run_server() -> Nil {
 
   let secret = wisp.random_string(64)
 
+  let stream_config =
+    StreamConfig(
+      gemini: gemini_service,
+      smtp: smtp_config,
+      allowed_origins: allowed_origins,
+    )
+
+  let wisp_handler =
+    wisp_mist.handler(fn(req) { server.handle(req, config) }, secret)
+
   logging.log(
     logging.Info,
     "Server listening on port " <> int.to_string(port),
   )
 
   let assert Ok(_) =
-    wisp_mist.handler(fn(req) { server.handle(req, config) }, secret)
+    fn(req: request.Request(mist.Connection)) {
+      // Intercept /api/chat/stream at the Mist level for SSE streaming.
+      // Everything else falls through to the Wisp handler.
+      case req.method, request.path_segments(req) {
+        http.Post, ["api", "chat", "stream"] ->
+          stream_handler.handle_stream(req, stream_config)
+        http.Options, ["api", "chat", "stream"] ->
+          server.cors_preflight(req, allowed_origins)
+        _, _ -> wisp_handler(req)
+      }
+    }
     |> mist.new
     |> mist.port(port)
     |> mist.bind("0.0.0.0")

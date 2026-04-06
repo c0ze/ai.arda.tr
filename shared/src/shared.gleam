@@ -84,3 +84,60 @@ pub fn chat_response_to_json(resp: ChatResponse) -> Json {
 pub fn error_response(message: String) -> Json {
   json.object([#("error", json.string(message))])
 }
+
+// ---------------------------------------------------------------------------
+// SSE stream event types
+// ---------------------------------------------------------------------------
+
+/// Events sent over the SSE `/api/chat/stream` connection.
+pub type StreamEvent {
+  /// Server is waiting for the first token from Gemini.
+  StreamThinking
+  /// A text delta from Gemini.
+  StreamChunk(text: String)
+  /// Generation complete. `text` is the full accumulated reply.
+  StreamDone(text: String)
+  /// Something went wrong.
+  StreamError(message: String)
+}
+
+pub fn stream_event_to_json(evt: StreamEvent) -> Json {
+  case evt {
+    StreamThinking -> json.object([#("type", json.string("thinking"))])
+    StreamChunk(text) ->
+      json.object([
+        #("type", json.string("chunk")),
+        #("text", json.string(text)),
+      ])
+    StreamDone(text) ->
+      json.object([
+        #("type", json.string("done")),
+        #("text", json.string(text)),
+      ])
+    StreamError(message) ->
+      json.object([
+        #("type", json.string("error")),
+        #("message", json.string(message)),
+      ])
+  }
+}
+
+pub fn stream_event_decoder() -> decode.Decoder(StreamEvent) {
+  use event_type <- decode.field("type", decode.string)
+  case event_type {
+    "thinking" -> decode.success(StreamThinking)
+    "chunk" -> {
+      use text <- decode.field("text", decode.string)
+      decode.success(StreamChunk(text:))
+    }
+    "done" -> {
+      use text <- decode.field("text", decode.string)
+      decode.success(StreamDone(text:))
+    }
+    "error" -> {
+      use message <- decode.field("message", decode.string)
+      decode.success(StreamError(message:))
+    }
+    _ -> decode.failure(StreamThinking, "StreamEvent")
+  }
+}

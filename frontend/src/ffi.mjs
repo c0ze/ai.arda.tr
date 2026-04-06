@@ -87,7 +87,7 @@ export function scroll_to_bottom(selector) {
 export function is_localhost() {
   if (typeof window === "undefined" || !window.location) return false;
   const h = window.location.hostname;
-  return h === "localhost" || h === "127.0.0.1";
+  return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0";
 }
 
 export function focus_element(selector) {
@@ -96,4 +96,62 @@ export function focus_element(selector) {
     const el = document.querySelector(selector);
     if (el && typeof el.focus === "function") el.focus();
   });
+}
+
+// Stream a POST request to the SSE endpoint. Calls `on_event` for each
+// parsed SSE event object. The callback receives a JSON string.
+export function stream_chat(url, body_json, on_event) {
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body_json,
+  })
+    .then((resp) => {
+      if (!resp.ok) {
+        on_event(JSON.stringify({ type: "error", message: "HTTP " + resp.status }));
+        return;
+      }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      function pump() {
+        return reader.read().then(({ done, value }) => {
+          if (done) {
+            // Process any remaining buffered data
+            if (buffer.trim()) processBuffer();
+            return;
+          }
+          buffer += decoder.decode(value, { stream: true });
+          processBuffer();
+          return pump();
+        });
+      }
+
+      function processBuffer() {
+        // SSE events are separated by double newlines
+        const parts = buffer.split("\n\n");
+        // Keep the last (possibly incomplete) part in the buffer
+        buffer = parts.pop() || "";
+        for (const part of parts) {
+          for (const line of part.split("\n")) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6);
+              try {
+                // Validate it's JSON before forwarding
+                JSON.parse(data);
+                on_event(data);
+              } catch (_) {
+                // Skip malformed data lines
+              }
+            }
+          }
+        }
+      }
+
+      return pump();
+    })
+    .catch((err) => {
+      on_event(JSON.stringify({ type: "error", message: String(err) }));
+    });
 }

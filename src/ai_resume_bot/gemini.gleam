@@ -127,7 +127,7 @@ fn decode_reply(body: String) -> Result(String, GeminiError) {
   })
 }
 
-fn response_decoder() -> decode.Decoder(List(String)) {
+pub fn response_decoder() -> decode.Decoder(List(String)) {
   use candidates <- decode.field("candidates", decode.list(candidate_decoder()))
   // Flatten the candidate -> parts -> text structure, keeping only the first
   // candidate (matches the Go implementation which reads candidates[0]).

@@ -6,6 +6,7 @@ import ai_resume_bot/gemini
 import ai_resume_bot/models.{type ChatRequest}
 import shared.{ChatResponse}
 import ai_resume_bot/smtp
+import gleam/bytes_tree
 import gleam/http
 import gleam/http/request
 import gleam/http/response
@@ -14,6 +15,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 import logging
+import mist
 import wisp.{type Request, type Response}
 
 pub type Config {
@@ -211,6 +213,38 @@ fn send_and_respond(
           )
         }
       }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CORS preflight for raw Mist routes (SSE)
+// ---------------------------------------------------------------------------
+
+/// Handle an OPTIONS preflight for endpoints served at the Mist level
+/// (outside of Wisp), such as `/api/chat/stream`.
+pub fn cors_preflight(
+  req: request.Request(mist.Connection),
+  allowed_origins: List(String),
+) -> response.Response(mist.ResponseData) {
+  let origin = case request.get_header(req, "origin") {
+    Ok(v) -> v
+    Error(_) -> ""
+  }
+  let base =
+    response.new(200)
+    |> response.set_body(mist.Bytes(bytes_tree.new()))
+    |> response.set_header(
+      "access-control-allow-methods",
+      "POST, GET, OPTIONS, PUT, DELETE",
+    )
+    |> response.set_header(
+      "access-control-allow-headers",
+      "Content-Type, Authorization",
+    )
+  case list.contains(allowed_origins, origin) {
+    True ->
+      response.set_header(base, "access-control-allow-origin", origin)
+    False -> base
   }
 }
 

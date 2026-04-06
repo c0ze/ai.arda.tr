@@ -656,6 +656,41 @@ input:checked + .slider::before {
     }
 }
 
+/* Anthropic-style "Thinking..." indicator */
+.thinking-indicator {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0.5rem 0;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+}
+
+.thinking-text {
+    animation: thinking-pulse 2s ease-in-out infinite;
+}
+
+.thinking-dots span {
+    display: inline-block;
+    animation: thinking-dot 1.4s infinite ease-in-out;
+}
+
+.thinking-dots span:nth-child(1) { animation-delay: 0s; }
+.thinking-dots span::after { content: "."; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinking-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+@keyframes thinking-dot {
+    0%, 60%, 100% { opacity: 0.3; }
+    30% { opacity: 1; }
+}
+
 /* ─── Mobile Responsive ───────────────────────── */
 @media (max-width: 640px) {
     #header {
