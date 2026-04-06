@@ -46,7 +46,7 @@ RUN gleam export erlang-shipment
 ##
 ## Stage 3: Minimal runtime image.
 ##
-FROM erlang:27-alpine
+FROM erlang:28-alpine
 
 WORKDIR /app
 
