@@ -1,0 +1,7 @@
+name = "shared"
+version = "1.0.0"
+description = "Shared types and JSON codecs for the ai.arda.tr chat API."
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+gleam_json = ">= 3.0.0 and < 4.0.0"

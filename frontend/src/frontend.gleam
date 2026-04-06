@@ -11,10 +11,10 @@ import frontend/i18n.{type Language, type Strings, En, Jp}
 import frontend/icons
 import gleam/dynamic/decode
 import gleam/int
-import gleam/json
 import gleam/list
 import gleam/string
 import lustre
+import shared.{ChatMessage as WireMessage, ChatRequest}
 import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
@@ -196,27 +196,19 @@ fn next_theme(theme: Theme) -> Theme {
 // ---------------------------------------------------------------------------
 
 fn call_api(text: String, history: List(ChatMessage)) -> Effect(Msg) {
-  let body =
-    json.object([
-      #("message", json.string(text)),
-      #(
-        "history",
-        json.array(history, fn(m) {
-          json.object([
-            #("role", json.string(role_of(m.sender))),
-            #("content", json.string(m.text)),
-          ])
-        }),
-      ),
-    ])
-
-  let handler = rsvp.expect_json(reply_decoder(), ApiReplied)
+  let wire_history =
+    list.map(history, fn(m) {
+      WireMessage(role: role_of(m.sender), content: m.text)
+    })
+  let body = shared.chat_request_to_json(ChatRequest(
+    message: text,
+    history: wire_history,
+  ))
+  let response_decoder =
+    shared.chat_response_decoder()
+    |> decode.map(fn(resp) { resp.reply })
+  let handler = rsvp.expect_json(response_decoder, ApiReplied)
   rsvp.post(api_endpoint(), body, handler)
-}
-
-fn reply_decoder() -> decode.Decoder(String) {
-  use reply <- decode.field("reply", decode.string)
-  decode.success(reply)
 }
 
 fn role_of(sender: Sender) -> String {

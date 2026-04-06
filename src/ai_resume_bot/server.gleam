@@ -4,6 +4,7 @@
 import ai_resume_bot/email.{type SmtpConfig}
 import ai_resume_bot/gemini
 import ai_resume_bot/models.{type ChatRequest}
+import shared.{ChatResponse}
 import ai_resume_bot/smtp
 import gleam/http
 import gleam/http/request
@@ -148,7 +149,7 @@ fn maybe_handle_email(reply: String, config: Config) -> Response {
     False ->
       json_response(
         200,
-        models.chat_response_to_json(models.ChatResponse(
+        models.chat_response_to_json(ChatResponse(
           reply: reply,
           error: "",
         )),
@@ -203,7 +204,7 @@ fn send_and_respond(
           let final_reply = extracted.clean_reply <> email.contact_success_suffix
           json_response(
             200,
-            models.chat_response_to_json(models.ChatResponse(
+            models.chat_response_to_json(ChatResponse(
               reply: final_reply,
               error: "",
             )),

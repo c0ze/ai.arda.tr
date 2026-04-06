@@ -1,61 +1,37 @@
-//// Domain types mirroring internal/models/models.go.
+//// Domain types for the backend.
 ////
-//// Kept deliberately close to the Go structs so the JSON contract with the
-//// frontend and with Gemini stays byte-for-byte compatible during migration.
+//// Chat wire types (ChatMessage, ChatRequest, ChatResponse) and their JSON
+//// codecs live in the `shared` package so both backend and frontend stay in
+//// sync at compile time. This module re-exports them for convenience and
+//// defines backend-only types (resume data, email payload).
 
 import gleam/dynamic/decode
-import gleam/json
 import gleam/option.{type Option, None, Some}
+import shared
 
 // ---------------------------------------------------------------------------
-// Chat wire types
+// Re-exports from shared (so existing imports keep working)
 // ---------------------------------------------------------------------------
 
-pub type ChatMessage {
-  ChatMessage(role: String, content: String)
-}
+pub type ChatMessage =
+  shared.ChatMessage
 
-pub type ChatRequest {
-  ChatRequest(message: String, history: List(ChatMessage))
-}
+pub type ChatRequest =
+  shared.ChatRequest
 
-pub type ChatResponse {
-  ChatResponse(reply: String, error: String)
-}
+pub type ChatResponse =
+  shared.ChatResponse
 
-pub fn chat_message_decoder() -> decode.Decoder(ChatMessage) {
-  use role <- decode.field("role", decode.string)
-  use content <- decode.field("content", decode.string)
-  decode.success(ChatMessage(role:, content:))
-}
+pub const chat_message_decoder = shared.chat_message_decoder
 
-pub fn chat_request_decoder() -> decode.Decoder(ChatRequest) {
-  use message <- decode.field("message", decode.string)
-  use history <- decode.optional_field(
-    "history",
-    [],
-    decode.list(chat_message_decoder()),
-  )
-  decode.success(ChatRequest(message:, history:))
-}
+pub const chat_request_decoder = shared.chat_request_decoder
 
-pub fn chat_response_to_json(resp: ChatResponse) -> json.Json {
-  case resp.error {
-    "" -> json.object([#("reply", json.string(resp.reply))])
-    err ->
-      json.object([
-        #("reply", json.string(resp.reply)),
-        #("error", json.string(err)),
-      ])
-  }
-}
+pub const chat_response_to_json = shared.chat_response_to_json
 
-pub fn error_response(message: String) -> json.Json {
-  json.object([#("error", json.string(message))])
-}
+pub const error_response = shared.error_response
 
 // ---------------------------------------------------------------------------
-// Resume data types
+// Resume data types (backend-only)
 // ---------------------------------------------------------------------------
 
 pub type About {
