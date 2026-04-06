@@ -1,0 +1,35 @@
+# .gcloudignore — controls what gcloud run deploy --source uploads.
+# Without this file, gcloud falls back to .gitignore which doesn't exclude
+# build/ when it contains epoch-timestamped files (causing the
+# "ZIP does not support timestamps before 1980" error).
+
+# Git internals
+.git/
+.github/
+
+# Local config / secrets
+.env
+.mise.toml
+.claude/
+
+# Gleam / BEAM build artifacts (epoch timestamps from reproducible builds)
+build/
+frontend/build/
+frontend/.lustre/
+
+# Generated frontend bundle (rebuilt inside Docker)
+public/frontend.js
+public/frontend.js.map
+public/index.html
+
+# Erlang crash dumps
+erl_crash.dump
+*.beam
+*.ez
+
+# Docs
+GLEAM_MIGRATION_PLAN.md
+DEPLOYMENT_OPTIONS.md
+DNS_SETUP.md
+README.md
+recovered_env.txt
