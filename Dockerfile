@@ -17,6 +17,7 @@ RUN cd frontend && gleam deps download
 
 # Source + static assets the build step reads/copies.
 COPY frontend/src frontend/src
+COPY shared/src shared/src
 COPY public public
 
 # Emit the minified bundle + generated index.html into /public so the
