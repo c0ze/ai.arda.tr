@@ -2,7 +2,7 @@ name: Deploy Backend to Cloud Run
 
 on:
   workflow_dispatch:
-  # Uncomment the below lines to enable auto-deploy on push
+  # Uncomment to enable auto-deploy on push to main
   # push:
   #   branches:
   #     - main
@@ -21,8 +21,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Authenticate to Google Cloud using Workload Identity Federation
-      # Requires secrets: GCP_WIF_PROVIDER, GCP_SA_EMAIL
+      # Authenticate to Google Cloud via Workload Identity Federation.
+      # Required secrets: GCP_WIF_PROVIDER, GCP_SA_EMAIL.
       - name: Google Auth
         id: auth
         uses: google-github-actions/auth@v2
@@ -30,8 +30,9 @@ jobs:
           workload_identity_provider: '${{ secrets.GCP_WIF_PROVIDER }}'
           service_account: '${{ secrets.GCP_SA_EMAIL }}'
 
-      # Deploy to Cloud Run
-      # Requires secret: GEMINI_API_KEY
+      # Build & deploy the Gleam/BEAM image from the repo-root Dockerfile.
+      # Required secrets: GEMINI_API_KEY, ALLOWED_ORIGINS.
+      # Optional secrets: GMAIL_USER, GMAIL_APP_PASSWORD, CONTACT_ADDRESS.
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
         with:
@@ -40,4 +41,8 @@ jobs:
           source: '.'
           env_vars: |
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
+            GMAIL_USER=${{ secrets.GMAIL_USER }}
+            GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
+            CONTACT_ADDRESS=${{ secrets.CONTACT_ADDRESS }}
           flags: '--allow-unauthenticated'

@@ -1,9 +1,10 @@
 # Backend Deployment Options (Google Cloud Run)
 
-You have two main ways to deploy the Go backend.
+The backend is a Gleam/BEAM service packaged by the repo-root [Dockerfile](Dockerfile) and deployed to Cloud Run (`ai-arda-tr-api`, `asia-northeast1`). You have two ways to ship it.
 
-## Option 1: Manual Deployment (from Local)
-**Best for:** Rapid testing, simple setup, no CI/CD overhead.
+## Option 1: Manual Deployment from Local
+
+Best for rapid iteration.
 
 1.  **Authenticate:**
     ```bash
@@ -12,7 +13,6 @@ You have two main ways to deploy the Go backend.
     ```
 
 2.  **Deploy:**
-    Run this command in the root of your project:
     ```bash
     gcloud run deploy ai-arda-tr-api \
       --source . \
@@ -20,91 +20,89 @@ You have two main ways to deploy the Go backend.
       --region asia-northeast1 \
       --project YOUR_PROJECT_ID \
       --allow-unauthenticated \
-      --set-env-vars "GEMINI_API_KEY=your_key_here,ALLOWED_ORIGINS=https://ai.arda.tr;http://localhost:8080"
+      --set-env-vars "GEMINI_API_KEY=your_key,ALLOWED_ORIGINS=https://ai.arda.tr;http://localhost:8080"
     ```
-    `ALLOWED_ORIGINS` is required by the app at startup.
+    `GEMINI_API_KEY` and `ALLOWED_ORIGINS` are required at startup. `GMAIL_USER` / `GMAIL_APP_PASSWORD` / `CONTACT_ADDRESS` are optional for the contact-email handoff.
 
 3.  **Finalize:**
-    - Copy the URL provided in the output.
-    - Paste it into `public/script.js` as the `API_BASE_URL`.
-    - Push the change to `public/script.js` to update the live frontend.
+    - The Cloud Run URL is already hard-coded as `API_BASE_URL` in [public/script.js](public/script.js). Update it only if you rename the service or move regions.
 
 ### Helper Script
 
-The included `cloud_deploy.sh` helper reads `.env` and requires:
+[cloud_deploy.sh](cloud_deploy.sh) reads `.env` and requires:
 - `GCP_PROJECT_ID`
 - `GEMINI_API_KEY`
 - `ALLOWED_ORIGINS`
 
-It also checks the currently active `gcloud` project and switches it to `GCP_PROJECT_ID` from `.env` before deploying, then still passes `--project` explicitly to `gcloud run deploy`.
+It forwards optional `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `CONTACT_ADDRESS`. It also verifies the active `gcloud` project and switches it to `GCP_PROJECT_ID` before calling `gcloud run deploy --source .`, which builds the Gleam Dockerfile via Cloud Build.
+
+> `--allow-unauthenticated` is required because the frontend is a public website. Without it, every visitor would need an IAM login.
 
 ---
-      # --allow-unauthenticated is REQUIRED because your frontend is a public website.
-      # Without this, Cloud Run would require a Google IAM login for every visitor.
 
-## Option 2: Automated Deployment (GitHub Actions)
-**Best for:** Professional workflow, automatic updates on push.
+## Option 2: GitHub Actions (Workload Identity Federation)
 
-**Security:** We use **Workload Identity Federation**, which allows GitHub Actions to authenticate without storing long-lived service account keys (JSON files).
+[.github/workflows/deploy-backend.yml](.github/workflows/deploy-backend.yml) runs on `workflow_dispatch` and uses **Workload Identity Federation** so no long-lived service-account JSON keys are stored in GitHub.
 
-### Setup Steps
+### One-time Google Cloud setup
 
-1.  **Google Cloud Setup (One-time):**
-    Run these commands locally to set up the trust:
+```bash
+export PROJECT_ID="your-project-id"
+export SERVICE_ACCOUNT="github-deployer"
+export REPO="akara/ai.arda.tr"   # owner/repo
 
-    ```bash
-    # Variables
-    export PROJECT_ID="your-project-id"
-    export SERVICE_ACCOUNT="github-deployer"
+gcloud iam service-accounts create "$SERVICE_ACCOUNT"
 
-    # 1. Create Service Account
-    gcloud iam service-accounts create $SERVICE_ACCOUNT
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/run.admin"
 
-    # 2. Grant Permissions (Cloud Run Admin & Artifact Registry Admin)
-    gcloud projects add-iam-policy-binding $PROJECT_ID \
-      --member="serviceAccount:$SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
-      --role="roles/run.admin"
-    
-    gcloud projects add-iam-policy-binding $PROJECT_ID \
-      --member="serviceAccount:$SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
-      --role="roles/iam.serviceAccountUser"
-      
-    gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:$SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
-        --role="roles/artifactregistry.admin"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser"
 
-    # 3. Create Workload Identity Pool
-    gcloud iam workload-identity-pools create "github-pool" \
-      --location="global" \
-      --display-name="GitHub Pool"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/artifactregistry.admin"
 
-    # 4. Create Provider
-    gcloud iam workload-identity-pools providers create-oidc "github-provider" \
-      --location="global" \
-      --workload-identity-pool="github-pool" \
-      --display-name="GitHub Provider" \
-      --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
-      --issuer-uri="https://token.actions.githubusercontent.com"
+gcloud iam workload-identity-pools create "github-pool" \
+  --location="global" --display-name="GitHub Pool"
 
-    # 5. Allow Repository to Impersonate Service Account
-    # REPLACE "user/repo" with your actual "username/repository-name"
-    gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
-      --role="roles/iam.workloadIdentityUser" \
-      --member="principalSet://iam.googleapis.com/projects/$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')/locations/global/workloadIdentityPools/github-pool/attribute.repository/akara/ai.arda.tr"
-    ```
+gcloud iam workload-identity-pools providers create-oidc "github-provider" \
+  --location="global" \
+  --workload-identity-pool="github-pool" \
+  --display-name="GitHub Provider" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
+  --issuer-uri="https://token.actions.githubusercontent.com"
 
-2.  **GitHub Secrets:**
-    Go to `Settings > Secrets and variables > Actions` and add:
-    - `GCP_PROJECT_ID`: Your Google Cloud Project ID.
-    - `GCP_SA_EMAIL`: `github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com`
-    - `GCP_WIF_PROVIDER`: The full provider path. You can get it with:
-      ```bash
-      gcloud iam workload-identity-pools providers describe github-provider \
-        --location=global \
-        --workload-identity-pool=github-pool \
-        --format="value(name)"
-      ```
-    - `GEMINI_API_KEY`: Your actual Gemini API key.
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 
-3.  **Workflow File:**
-    Create `.github/workflows/deploy-backend.yml` (I can create this for you if you choose this path).
+gcloud iam service-accounts add-iam-policy-binding \
+  "$SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/$REPO"
+```
+
+### GitHub repository secrets
+
+Under `Settings → Secrets and variables → Actions`:
+
+| Secret | Purpose |
+|---|---|
+| `GCP_WIF_PROVIDER` | Full provider resource name (see below) |
+| `GCP_SA_EMAIL` | `github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com` |
+| `GEMINI_API_KEY` | Google Gemini API key |
+| `ALLOWED_ORIGINS` | Semicolon-delimited CORS allowlist |
+| `GMAIL_USER` | (optional) SMTP user for contact handoff |
+| `GMAIL_APP_PASSWORD` | (optional) SMTP app password |
+| `CONTACT_ADDRESS` | (optional) Recipient address; defaults to `GMAIL_USER` |
+
+Fetch the provider resource name with:
+```bash
+gcloud iam workload-identity-pools providers describe github-provider \
+  --location=global \
+  --workload-identity-pool=github-pool \
+  --format="value(name)"
+```
+
+Trigger the workflow manually from the Actions tab (`Deploy Backend to Cloud Run → Run workflow`).

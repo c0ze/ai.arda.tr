@@ -1,32 +1,71 @@
-# Stage 1: Builder
-FROM golang:1.26.1-alpine AS builder
-WORKDIR /app
+##
+## Stage 1: Build the Lustre frontend bundle.
+##
+## lustre_dev_tools downloads Bun on first run, so we need a writeable
+## $HOME and network access during the build.
+##
+FROM ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine AS frontend
+
+WORKDIR /frontend
+RUN apk add --no-cache bash libstdc++
+
+# Cache deps separately from the source tree.
+COPY frontend/gleam.toml frontend/manifest.toml* ./
+RUN gleam deps download
+
+# Source + static assets the build step reads/copies.
+COPY frontend/src ./src
+COPY public /public
+
+# Emit the minified bundle + generated index.html into /public so the
+# backend can serve it at runtime.
+RUN gleam run -m lustre/dev build --minify --outdir=/public
+
+##
+## Stage 2: Build the Gleam backend as an Erlang release.
+##
+FROM ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine AS builder
+
+WORKDIR /build
 
 # Cache dependencies separately from the source tree.
-COPY go.mod go.sum ./
-RUN go mod download
+COPY gleam.toml manifest.toml* ./
+RUN gleam deps download
 
 # Copy the application source.
-COPY . .
+COPY src ./src
+COPY test ./test
 
-# Fetch resume data
-RUN go run main.go -fetch
+# Fetch the resume JSON at build time so the runtime image does not need
+# outbound access to GitHub at boot.
+RUN gleam run -- fetch
 
-# Build Binary
-# CGO_ENABLED=0 ensures a static binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o server main.go
+# Build a self-contained Erlang release tree under /build/build/erlang-shipment
+RUN gleam export erlang-shipment
 
-# Stage 2: Runtime
-FROM gcr.io/distroless/static-debian12
-WORKDIR /
+##
+## Stage 3: Minimal runtime image.
+##
+FROM erlang:28-alpine
 
-# Copy Binary and Static Assets
-COPY --from=builder /app/server /server
-COPY --from=builder /app/public /public
-COPY --from=builder /app/data /data
-COPY --from=builder /app/job_requirements.md /job_requirements.md
+WORKDIR /app
+
+# Copy the Gleam/Erlang shipment.
+COPY --from=builder /build/build/erlang-shipment /app
+
+# Resume data fetched at build time.
+COPY --from=builder /build/data /app/data
+
+# Static frontend assets (including the Lustre-built bundle) served by
+# wisp.serve_static.
+COPY --from=frontend /public /app/public
+
+# Optional job-requirements rider appended to the system prompt at startup.
+COPY job_requirements.md /app/job_requirements.md
+
+ENV PUBLIC_DIR=/app/public
 
 # Cloud Run expects 8080 by default
 EXPOSE 8080
 
-ENTRYPOINT ["/server"]
+ENTRYPOINT ["/app/entrypoint.sh", "run"]

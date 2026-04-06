@@ -1,0 +1,37 @@
+name = "frontend"
+version = "1.0.0"
+target = "javascript"
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+gleam_json = ">= 3.0.0 and < 4.0.0"
+lustre = ">= 5.0.0 and < 6.0.0"
+rsvp = ">= 1.0.0 and < 2.0.0"
+
+[dev_dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
+lustre_dev_tools = ">= 1.0.0 and < 3.0.0"
+
+[tools.lustre.build]
+minify = true
+outdir = "../public"
+
+[tools.lustre.dev]
+proxy = { from = "/api", to = "http://localhost:8080/api" }
+
+[tools.lustre.html]
+lang = "en"
+title = "Arda's AI Construct"
+meta = [
+  { name = "viewport", content = "width=device-width, initial-scale=1.0" },
+]
+stylesheets = [
+  { href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
+  { href = "/style.css?v=10" },
+]
+scripts = [
+  { src = "https://cdn.jsdelivr.net/npm/marked/marked.min.js" },
+  { src = "https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js" },
+  { content = "var _f=document.createElement('link');_f.rel='icon';_f.type='image/svg+xml';_f.href='/favicon.svg';document.head.appendChild(_f);document.addEventListener('DOMContentLoaded',function(){document.body.setAttribute('data-theme',localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));});" },
+]
+body = "<div id=\"app\"></div>"
