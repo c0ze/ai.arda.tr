@@ -6,20 +6,24 @@
 ##
 FROM ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine AS frontend
 
-WORKDIR /frontend
+WORKDIR /app
 RUN apk add --no-cache bash libstdc++
 
-# Cache deps separately from the source tree.
-COPY frontend/gleam.toml frontend/manifest.toml* ./
-RUN gleam deps download
+# Cache deps separately from the source tree, but we need the shared module
+# since frontend/gleam.toml specifies a local path dependency on it
+COPY frontend/gleam.toml frontend/manifest.toml* frontend/
+COPY shared/gleam.toml shared/manifest.toml* shared/
+RUN cd frontend && gleam deps download
 
 # Source + static assets the build step reads/copies.
-COPY frontend/src ./src
-COPY public /public
+COPY frontend/src frontend/src
+COPY public public
 
 # Emit the minified bundle + generated index.html into /public so the
 # backend can serve it at runtime.
-RUN gleam run -m lustre/dev build --minify --outdir=/public
+RUN cd frontend && gleam run -m lustre/dev build --minify --outdir=../public
+
+
 
 ##
 ## Stage 2: Build the Gleam backend as an Erlang release.
@@ -30,10 +34,12 @@ WORKDIR /build
 
 # Cache dependencies separately from the source tree.
 COPY gleam.toml manifest.toml* ./
+COPY shared/gleam.toml shared/manifest.toml* shared/
 RUN gleam deps download
 
 # Copy the application source.
 COPY src ./src
+COPY shared/src ./shared/src
 COPY test ./test
 
 # Fetch the resume JSON at build time so the runtime image does not need
