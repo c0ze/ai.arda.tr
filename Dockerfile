@@ -25,7 +25,6 @@ COPY public public
 RUN cd frontend && gleam run -m lustre/dev build --minify --outdir=../public
 
 
-
 ##
 ## Stage 2: Build the Gleam backend as an Erlang release.
 ##
