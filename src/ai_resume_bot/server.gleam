@@ -4,6 +4,7 @@
 import ai_resume_bot/email.{type SmtpConfig}
 import ai_resume_bot/gemini
 import ai_resume_bot/models.{type ChatRequest}
+import ai_resume_bot/rate_limit
 import ai_resume_bot/smtp
 import gleam/bytes_tree
 import gleam/http
@@ -25,6 +26,7 @@ pub type Config {
     smtp: Option(SmtpConfig),
     public_dir: String,
     log_requests: Bool,
+    rate_limit: rate_limit.Config,
   )
 }
 
@@ -121,9 +123,22 @@ fn maybe_set_header(
 // ---------------------------------------------------------------------------
 
 fn handle_chat(req: Request, config: Config) -> Response {
-  case req.method {
-    http.Post -> do_chat(req, config)
-    _ -> json_response(405, models.error_response("Method not allowed"))
+  case
+    rate_limit.check(
+      config.rate_limit,
+      request.get_header(req, "x-forwarded-for"),
+    )
+  {
+    False ->
+      json_response(
+        429,
+        models.error_response("Too many requests. Please slow down."),
+      )
+    True ->
+      case req.method {
+        http.Post -> do_chat(req, config)
+        _ -> json_response(405, models.error_response("Method not allowed"))
+      }
   }
 }
 
