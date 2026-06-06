@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
@@ -49,9 +50,20 @@ func main() {
 		systemPrompt = resume.BuildPrompt(resumeData)
 	}
 
-	// Initialize Gemini Service
+	// Fold in job requirements once at startup, instead of re-reading the file
+	// on every request. A missing file is fine — the prompt is left unchanged.
+	if reqData, err := os.ReadFile("job_requirements.md"); err == nil {
+		systemPrompt = gemini.ComposeSystemPrompt(systemPrompt, string(reqData))
+	}
+
+	// Initialize Gemini Service. The underlying client is created once here and
+	// reused for every request.
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	geminiService := gemini.NewService(apiKey, systemPrompt)
+	geminiService, err := gemini.NewService(context.Background(), apiKey, systemPrompt)
+	if err != nil {
+		log.Fatalf("Failed to initialize Gemini service: %v", err)
+	}
+	defer geminiService.Close()
 
 	// Initialize API Handler
 	apiHandler := api.NewHandler(geminiService)
