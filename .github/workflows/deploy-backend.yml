@@ -17,6 +17,11 @@ on:
       - 'manifest.toml'
       - 'job_requirements.md'
       - '.github/workflows/deploy-backend.yml'
+  # Fired by c0ze/resume (via repository_dispatch) when the résumé content
+  # changes, so the bot re-fetches the latest résumé at build time. See
+  # DEPLOYMENT_OPTIONS.md → "Auto-refresh on résumé changes".
+  repository_dispatch:
+    types: [resume-updated]
   workflow_dispatch:
 
 permissions:
