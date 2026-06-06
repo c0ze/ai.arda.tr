@@ -75,9 +75,15 @@ export function render_markdown(text) {
 // before we read its layout.
 export function scroll_to_bottom(selector) {
   if (typeof document === "undefined") return;
+  // Double rAF: the first frame lets Lustre commit its DOM patch (e.g. the
+  // freshly-sent message); the second runs after that paint, so scrollHeight
+  // is final. A single rAF can read a stale height on the send path, leaving
+  // the new message below the fold until the agent's reply re-scrolls.
   requestAnimationFrame(() => {
-    const el = document.querySelector(selector);
-    if (el) el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => {
+      const el = document.querySelector(selector);
+      if (el) el.scrollTop = el.scrollHeight;
+    });
   });
 }
 
