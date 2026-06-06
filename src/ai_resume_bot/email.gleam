@@ -14,6 +14,17 @@ pub const contact_failure_message = "I couldn't reach Arda at this moment. Pleas
 
 pub const contact_success_suffix = "\n\n(Note: I have sent the email to Arda with your details.)"
 
+/// Compose the user-facing reply after a contact-email attempt. Used by both
+/// the streaming and non-streaming paths so they report success/failure
+/// consistently: a failed or unconfigured send appends the failure message
+/// rather than silently implying success.
+pub fn reply_with_outcome(clean_reply: String, sent: Bool) -> String {
+  case sent {
+    True -> clean_reply <> contact_success_suffix
+    False -> clean_reply <> "\n\n" <> contact_failure_message
+  }
+}
+
 pub type ExtractError {
   MissingTags
   EmptyPayload
