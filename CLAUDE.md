@@ -43,7 +43,7 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │       └── ffi.mjs         # localStorage, matchMedia, marked+DOMPurify, scroll
 ├── public/                 # Hand-written style.css + favicon + CNAME + built Lustre bundle
 ├── data/                   # Resume JSON fetched from c0ze/resume
-├── Dockerfile              # BEAM release on erlang:27-alpine
+├── Dockerfile              # BEAM release on erlang:28-alpine
 ├── cloud_deploy.sh         # gcloud run deploy wrapper, reads .env
 └── .github/workflows/      # CI/CD for backend and UI
 ```

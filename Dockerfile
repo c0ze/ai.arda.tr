@@ -4,7 +4,12 @@
 ## lustre_dev_tools downloads Bun on first run, so we need a writeable
 ## $HOME and network access during the build.
 ##
-FROM ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine AS frontend
+# Pin the build OTP explicitly to match the runtime (erlang:28-alpine). The
+# gleam image is built on an unpinned `erlang:alpine`, so we reuse only its
+# official gleam binary on a version-locked base instead of depending on
+# whatever OTP that image happens to bundle.
+FROM erlang:28-alpine AS frontend
+COPY --from=ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine /bin/gleam /bin/gleam
 
 WORKDIR /app
 RUN apk add --no-cache bash libstdc++
@@ -28,7 +33,8 @@ RUN cd frontend && gleam run -m lustre/dev build --minify --outdir=../public
 ##
 ## Stage 2: Build the Gleam backend as an Erlang release.
 ##
-FROM ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine AS builder
+FROM erlang:28-alpine AS builder
+COPY --from=ghcr.io/gleam-lang/gleam:v1.15.2-erlang-alpine /bin/gleam /bin/gleam
 
 WORKDIR /build
 
