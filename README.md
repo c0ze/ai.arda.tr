@@ -6,7 +6,7 @@ A chatbot that answers questions about Arda's career, backed by Google's Gemini 
 
 - **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist), hosted on **Google Cloud Run** (Tokyo).
 - **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript, sources in [frontend/](frontend/). The build emits a minified bundle into [public/](public/) (alongside the hand-written [public/style.css](public/style.css)), which is served by the Gleam backend locally and by **GitHub Pages** in production.
-- **AI Model**: Google Gemini (`gemini-3-flash-preview` by default, configurable via `GEMINI_MODEL`).
+- **AI Model**: Google Gemini (`gemini-3.5-flash` by default, configurable via `GEMINI_MODEL`).
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@ A chatbot that answers questions about Arda's career, backed by Google's Gemini 
    # Optional:
    # PORT=8080
    # LOG_REQUESTS=true              # per-request logs, off in prod by default
-   # GEMINI_MODEL=gemini-3-flash-preview
+   # GEMINI_MODEL=gemini-3.5-flash
    # GMAIL_USER=...                 # contact-email handoff (optional)
    # GMAIL_APP_PASSWORD=...
    # CONTACT_ADDRESS=...
@@ -73,7 +73,7 @@ The resume JSON is fetched at build time and baked into the image. The built fro
 | `ALLOWED_ORIGINS` | yes | — | Semicolon-delimited CORS allowlist |
 | `PORT` | no | `8080` | HTTP listen port |
 | `PUBLIC_DIR` | no | `./public` | Static asset directory |
-| `GEMINI_MODEL` | no | `gemini-3-flash-preview` | Gemini model id |
+| `GEMINI_MODEL` | no | `gemini-3.5-flash` | Gemini model id |
 | `LOG_REQUESTS` | no | off | `true`/`1`/`yes`/`on` enables per-request logs |
 | `RATE_LIMIT_REQUESTS` | no | `30` | Max chat requests per window per client IP |
 | `RATE_LIMIT_WINDOW_SECONDS` | no | `60` | Rate-limit window length, in seconds |

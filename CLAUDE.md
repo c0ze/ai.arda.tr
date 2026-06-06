@@ -10,7 +10,7 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 
 - **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist)
 - **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript in [frontend/](frontend/); build output lands in [public/](public/), served by the Gleam backend locally and by GitHub Pages in production
-- **AI**: Google Gemini (`gemini-3-flash-preview` by default, configurable via `GEMINI_MODEL`)
+- **AI**: Google Gemini (`gemini-3.5-flash` by default, configurable via `GEMINI_MODEL`)
 - **Deployment**: Docker container on Google Cloud Run (backend), GitHub Pages (frontend)
 
 ## Project Structure
@@ -84,7 +84,7 @@ docker run -p 8080:8080 \
 | `ALLOWED_ORIGINS` | yes | — | Semicolon-delimited CORS allowlist |
 | `PORT` | no | `8080` | HTTP listen port |
 | `PUBLIC_DIR` | no | `./public` | Static asset directory |
-| `GEMINI_MODEL` | no | `gemini-3-flash-preview` | Gemini model id |
+| `GEMINI_MODEL` | no | `gemini-3.5-flash` | Gemini model id |
 | `LOG_REQUESTS` | no | off | Per-request logs; off in prod, on in local `.env` |
 | `RATE_LIMIT_REQUESTS` | no | `30` | Max chat requests per window per client IP |
 | `RATE_LIMIT_WINDOW_SECONDS` | no | `60` | Rate-limit window length, in seconds |

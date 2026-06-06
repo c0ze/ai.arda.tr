@@ -111,7 +111,7 @@ fn run_server() -> Nil {
 
   let model_name = case envoy.get("GEMINI_MODEL") {
     Ok(v) if v != "" -> v
-    _ -> "gemini-3-flash-preview"
+    _ -> "gemini-3.5-flash"
   }
 
   let gemini_service = gemini.new(api_key, model_name, system_prompt)
