@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 
@@ -9,6 +10,11 @@ import (
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
 )
+
+// ErrMissingAPIKey is returned by NewService when no API key is provided, so
+// the server fails fast at startup with a clear message rather than depending
+// on the SDK to surface an auth error later.
+var ErrMissingAPIKey = errors.New("missing GEMINI_API_KEY")
 
 // defaultModel is the Gemini model used for chat completions.
 const defaultModel = "gemini-3-flash-preview"
@@ -73,6 +79,9 @@ type Service struct {
 // service, so callers must Close it on shutdown. initialPrompt is used as the
 // model's system instruction.
 func NewService(ctx context.Context, apiKey, initialPrompt string) (*Service, error) {
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, ErrMissingAPIKey
+	}
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return nil, err

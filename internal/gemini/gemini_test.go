@@ -1,12 +1,30 @@
 package gemini
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/c0ze/ai-resume-bot/internal/models"
 	"github.com/google/generative-ai-go/genai"
 )
+
+func TestNewService_EmptyAPIKey(t *testing.T) {
+	svc, err := NewService(context.Background(), "", "prompt")
+	if !errors.Is(err, ErrMissingAPIKey) {
+		t.Errorf("expected ErrMissingAPIKey, got %v", err)
+	}
+	if svc != nil {
+		t.Errorf("expected nil service on error, got %v", svc)
+	}
+}
+
+func TestNewService_WhitespaceAPIKey(t *testing.T) {
+	if _, err := NewService(context.Background(), "  \t ", "prompt"); !errors.Is(err, ErrMissingAPIKey) {
+		t.Errorf("expected ErrMissingAPIKey for whitespace key, got %v", err)
+	}
+}
 
 func TestComposeSystemPrompt_NoRequirements(t *testing.T) {
 	base := "BASE PROMPT"

@@ -63,7 +63,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize Gemini service: %v", err)
 	}
-	defer geminiService.Close()
+	defer func() {
+		if err := geminiService.Close(); err != nil {
+			log.Printf("Warning: failed to close Gemini service: %v", err)
+		}
+	}()
 
 	// Initialize API Handler
 	apiHandler := api.NewHandler(geminiService)
