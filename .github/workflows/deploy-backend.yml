@@ -1,40 +1,52 @@
 name: Deploy Backend to Cloud Run
 
+# Auto-deploys on push to main when backend-relevant files change. Frontend /
+# docs-only changes do not trigger a backend redeploy (the frontend ships to
+# GitHub Pages via deploy-ui.yml). Manual runs are still available.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - 'src/**'
+      - 'shared/src/**'
+      - 'shared/gleam.toml'
+      - 'shared/manifest.toml'
+      - 'gleam.toml'
+      - 'manifest.toml'
+      - 'job_requirements.md'
+      - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
-  # Uncomment to enable auto-deploy on push to main
-  # push:
-  #   branches:
-  #     - main
-  #   paths-ignore:
-  #     - 'public/**'
-  #     - '.github/workflows/deploy-ui.yml'
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
-      # Authenticate to Google Cloud via Workload Identity Federation.
-      # Required secrets: GCP_WIF_PROVIDER, GCP_SA_EMAIL.
+      # Keyless auth via Workload Identity Federation — no JSON keys in GitHub.
+      # Required secrets: GCP_WIF_PROVIDER (full provider resource name),
+      # GCP_SA_EMAIL. Create them once with scripts/setup-gcp-wif.sh.
       - name: Google Auth
         id: auth
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           workload_identity_provider: '${{ secrets.GCP_WIF_PROVIDER }}'
           service_account: '${{ secrets.GCP_SA_EMAIL }}'
 
-      # Build & deploy the Gleam/BEAM image from the repo-root Dockerfile.
-      # Required secrets: GEMINI_API_KEY, ALLOWED_ORIGINS.
-      # Optional secrets: GMAIL_USER, GMAIL_APP_PASSWORD, CONTACT_ADDRESS.
+      # Build the image from the repo-root Dockerfile (via Cloud Build) and
+      # deploy. Required secrets: GEMINI_API_KEY, ALLOWED_ORIGINS.
+      # Optional: GMAIL_USER, GMAIL_APP_PASSWORD, CONTACT_ADDRESS.
       - name: Deploy to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
+        uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2
         with:
           service: 'ai-arda-tr-api'
           region: 'asia-northeast1'
