@@ -26,14 +26,6 @@ export function storage_set(key, value) {
   }
 }
 
-export function prefers_dark() {
-  try {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  } catch (_) {
-    return false;
-  }
-}
-
 export function set_body_theme(theme) {
   if (typeof document !== "undefined" && document.body) {
     document.body.setAttribute("data-theme", theme);

@@ -27,8 +27,8 @@ meta = [
   { name = "viewport", content = "width=device-width, initial-scale=1.0" },
 ]
 stylesheets = [
-  { href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
-  { href = "/style.css?v=10" },
+  { href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
+  { href = "/style.css?v=11" },
 ]
 scripts = [
   # Vendored under public/vendor/ (marked 18.0.5, DOMPurify 3.4.8) — pinned and
@@ -36,6 +36,6 @@ scripts = [
   # no need for SRI (which Lustre's html config can't express on scripts anyway).
   { src = "/vendor/marked.min.js" },
   { src = "/vendor/purify.min.js" },
-  { content = "var _f=document.createElement('link');_f.rel='icon';_f.type='image/svg+xml';_f.href='/favicon.svg';document.head.appendChild(_f);document.addEventListener('DOMContentLoaded',function(){document.body.setAttribute('data-theme',localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));});" },
+  { content = "var _f=document.createElement('link');_f.rel='icon';_f.type='image/svg+xml';_f.href='/favicon.svg';document.head.appendChild(_f);document.addEventListener('DOMContentLoaded',function(){document.body.setAttribute('data-theme',localStorage.getItem('theme')||'light');});" },
 ]
 body = "<div id=\"app\"></div>"

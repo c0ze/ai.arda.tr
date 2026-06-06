@@ -26,13 +26,6 @@ pub fn sun() -> Element(msg) {
   )
 }
 
-pub fn dracula() -> Element(msg) {
-  raw(
-    "icon-slot",
-    "<svg class=\"icon-dracula\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z\"/><path d=\"M8 14l2-4 2 4\"/><path d=\"M12 14l2-4 2 4\"/></svg>",
-  )
-}
-
 pub fn terminal() -> Element(msg) {
   raw(
     "welcome-svg",

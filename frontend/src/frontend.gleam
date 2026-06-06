@@ -1,7 +1,7 @@
 //// Lustre port of the chat UI that lives at ai.arda.tr.
 ////
 //// Shape mirrors the old `public/script.js`:
-////   - theme (dark / light / dracula) persisted in localStorage
+////   - theme (light / dark) persisted in localStorage
 ////   - language toggle (en / jp) with translated strings + quick prompts
 ////   - chat history sent with each request to `/api/chat/stream` (SSE)
 ////   - markdown rendered through marked.js + DOMPurify (loaded from CDN
@@ -45,9 +45,8 @@ const max_history_messages = 20
 // ---------------------------------------------------------------------------
 
 pub type Theme {
-  Dark
   Light
-  Dracula
+  Dark
 }
 
 pub type Sender {
@@ -270,9 +269,8 @@ fn split_last(items: List(a)) -> #(List(a), Bool) {
 
 fn next_theme(theme: Theme) -> Theme {
   case theme {
+    Light -> Dark
     Dark -> Light
-    Light -> Dracula
-    Dracula -> Dark
   }
 }
 
@@ -354,7 +352,7 @@ fn header(model: Model, s: Strings) -> Element(Msg) {
           attribute.title("Toggle theme"),
           event.on_click(UserToggledTheme),
         ],
-        [icons.moon(), icons.sun(), icons.dracula()],
+        [icons.moon(), icons.sun()],
       ),
       language_toggle(model.language),
     ]),
@@ -546,15 +544,10 @@ fn input_footer(model: Model, s: Strings) -> Element(Msg) {
 // ---------------------------------------------------------------------------
 
 fn load_theme() -> Theme {
+  // Default to light to match resume.arda.tr; dark is opt-in via the toggle.
   case do_storage_get("theme") {
     Ok("dark") -> Dark
-    Ok("light") -> Light
-    Ok("dracula") -> Dracula
-    _ ->
-      case do_prefers_dark() {
-        True -> Dark
-        False -> Light
-      }
+    _ -> Light
   }
 }
 
@@ -568,9 +561,8 @@ fn apply_theme(theme: Theme) -> Nil {
 
 fn theme_to_string(theme: Theme) -> String {
   case theme {
-    Dark -> "dark"
     Light -> "light"
-    Dracula -> "dracula"
+    Dark -> "dark"
   }
 }
 
@@ -583,9 +575,6 @@ fn do_storage_get(key: String) -> Result(String, Nil)
 
 @external(javascript, "./ffi.mjs", "storage_set")
 fn do_storage_set(key: String, value: String) -> Nil
-
-@external(javascript, "./ffi.mjs", "prefers_dark")
-fn do_prefers_dark() -> Bool
 
 @external(javascript, "./ffi.mjs", "set_body_theme")
 fn do_set_body_theme(theme: String) -> Nil
