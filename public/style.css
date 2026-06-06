@@ -334,15 +334,18 @@ input:checked + .slider::before {
 .topic-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 0.875rem;
-    background-color: transparent;
+    gap: 0.5rem;
+    padding: 0.5rem 0.9rem;
+    background-color: var(--bg-secondary);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-xl);
     color: var(--text-secondary);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.8125rem;
+    /* Mono, uppercase, tracked — echoes resume.arda.tr's nav/eyebrow labels. */
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.7rem;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
     cursor: pointer;
     transition: all 0.18s ease;
 }
