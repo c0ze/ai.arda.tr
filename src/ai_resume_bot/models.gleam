@@ -6,7 +6,7 @@
 //// defines backend-only types (resume data, email payload).
 
 import gleam/dynamic/decode
-import gleam/option.{type Option, None, Some}
+import gleam/option.{type Option, None}
 import shared
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ pub fn education_entry_decoder() -> decode.Decoder(EducationEntry) {
   use additional_info <- decode.optional_field(
     "additionalInfo",
     None,
-    decode.optional(additional_info_decoder()) |> decode.map(option_flatten),
+    decode.optional(additional_info_decoder()),
   )
   decode.success(EducationEntry(
     degree:,
@@ -180,13 +180,6 @@ pub fn education_entry_decoder() -> decode.Decoder(EducationEntry) {
     description:,
     additional_info:,
   ))
-}
-
-fn option_flatten(o: Option(AdditionalInfo)) -> Option(AdditionalInfo) {
-  case o {
-    Some(v) -> Some(v)
-    None -> None
-  }
 }
 
 pub fn education_decoder() -> decode.Decoder(Education) {
