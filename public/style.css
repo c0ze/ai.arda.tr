@@ -461,7 +461,7 @@ input:checked + .slider::before {
 }
 .message-content strong { font-weight: 600; }
 .message-content h1, .message-content h2, .message-content h3 {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Manrope', sans-serif;
     font-weight: 600;
     margin-bottom: 0.5em;
     margin-top: 0.75em;
@@ -499,7 +499,7 @@ input:checked + .slider::before {
     border: none;
     color: var(--text-primary);
     font-size: 0.9375rem;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Manrope', sans-serif;
     outline: none;
     padding: 0.625rem 0;
 }
