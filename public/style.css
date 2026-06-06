@@ -77,16 +77,9 @@ html, body {
 body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: Manrope, -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-}
-
-/* Display font for headings, matching resume.arda.tr (Space Grotesk). */
-#header h1,
-#welcome-screen h2 {
-    font-family: 'Space Grotesk', 'Manrope', sans-serif;
-    letter-spacing: -0.02em;
 }
 
 #app {
@@ -111,7 +104,7 @@ body {
 }
 
 .header-left h1 {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Space Grotesk', Manrope, sans-serif;
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--text-primary);
@@ -284,7 +277,7 @@ input:checked + .slider::before {
 }
 
 #welcome-screen h2 {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Space Grotesk', Manrope, sans-serif;
     font-size: 1.5rem;
     font-weight: 700;
     margin-bottom: 0.625rem;
@@ -334,15 +327,18 @@ input:checked + .slider::before {
 .topic-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 0.875rem;
-    background-color: transparent;
+    gap: 0.5rem;
+    padding: 0.5rem 0.9rem;
+    background-color: var(--bg-secondary);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-xl);
     color: var(--text-secondary);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.8125rem;
+    /* Mono, uppercase, tracked — echoes resume.arda.tr's nav/eyebrow labels. */
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.7rem;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
     cursor: pointer;
     transition: all 0.18s ease;
 }
@@ -465,7 +461,7 @@ input:checked + .slider::before {
 }
 .message-content strong { font-weight: 600; }
 .message-content h1, .message-content h2, .message-content h3 {
-    font-family: 'Inter', sans-serif;
+    font-family: Manrope, sans-serif;
     font-weight: 600;
     margin-bottom: 0.5em;
     margin-top: 0.75em;
@@ -503,7 +499,7 @@ input:checked + .slider::before {
     border: none;
     color: var(--text-primary);
     font-size: 0.9375rem;
-    font-family: 'Inter', sans-serif;
+    font-family: Manrope, sans-serif;
     outline: none;
     padding: 0.625rem 0;
 }
