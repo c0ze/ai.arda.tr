@@ -185,10 +185,14 @@ pub fn gemini_request_omits_key_from_url_test() {
   let body = gemini.build_request_body("system prompt", [], "hello")
   let assert Ok(req) = gemini.build_request(svc, body)
 
+  // Assert both the secret value and the `key=` parameter name are absent, so
+  // the test also fails if the URL regresses to `?key=` with a different value.
   let in_url =
     string.contains(req.path, "SECRET-KEY-123")
+    || string.contains(req.path, "key=")
     || case req.query {
-      Some(q) -> string.contains(q, "SECRET-KEY-123")
+      Some(q) ->
+        string.contains(q, "SECRET-KEY-123") || string.contains(q, "key=")
       None -> False
     }
   in_url
