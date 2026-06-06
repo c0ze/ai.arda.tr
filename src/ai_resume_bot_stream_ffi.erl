@@ -10,25 +10,30 @@
 %% body incrementally via mailbox messages.
 
 -module(ai_resume_bot_stream_ffi).
--export([stream_post/3]).
+-export([stream_post/4]).
 
-%% stream_post(Url, Body, Subject)
-%%   Url     :: binary()  — full URL including ?key=...&alt=sse
+%% stream_post(Url, ApiKey, Body, Subject)
+%%   Url     :: binary()  — full URL including ?alt=sse (no key; see ApiKey)
+%%   ApiKey  :: binary()  — Gemini API key, sent as the x-goog-api-key header
+%%                          so it never appears in the URL / logs
 %%   Body    :: binary()  — JSON request body
 %%   Subject :: gleam Subject (an erlang process wrapped by gleam/otp)
 %%
 %% Spawns a process that makes the request and forwards chunks to Subject.
 %% Returns {ok, nil} immediately.
-stream_post(Url, Body, Subject) ->
+stream_post(Url, ApiKey, Body, Subject) ->
     %% Ensure inets is started (needed for httpc)
     _ = application:ensure_all_started(inets),
     _ = application:ensure_all_started(ssl),
-    spawn_link(fun() -> do_stream(Url, Body, Subject) end),
+    spawn_link(fun() -> do_stream(Url, ApiKey, Body, Subject) end),
     {ok, nil}.
 
-do_stream(Url, Body, Subject) ->
+do_stream(Url, ApiKey, Body, Subject) ->
     UrlStr = binary_to_list(Url),
-    Headers = [{"content-type", "application/json"}],
+    Headers = [
+        {"content-type", "application/json"},
+        {"x-goog-api-key", binary_to_list(ApiKey)}
+    ],
     Request = {UrlStr, Headers, "application/json", Body},
     HttpOpts = [{timeout, 120000}, {connect_timeout, 10000}],
     Opts = [{sync, false}, {stream, self}],

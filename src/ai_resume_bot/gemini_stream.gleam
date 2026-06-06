@@ -39,20 +39,26 @@ pub fn stream_generate(
     gemini.build_request_body(svc.system_prompt, history, user_message)
     |> json.to_string
 
-  let url =
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    <> svc.model
-    <> ":streamGenerateContent?key="
-    <> svc.api_key
-    <> "&alt=sse"
+  let url = stream_url(svc.model)
 
-  do_stream_post(url, body, subject)
+  do_stream_post(url, svc.api_key, body, subject)
   |> result.map(fn(_) { Nil })
+}
+
+/// The streaming generateContent endpoint for a model. As with the
+/// non-streaming `gemini.endpoint_url`, the API key is deliberately NOT in the
+/// URL — it is sent in the `x-goog-api-key` header by the FFI — so it never
+/// leaks into logs or error values.
+pub fn stream_url(model: String) -> String {
+  "https://generativelanguage.googleapis.com/v1beta/models/"
+  <> model
+  <> ":streamGenerateContent?alt=sse"
 }
 
 @external(erlang, "ai_resume_bot_stream_ffi", "stream_post")
 fn do_stream_post(
   url: String,
+  api_key: String,
   body: String,
   subject: Subject(StreamMsg),
 ) -> Result(Nil, String)
