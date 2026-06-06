@@ -21,11 +21,18 @@
 %%
 %% Spawns a process that makes the request and forwards chunks to Subject.
 %% Returns {ok, nil} immediately.
-stream_post(Url, ApiKey, Body, Subject) ->
+stream_post(Url, ApiKey, Body, {subject, OwnerPid, _Tag} = Subject) ->
     %% Ensure inets is started (needed for httpc)
     _ = application:ensure_all_started(inets),
     _ = application:ensure_all_started(ssl),
-    spawn_link(fun() -> do_stream(Url, ApiKey, Body, Subject) end),
+    %% Unlinked spawn: a crash in this HTTP process must NOT take down the SSE
+    %% actor. Instead we monitor the SSE owner, so that if the client
+    %% disconnects (the owner goes DOWN) we stop streaming and cancel the
+    %% in-flight Gemini request rather than orphaning it.
+    spawn(fun() ->
+        _ = erlang:monitor(process, OwnerPid),
+        do_stream(Url, ApiKey, Body, Subject)
+    end),
     {ok, nil}.
 
 do_stream(Url, ApiKey, Body, Subject) ->
@@ -71,7 +78,12 @@ receive_loop(RequestId, Subject) ->
                     send_msg(Subject, {stream_error, iolist_to_binary(
                         io_lib:format("HTTP ~p: ~s", [StatusCode, ResponseBody])
                     )})
-            end
+            end;
+        {'DOWN', _MRef, process, _OwnerPid, _Reason} ->
+            %% The SSE owner (client connection) went away; stop streaming and
+            %% cancel the request so we don't keep consuming the Gemini stream.
+            catch httpc:cancel_request(RequestId),
+            ok
     after 120000 ->
         send_msg(Subject, {stream_error, <<"stream timeout">>})
     end.

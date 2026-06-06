@@ -44,21 +44,54 @@ send(User, Password, To, Body) ->
                 {auth, always}
             ],
             Email = {User, [To], Body},
-            try gen_smtp_client:send_blocking(Email, Options) of
-                Receipt when is_binary(Receipt) ->
-                    {ok, nil};
-                {error, Type, Message} ->
-                    {error, {send_failed, iolist_to_binary(
-                        io_lib:format("~p: ~p", [Type, Message])
-                    )}};
-                {error, Reason} ->
-                    {error, {send_failed, iolist_to_binary(
-                        io_lib:format("~p", [Reason])
-                    )}}
-            catch
-                Class:Reason:_Stack ->
-                    {error, {send_failed, iolist_to_binary(
-                        io_lib:format("~p:~p", [Class, Reason])
-                    )}}
+            send_with_timeout(Email, Options, 30000)
+    end.
+
+%% Run the (blocking) send in a worker process so a hung SMTP connection can't
+%% block the chat reply indefinitely. The result is still returned
+%% synchronously, so the server / stream handlers can report success vs failure
+%% honestly (rather than a fire-and-forget that always claims success).
+send_with_timeout(Email, Options, TimeoutMs) ->
+    Parent = self(),
+    {Pid, Mon} = spawn_monitor(fun() ->
+        Parent ! {smtp_result, self(), do_send(Email, Options)}
+    end),
+    receive
+        {smtp_result, Pid, Result} ->
+            erlang:demonitor(Mon, [flush]),
+            Result;
+        {'DOWN', Mon, process, Pid, DownReason} ->
+            %% A normal worker exit races its result message; grab the result
+            %% if it's already in the mailbox, otherwise it really did crash.
+            receive
+                {smtp_result, Pid, Result} ->
+                    Result
+            after 0 ->
+                {error, {send_failed, iolist_to_binary(
+                    io_lib:format("smtp worker crashed: ~p", [DownReason])
+                )}}
             end
+    after TimeoutMs ->
+        erlang:demonitor(Mon, [flush]),
+        exit(Pid, kill),
+        {error, {send_failed, <<"smtp send timed out">>}}
+    end.
+
+do_send(Email, Options) ->
+    try gen_smtp_client:send_blocking(Email, Options) of
+        Receipt when is_binary(Receipt) ->
+            {ok, nil};
+        {error, Type, Message} ->
+            {error, {send_failed, iolist_to_binary(
+                io_lib:format("~p: ~p", [Type, Message])
+            )}};
+        {error, Reason} ->
+            {error, {send_failed, iolist_to_binary(
+                io_lib:format("~p", [Reason])
+            )}}
+    catch
+        Class:Reason:_Stack ->
+            {error, {send_failed, iolist_to_binary(
+                io_lib:format("~p:~p", [Class, Reason])
+            )}}
     end.
