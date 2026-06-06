@@ -76,3 +76,17 @@ Under `Settings → Secrets and variables → Actions` (or via `gh secret set`):
 ### Triggering
 
 Once the secrets are set, **pushing backend changes to `main` deploys automatically** (path-filtered to `Dockerfile`, `src/**`, `shared/src/**`, `gleam.toml`, `manifest.toml`, and `job_requirements.md`). You can also run it on demand from the Actions tab (`Deploy Backend to Cloud Run → Run workflow`).
+
+---
+
+## Auto-refresh on résumé changes
+
+The bot bakes the résumé JSON into its image at **build time** (`gleam run -- fetch`), so the running service holds a snapshot from its last deploy. To make résumé edits propagate automatically, this deploy also accepts a `repository_dispatch` event of type `resume-updated`, and the source repo ([`c0ze/resume`](https://github.com/c0ze/resume)) fires it whenever its content changes.
+
+**One-time setup:**
+
+1. Create a **fine-grained PAT** scoped to **`c0ze/ai.arda.tr`** with **Contents: Read and write** (that scope authorizes the `POST /repos/{owner}/{repo}/dispatches` API).
+2. In **`c0ze/resume`**, add it as the Actions secret **`BOT_DEPLOY_TOKEN`**.
+3. `c0ze/resume`'s `notify-bot.yml` workflow then dispatches `resume-updated` to this repo whenever `content/**` changes, triggering a backend redeploy that re-fetches the latest résumé.
+
+Until the PAT is set, refresh manually with `gh workflow run deploy-backend.yml` (or the Actions tab).
