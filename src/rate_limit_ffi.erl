@@ -47,11 +47,15 @@ now_ms() ->
 maybe_sweep(WindowStart) ->
     case rand:uniform(100) of
         1 ->
-            %% delete every object whose key's WindowStart is < the current one
-            ets:select_delete(
-                ?TABLE,
-                [{{{'_', '$1'}, '_'}, [{'<', '$1', WindowStart}], [true]}]
-            ),
+            %% Run the full-table delete in a throwaway process so the request
+            %% process never pays the scan cost. ETS is concurrency-safe, so
+            %% this does not block concurrent counter updates.
+            spawn(fun() ->
+                ets:select_delete(
+                    ?TABLE,
+                    [{{{'_', '$1'}, '_'}, [{'<', '$1', WindowStart}], [true]}]
+                )
+            end),
             ok;
         _ ->
             ok

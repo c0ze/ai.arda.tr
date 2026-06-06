@@ -212,8 +212,10 @@ pub fn gemini_stream_url_omits_key_test() {
 // rate_limit
 // ---------------------------------------------------------------------------
 
-pub fn client_key_takes_first_forwarded_ip_test() {
-  rate_limit.client_key(Ok("1.2.3.4, 5.6.7.8, 9.10.11.12"))
+pub fn client_key_takes_last_forwarded_ip_test() {
+  // Cloud Run appends the real client IP as the right-most hop; the left hops
+  // are client-spoofable and must be ignored.
+  rate_limit.client_key(Ok("9.9.9.9, 5.6.7.8, 1.2.3.4"))
   |> should.equal("1.2.3.4")
 }
 

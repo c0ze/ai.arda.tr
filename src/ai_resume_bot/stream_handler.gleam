@@ -43,23 +43,46 @@ pub fn handle_stream(
   req: request.Request(mist.Connection),
   config: StreamConfig,
 ) -> response.Response(ResponseData) {
+  let origin = case request.get_header(req, "origin") {
+    Ok(v) -> v
+    Error(_) -> ""
+  }
+  // Error responses must carry CORS headers too, otherwise the browser hides
+  // the 429/400 body from the (cross-origin) frontend.
+  let with_cors = fn(resp: response.Response(ResponseData)) {
+    let resp =
+      resp
+      |> response.set_header(
+        "access-control-allow-methods",
+        "POST, GET, OPTIONS",
+      )
+      |> response.set_header("access-control-allow-headers", "Content-Type")
+    case list.contains(config.allowed_origins, origin) {
+      True -> response.set_header(resp, "access-control-allow-origin", origin)
+      False -> resp
+    }
+  }
+
   case
     rate_limit.check(
       config.rate_limit,
       request.get_header(req, "x-forwarded-for"),
     )
   {
-    False -> error_response(429, "Too many requests. Please slow down.")
+    False ->
+      with_cors(error_response(429, "Too many requests. Please slow down."))
     True ->
       // Read the request body
       case mist.read_body(req, 1_000_000) {
-        Error(_) -> error_response(400, "Failed to read request body")
+        Error(_) ->
+          with_cors(error_response(400, "Failed to read request body"))
         Ok(req_with_body) ->
           case bit_array.to_string(req_with_body.body) {
-            Error(_) -> error_response(400, "Invalid UTF-8 in request body")
+            Error(_) ->
+              with_cors(error_response(400, "Invalid UTF-8 in request body"))
             Ok(body_str) ->
               case json.parse(body_str, shared.chat_request_decoder()) {
-                Error(_) -> error_response(400, "Invalid JSON")
+                Error(_) -> with_cors(error_response(400, "Invalid JSON"))
                 Ok(chat_req) -> start_sse(req, chat_req, config)
               }
           }

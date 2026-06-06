@@ -7,6 +7,7 @@
 //// this module owns the pure client-key extraction and the small wrapper API.
 
 import gleam/int
+import gleam/list
 import gleam/string
 
 /// Rate-limit policy: at most `max_requests` per `window_ms` per client key.
@@ -36,21 +37,28 @@ fn parse_positive(raw: Result(String, Nil), fallback: Int) -> Int {
   }
 }
 
-/// Derive the client key from the `x-forwarded-for` header value. Cloud Run
-/// puts the originating client IP first, so we take the left-most entry. When
-/// the header is absent we fall back to a shared `"unknown"` bucket so missing
-/// headers are *rate limited together* rather than bypassing the limit.
+/// Derive the rate-limit key from the `x-forwarded-for` header.
+///
+/// This service runs directly on Cloud Run (`*.run.app`), where Google's front
+/// end *appends* the real client IP as the right-most entry; any client-supplied
+/// hops sit to its left and are spoofable, so we take the right-most non-empty
+/// entry. (Behind a custom HTTPS load balancer the authoritative hop would be
+/// the second-from-right instead — revisit if the ingress changes.) A missing
+/// or blank header falls back to a shared `"unknown"` bucket so those requests
+/// are limited *together* rather than bypassing the limit.
 pub fn client_key(forwarded_for: Result(String, Nil)) -> String {
   case forwarded_for {
-    Ok(value) ->
-      case string.split(value, on: ",") {
-        [first, ..] ->
-          case string.trim(first) {
-            "" -> "unknown"
-            ip -> ip
-          }
-        [] -> "unknown"
+    Ok(value) -> {
+      let hops =
+        value
+        |> string.split(on: ",")
+        |> list.map(string.trim)
+        |> list.filter(fn(hop) { hop != "" })
+      case list.last(hops) {
+        Ok(ip) -> ip
+        Error(_) -> "unknown"
       }
+    }
     Error(_) -> "unknown"
   }
 }
