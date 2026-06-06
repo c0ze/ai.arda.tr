@@ -82,13 +82,6 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Display font for headings, matching resume.arda.tr (Space Grotesk). */
-#header h1,
-#welcome-screen h2 {
-    font-family: 'Space Grotesk', 'Manrope', sans-serif;
-    letter-spacing: -0.02em;
-}
-
 #app {
     display: flex;
     flex-direction: column;
@@ -111,7 +104,7 @@ body {
 }
 
 .header-left h1 {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Space Grotesk', 'Manrope', sans-serif;
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--text-primary);
@@ -284,7 +277,7 @@ input:checked + .slider::before {
 }
 
 #welcome-screen h2 {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Space Grotesk', 'Manrope', sans-serif;
     font-size: 1.5rem;
     font-weight: 700;
     margin-bottom: 0.625rem;
