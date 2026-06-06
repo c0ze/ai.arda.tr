@@ -56,6 +56,10 @@ FROM erlang:28-alpine
 
 WORKDIR /app
 
+# CA certificates so outbound TLS (e.g. verified SMTP via gen_smtp) can
+# validate server certificates; the base alpine image ships without them.
+RUN apk add --no-cache ca-certificates
+
 # Copy the Gleam/Erlang shipment.
 COPY --from=builder /build/build/erlang-shipment /app
 
