@@ -6,16 +6,22 @@ on:
     branches:
       - main
 
+# Least privilege: CI only needs to read the repository.
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend (format, build, test)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Erlang/OTP + Gleam
-        uses: erlef/setup-beam@v1
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1
         with:
           otp-version: "28.0"
           gleam-version: "1.15.2"
@@ -38,10 +44,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Erlang/OTP + Gleam
-        uses: erlef/setup-beam@v1
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1
         with:
           otp-version: "28.0"
           gleam-version: "1.15.2"
