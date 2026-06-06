@@ -35,6 +35,11 @@ import shared
 /// Gleam backend can serve us CORS-free.
 const cloud_run_base = "https://ai-arda-tr-api-599610058688.asia-northeast1.run.app"
 
+/// Cap on how many past messages are sent with each request, to bound token
+/// cost / latency on long conversations (~the last 10 exchanges). The full
+/// conversation is still shown in the UI.
+const max_history_messages = 20
+
 // ---------------------------------------------------------------------------
 // Model
 // ---------------------------------------------------------------------------
@@ -280,6 +285,7 @@ fn call_api_stream(text: String, history: List(ChatMessage)) -> Effect(Msg) {
     list.map(history, fn(m) {
       shared.ChatMessage(role: role_of(m.sender), content: m.text)
     })
+    |> shared.cap_history(max_history_messages)
   let body =
     shared.chat_request_to_json(shared.ChatRequest(
       message: text,
