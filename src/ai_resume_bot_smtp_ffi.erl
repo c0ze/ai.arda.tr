@@ -29,6 +29,18 @@ send(User, Password, To, Body) ->
                 {username, User},
                 {password, Password},
                 {tls, always},
+                %% Verify the server certificate (gen_smtp's default does not),
+                %% pin modern TLS, and check the hostname. Without this the
+                %% STARTTLS session is open to a MITM on outbound credentials.
+                {tls_options, [
+                    {verify, verify_peer},
+                    {cacerts, public_key:cacerts_get()},
+                    {versions, ['tlsv1.2', 'tlsv1.3']},
+                    {customize_hostname_check, [
+                        {match_fun,
+                            public_key:pkix_verify_hostname_match_fun(https)}
+                    ]}
+                ]},
                 {auth, always}
             ],
             Email = {User, [To], Body},
