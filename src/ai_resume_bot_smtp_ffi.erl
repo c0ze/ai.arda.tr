@@ -61,9 +61,16 @@ send_with_timeout(Email, Options, TimeoutMs) ->
             erlang:demonitor(Mon, [flush]),
             Result;
         {'DOWN', Mon, process, Pid, DownReason} ->
-            {error, {send_failed, iolist_to_binary(
-                io_lib:format("smtp worker crashed: ~p", [DownReason])
-            )}}
+            %% A normal worker exit races its result message; grab the result
+            %% if it's already in the mailbox, otherwise it really did crash.
+            receive
+                {smtp_result, Pid, Result} ->
+                    Result
+            after 0 ->
+                {error, {send_failed, iolist_to_binary(
+                    io_lib:format("smtp worker crashed: ~p", [DownReason])
+                )}}
+            end
     after TimeoutMs ->
         erlang:demonitor(Mon, [flush]),
         exit(Pid, kill),
