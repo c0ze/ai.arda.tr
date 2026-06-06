@@ -13,6 +13,7 @@ import gleam/option.{None, Some}
 import gleam/string
 import gleeunit
 import gleeunit/should
+import shared
 
 pub fn main() {
   gleeunit.main()
@@ -297,4 +298,34 @@ pub fn reply_with_outcome_failed_surfaces_failure_test() {
   // ... and must never claim success.
   string.contains(out, email.contact_success_suffix)
   |> should.be_false
+}
+
+// ---------------------------------------------------------------------------
+// shared.cap_history — bound the conversation history sent to the backend
+// ---------------------------------------------------------------------------
+
+pub fn cap_history_keeps_most_recent_test() {
+  let h = [
+    shared.ChatMessage("user", "1"),
+    shared.ChatMessage("model", "2"),
+    shared.ChatMessage("user", "3"),
+    shared.ChatMessage("model", "4"),
+  ]
+  shared.cap_history(h, 2)
+  |> should.equal([
+    shared.ChatMessage("user", "3"),
+    shared.ChatMessage("model", "4"),
+  ])
+}
+
+pub fn cap_history_shorter_than_max_is_unchanged_test() {
+  let h = [shared.ChatMessage("user", "1"), shared.ChatMessage("model", "2")]
+  shared.cap_history(h, 10)
+  |> should.equal(h)
+}
+
+pub fn cap_history_nonpositive_keeps_all_test() {
+  let h = [shared.ChatMessage("user", "1"), shared.ChatMessage("model", "2")]
+  shared.cap_history(h, 0)
+  |> should.equal(h)
 }

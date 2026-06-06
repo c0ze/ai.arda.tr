@@ -5,6 +5,7 @@
 
 import gleam/dynamic/decode
 import gleam/json.{type Json}
+import gleam/list
 
 // ---------------------------------------------------------------------------
 // Wire types
@@ -24,6 +25,22 @@ pub type ChatRequest {
 /// The response from `POST /api/chat`.
 pub type ChatResponse {
   ChatResponse(reply: String, error: String)
+}
+
+/// Keep only the most recent `max` messages of a conversation history, so a
+/// long chat doesn't grow the request payload (and token cost) without bound.
+/// A non-positive `max` keeps everything.
+pub fn cap_history(history: List(ChatMessage), max: Int) -> List(ChatMessage) {
+  case max <= 0 {
+    True -> history
+    False -> {
+      let len = list.length(history)
+      case len > max {
+        True -> list.drop(history, len - max)
+        False -> history
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
