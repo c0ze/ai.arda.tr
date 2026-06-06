@@ -86,6 +86,8 @@ docker run -p 8080:8080 \
 | `PUBLIC_DIR` | no | `./public` | Static asset directory |
 | `GEMINI_MODEL` | no | `gemini-3-flash-preview` | Gemini model id |
 | `LOG_REQUESTS` | no | off | Per-request logs; off in prod, on in local `.env` |
+| `RATE_LIMIT_REQUESTS` | no | `30` | Max chat requests per window per client IP |
+| `RATE_LIMIT_WINDOW_SECONDS` | no | `60` | Rate-limit window length, in seconds |
 | `GMAIL_USER` | no | — | SMTP user for contact handoff |
 | `GMAIL_APP_PASSWORD` | no | — | SMTP app password |
 | `CONTACT_ADDRESS` | no | `GMAIL_USER` | Recipient of contact emails |

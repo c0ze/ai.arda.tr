@@ -12,6 +12,7 @@
 import ai_resume_bot/email.{type SmtpConfig}
 import ai_resume_bot/gemini
 import ai_resume_bot/gemini_stream.{Chunk, Done, StreamError}
+import ai_resume_bot/rate_limit
 import ai_resume_bot/smtp
 import gleam/bit_array
 import gleam/bytes_tree
@@ -33,6 +34,7 @@ pub type StreamConfig {
     gemini: gemini.Service,
     smtp: Option(SmtpConfig),
     allowed_origins: List(String),
+    rate_limit: rate_limit.Config,
   )
 }
 
@@ -41,16 +43,25 @@ pub fn handle_stream(
   req: request.Request(mist.Connection),
   config: StreamConfig,
 ) -> response.Response(ResponseData) {
-  // Read the request body
-  case mist.read_body(req, 1_000_000) {
-    Error(_) -> error_response(400, "Failed to read request body")
-    Ok(req_with_body) ->
-      case bit_array.to_string(req_with_body.body) {
-        Error(_) -> error_response(400, "Invalid UTF-8 in request body")
-        Ok(body_str) ->
-          case json.parse(body_str, shared.chat_request_decoder()) {
-            Error(_) -> error_response(400, "Invalid JSON")
-            Ok(chat_req) -> start_sse(req, chat_req, config)
+  case
+    rate_limit.check(
+      config.rate_limit,
+      request.get_header(req, "x-forwarded-for"),
+    )
+  {
+    False -> error_response(429, "Too many requests. Please slow down.")
+    True ->
+      // Read the request body
+      case mist.read_body(req, 1_000_000) {
+        Error(_) -> error_response(400, "Failed to read request body")
+        Ok(req_with_body) ->
+          case bit_array.to_string(req_with_body.body) {
+            Error(_) -> error_response(400, "Invalid UTF-8 in request body")
+            Ok(body_str) ->
+              case json.parse(body_str, shared.chat_request_decoder()) {
+                Error(_) -> error_response(400, "Invalid JSON")
+                Ok(chat_req) -> start_sse(req, chat_req, config)
+              }
           }
       }
   }

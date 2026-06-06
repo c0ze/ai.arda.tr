@@ -8,6 +8,7 @@ import ai_resume_bot/dotenv
 import ai_resume_bot/email
 import ai_resume_bot/gemini
 import ai_resume_bot/prompt
+import ai_resume_bot/rate_limit
 import ai_resume_bot/resume
 import ai_resume_bot/server.{Config}
 import ai_resume_bot/stream_handler.{StreamConfig}
@@ -138,6 +139,15 @@ fn run_server() -> Nil {
     Error(_) -> False
   }
 
+  // Per-IP rate limiting for the public chat endpoints (configurable via
+  // RATE_LIMIT_REQUESTS / RATE_LIMIT_WINDOW_SECONDS; defaults 30 req / 60s).
+  let rate_limit_config =
+    rate_limit.config_from_env(
+      envoy.get("RATE_LIMIT_REQUESTS"),
+      envoy.get("RATE_LIMIT_WINDOW_SECONDS"),
+    )
+  rate_limit.init()
+
   let config =
     Config(
       gemini: gemini_service,
@@ -145,6 +155,7 @@ fn run_server() -> Nil {
       smtp: smtp_config,
       public_dir: public_dir,
       log_requests: log_requests,
+      rate_limit: rate_limit_config,
     )
 
   let port = case envoy.get("PORT") {
@@ -163,6 +174,7 @@ fn run_server() -> Nil {
       gemini: gemini_service,
       smtp: smtp_config,
       allowed_origins: allowed_origins,
+      rate_limit: rate_limit_config,
     )
 
   let wisp_handler =

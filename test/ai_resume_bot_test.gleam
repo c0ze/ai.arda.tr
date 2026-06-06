@@ -6,6 +6,7 @@ import ai_resume_bot/models.{
   Projects, ResumeData, Skills,
 }
 import ai_resume_bot/prompt
+import ai_resume_bot/rate_limit
 import gleam/http/request
 import gleam/list
 import gleam/option.{None, Some}
@@ -205,4 +206,73 @@ pub fn gemini_stream_url_omits_key_test() {
   |> should.be_false
   string.contains(url, "alt=sse")
   |> should.be_true
+}
+
+// ---------------------------------------------------------------------------
+// rate_limit
+// ---------------------------------------------------------------------------
+
+pub fn client_key_takes_first_forwarded_ip_test() {
+  rate_limit.client_key(Ok("1.2.3.4, 5.6.7.8, 9.10.11.12"))
+  |> should.equal("1.2.3.4")
+}
+
+pub fn client_key_trims_whitespace_test() {
+  rate_limit.client_key(Ok("  1.2.3.4  "))
+  |> should.equal("1.2.3.4")
+}
+
+pub fn client_key_falls_back_when_absent_test() {
+  rate_limit.client_key(Error(Nil))
+  |> should.equal("unknown")
+}
+
+pub fn client_key_falls_back_when_blank_test() {
+  rate_limit.client_key(Ok("   "))
+  |> should.equal("unknown")
+}
+
+pub fn rate_limit_allows_up_to_limit_then_denies_test() {
+  rate_limit.init()
+  let cfg = rate_limit.Config(max_requests: 3, window_ms: 1000)
+  rate_limit.allow_at(cfg, "rl-a", 0) |> should.be_true
+  rate_limit.allow_at(cfg, "rl-a", 100) |> should.be_true
+  rate_limit.allow_at(cfg, "rl-a", 200) |> should.be_true
+  rate_limit.allow_at(cfg, "rl-a", 300) |> should.be_false
+}
+
+pub fn rate_limit_resets_in_next_window_test() {
+  rate_limit.init()
+  let cfg = rate_limit.Config(max_requests: 1, window_ms: 1000)
+  rate_limit.allow_at(cfg, "rl-b", 500) |> should.be_true
+  rate_limit.allow_at(cfg, "rl-b", 700) |> should.be_false
+  // 1500 ms falls in the next 1000ms window, so the counter resets.
+  rate_limit.allow_at(cfg, "rl-b", 1500) |> should.be_true
+}
+
+pub fn rate_limit_isolates_keys_test() {
+  rate_limit.init()
+  let cfg = rate_limit.Config(max_requests: 1, window_ms: 1000)
+  rate_limit.allow_at(cfg, "rl-c1", 0) |> should.be_true
+  rate_limit.allow_at(cfg, "rl-c1", 1) |> should.be_false
+  // A different key has its own independent bucket.
+  rate_limit.allow_at(cfg, "rl-c2", 1) |> should.be_true
+}
+
+pub fn config_from_env_defaults_test() {
+  let cfg = rate_limit.config_from_env(Error(Nil), Error(Nil))
+  cfg.max_requests |> should.equal(30)
+  cfg.window_ms |> should.equal(60_000)
+}
+
+pub fn config_from_env_parses_values_test() {
+  let cfg = rate_limit.config_from_env(Ok("10"), Ok("5"))
+  cfg.max_requests |> should.equal(10)
+  cfg.window_ms |> should.equal(5000)
+}
+
+pub fn config_from_env_ignores_invalid_test() {
+  let cfg = rate_limit.config_from_env(Ok("abc"), Ok("-5"))
+  cfg.max_requests |> should.equal(30)
+  cfg.window_ms |> should.equal(60_000)
 }
