@@ -11,6 +11,11 @@ permissions:
   pages: write
   id-token: write
 
+# Opt JavaScript actions into Node 24 ahead of GitHub's June 2026 default
+# (keeps the SHA pins below; just changes the runtime).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: "pages"
   cancel-in-progress: true
