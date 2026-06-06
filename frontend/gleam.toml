@@ -38,4 +38,6 @@ scripts = [
   { src = "/vendor/purify.min.js" },
   { content = "var _f=document.createElement('link');_f.rel='icon';_f.type='image/svg+xml';_f.href='/favicon.svg';document.head.appendChild(_f);document.addEventListener('DOMContentLoaded',function(){document.body.setAttribute('data-theme',localStorage.getItem('theme')||'light');});" },
 ]
-body = "<div id=\"app\"></div>"
+# The CF Web Analytics beacon lives in `body` (raw HTML) because Lustre's
+# `scripts` config can't express the required data-cf-beacon attribute.
+body = "<div id=\"app\"></div><!-- Cloudflare Web Analytics --><script defer src=\"https://static.cloudflareinsights.com/beacon.min.js\" data-cf-beacon='{\"token\": \"ec0a808ebf6b4be7b59a63377cbeff3a\"}'></script><!-- End Cloudflare Web Analytics -->"
