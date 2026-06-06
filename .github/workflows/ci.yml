@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend:
+    name: Backend (format, build, test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Erlang/OTP + Gleam
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.0"
+          gleam-version: "1.15.2"
+          rebar3-version: "3"
+
+      - name: Check formatting
+        run: gleam format --check src test shared/src
+
+      - name: Download dependencies
+        run: gleam deps download
+
+      - name: Build
+        run: gleam build
+
+      - name: Test
+        run: gleam test
+
+  frontend:
+    name: Frontend (format, build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Erlang/OTP + Gleam
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.0"
+          gleam-version: "1.15.2"
+          rebar3-version: "3"
+
+      - name: Check formatting
+        working-directory: frontend
+        run: gleam format --check src
+
+      - name: Download dependencies
+        working-directory: frontend
+        run: gleam deps download
+
+      - name: Build Lustre bundle
+        working-directory: frontend
+        run: gleam run -m lustre/dev build --minify --outdir=../public
