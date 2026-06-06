@@ -11,6 +11,8 @@ on:
       - 'Dockerfile'
       - 'src/**'
       - 'shared/src/**'
+      - 'shared/gleam.toml'
+      - 'shared/manifest.toml'
       - 'gleam.toml'
       - 'manifest.toml'
       - 'job_requirements.md'
