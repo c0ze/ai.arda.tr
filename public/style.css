@@ -11,87 +11,56 @@
     font-size: 115%;
 }
 
-/* ─── Dark Mode (default) ─────────────────────── */
-[data-theme="dark"] {
-    --bg-primary:    #0c0c0e;
-    --bg-secondary:  #141417;
-    --bg-tertiary:   #1d1d21;
-    --bg-hover:      #252529;
-
-    --text-primary:  #eceae6;
-    --text-secondary:#a09890; /* 6.8:1 on bg-primary */
-    --text-muted:    #878380; /* 4.9:1 on bg-primary */
-
-    --accent:        #e8a52a;
-    --accent-hover:  #f2b840;
-    --accent-subtle: rgba(232, 165, 42, 0.09);
-
-    --border:        #222224;
-    --border-light:  #2d2d31;
-
-    --user-bubble:   #e8a52a;
-    --user-text:     #0c0c0e;
-    --bot-bubble:    #141417;
-
-    --shadow:        0 2px 16px rgba(0, 0, 0, 0.6);
-    --shadow-lg:     0 4px 32px rgba(0, 0, 0, 0.7);
-}
-
-/* ─── Light Mode ──────────────────────────────── */
+/* ─── Light Mode (default) — resume.arda.tr "alucard" ─── */
 [data-theme="light"] {
-    --bg-primary:    #f7f4ef;
-    --bg-secondary:  #ede9e1;
-    --bg-tertiary:   #e0dbd2;
-    --bg-hover:      #d5cfc4;
+    --bg-primary:    hsl(30 10% 98%);
+    --bg-secondary:  hsl(0 0% 100%);
+    --bg-tertiary:   hsl(60 4.8% 95.9%);
+    --bg-hover:      hsl(20 6% 92%);
 
-    --text-primary:  #1a1714;
-    --text-secondary:#5c5750;
-    --text-muted:    #706c66; /* 4.9:1 on bg-primary */
+    --text-primary:  hsl(20 14.3% 4.1%);
+    --text-secondary:hsl(25 8% 38%);
+    --text-muted:    hsl(25 6% 45%);
 
-    --accent:        #8a5200; /* 6.2:1 on bg-primary; was #c47a10 (3.5:1 — failed) */
-    --accent-hover:  #7a4900;
-    --accent-subtle: rgba(138, 82, 0, 0.1);
+    --accent:        hsl(216 55% 22%);   /* resume --primary (navy) */
+    --accent-hover:  hsl(216 55% 30%);
+    --accent-subtle: hsl(216 55% 22% / 0.08);
 
-    --border:        #dbd6ce;
-    --border-light:  #ccc7be;
+    --border:        hsl(20 6% 85%);
+    --border-light:  hsl(20 6% 90%);
 
-    --user-bubble:   #c47a10; /* kept warm amber; use dark text below for contrast */
-    --user-text:     #1a1714; /* 4.8:1 on user-bubble; was #fff (3.4:1 — failed) */
-    --bot-bubble:    #ede9e1;
+    --user-bubble:   hsl(216 55% 22%);
+    --user-text:     hsl(210 40% 98%);
+    --bot-bubble:    hsl(0 0% 100%);
 
-    --shadow:        0 2px 8px rgba(0, 0, 0, 0.08);
-    --shadow-lg:     0 4px 16px rgba(0, 0, 0, 0.12);
+    --shadow:        0 1px 2px hsl(20 14.3% 4.1% / 0.04), 0 4px 14px -8px hsl(20 14.3% 4.1% / 0.14);
+    --shadow-lg:     0 2px 6px -2px hsl(20 14.3% 4.1% / 0.08), 0 12px 30px -12px hsl(20 14.3% 4.1% / 0.22);
 }
 
-/* ─── Dracula Pro Mode ────────────────────────── */
-[data-theme="dracula"] {
-    --bg-primary:    #1e1d2e;
-    --bg-secondary:  #27263a;
-    --bg-tertiary:   #35324e;
-    --bg-hover:      #413e60;
+/* ─── Dark Mode — resume.arda.tr "van-helsing" ─── */
+[data-theme="dark"] {
+    --bg-primary:    hsl(20 14.3% 4.1%);
+    --bg-secondary:  hsl(20 10% 7%);
+    --bg-tertiary:   hsl(12 6.5% 12%);
+    --bg-hover:      hsl(20 6% 18%);
 
-    --text-primary:  #f8f8f2;
-    --text-secondary:#a8a5bc;
-    --text-muted:    #8c9abe; /* 4.7:1 on bg-primary; was #6272a4 (2.5:1 — failed) */
+    --text-primary:  hsl(40 10% 92%);
+    --text-secondary:hsl(30 6% 68%);
+    --text-muted:    hsl(30 6% 56%);
 
-    --accent:        #9580ff;
-    --accent-hover:  #aa99ff;
-    --accent-subtle: rgba(149, 128, 255, 0.13);
+    --accent:        hsl(216 50% 58%);   /* resume --primary (blue) */
+    --accent-hover:  hsl(216 50% 66%);
+    --accent-subtle: hsl(216 50% 58% / 0.12);
 
-    --border:        #35324e;
-    --border-light:  #413e60;
+    --border:        hsl(20 6% 18%);
+    --border-light:  hsl(20 6% 24%);
 
-    --user-bubble:   #9580ff;
-    --user-text:     #171626; /* 5.5:1 on user-bubble; was #fff (2.4:1 — failed) */
-    --bot-bubble:    #27263a;
+    --user-bubble:   hsl(216 50% 58%);
+    --user-text:     hsl(216 50% 8%);
+    --bot-bubble:    hsl(20 10% 7%);
 
-    --shadow:        0 2px 12px rgba(0, 0, 0, 0.5);
-    --shadow-lg:     0 4px 24px rgba(0, 0, 0, 0.6);
-
-    /* Dracula palette extras */
-    --dracula-pink:  #FF80BF;
-    --dracula-cyan:  #80FFEA;
-    --dracula-green: #8AFF80;
+    --shadow:        0 2px 16px hsl(0 0% 0% / 0.5);
+    --shadow-lg:     0 4px 32px hsl(0 0% 0% / 0.6);
 }
 
 /* ─── Reset ───────────────────────────────────── */
@@ -108,9 +77,16 @@ html, body {
 body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+/* Display font for headings, matching resume.arda.tr (Space Grotesk). */
+#header h1,
+#welcome-screen h2 {
+    font-family: 'Space Grotesk', 'Manrope', sans-serif;
+    letter-spacing: -0.02em;
 }
 
 #app {
@@ -185,9 +161,8 @@ body {
     display: none;
 }
 
-[data-theme="dark"]    .theme-toggle .icon-moon    { display: block; }
-[data-theme="light"]   .theme-toggle .icon-sun     { display: block; }
-[data-theme="dracula"] .theme-toggle .icon-dracula { display: block; }
+[data-theme="dark"]  .theme-toggle .icon-moon { display: block; }
+[data-theme="light"] .theme-toggle .icon-sun  { display: block; }
 
 /* ─── Language Toggle ─────────────────────────── */
 .language-toggle {
