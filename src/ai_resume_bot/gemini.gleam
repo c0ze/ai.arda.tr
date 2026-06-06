@@ -35,26 +35,41 @@ pub fn with_prompt_suffix(svc: Service, suffix: String) -> Service {
   Service(..svc, system_prompt: svc.system_prompt <> suffix)
 }
 
+/// The (non-streaming) generateContent endpoint for a model. The API key is
+/// deliberately NOT part of the URL — it is sent in a header (see
+/// `build_request`) so it never lands in logs or error values.
+pub fn endpoint_url(model: String) -> String {
+  "https://generativelanguage.googleapis.com/v1beta/models/"
+  <> model
+  <> ":generateContent"
+}
+
+/// Build the HTTP request for a generateContent call. The key travels in the
+/// `x-goog-api-key` header rather than the `?key=` query string.
+pub fn build_request(
+  svc: Service,
+  body: json.Json,
+) -> Result(request.Request(String), GeminiError) {
+  let url = endpoint_url(svc.model)
+  request.to(url)
+  |> result.map_error(fn(_) { RequestBuildError(url) })
+  |> result.map(fn(req) {
+    req
+    |> request.set_method(Post)
+    |> request.set_header("content-type", "application/json")
+    |> request.set_header("x-goog-api-key", svc.api_key)
+    |> request.set_body(json.to_string(body))
+  })
+}
+
 pub fn generate(
   svc: Service,
   user_message: String,
   history: List(ChatMessage),
 ) -> Result(String, GeminiError) {
   let body = build_request_body(svc.system_prompt, history, user_message)
-  let url =
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    <> svc.model
-    <> ":generateContent?key="
-    <> svc.api_key
 
-  use req <- result.try(
-    request.to(url) |> result.map_error(fn(_) { RequestBuildError(url) }),
-  )
-  let req =
-    req
-    |> request.set_method(Post)
-    |> request.set_header("content-type", "application/json")
-    |> request.set_body(json.to_string(body))
+  use req <- result.try(build_request(svc, body))
 
   use resp <- result.try(
     httpc.send(req)

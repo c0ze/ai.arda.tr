@@ -1,9 +1,12 @@
 import ai_resume_bot/email
+import ai_resume_bot/gemini
+import ai_resume_bot/gemini_stream
 import ai_resume_bot/models.{
   type ResumeData, About, Education, EducationEntry, Experience, Job, Project,
   Projects, ResumeData, Skills,
 }
 import ai_resume_bot/prompt
+import gleam/http/request
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
@@ -161,4 +164,41 @@ pub fn contains_tag_test() {
 pub fn sanitize_removes_header_injection_test() {
   email.sanitize("Taro\r\nBcc: evil@example.com")
   |> should.equal("Taro Bcc: evil@example.com")
+}
+
+// ---------------------------------------------------------------------------
+// gemini request construction — the API key must travel in a header, never in
+// the URL (where it would leak into logs / error values).
+// ---------------------------------------------------------------------------
+
+pub fn gemini_request_carries_key_in_header_test() {
+  let svc = gemini.new("SECRET-KEY-123", "gemini-test", "system prompt")
+  let body = gemini.build_request_body("system prompt", [], "hello")
+  let assert Ok(req) = gemini.build_request(svc, body)
+
+  request.get_header(req, "x-goog-api-key")
+  |> should.equal(Ok("SECRET-KEY-123"))
+}
+
+pub fn gemini_request_omits_key_from_url_test() {
+  let svc = gemini.new("SECRET-KEY-123", "gemini-test", "system prompt")
+  let body = gemini.build_request_body("system prompt", [], "hello")
+  let assert Ok(req) = gemini.build_request(svc, body)
+
+  let in_url =
+    string.contains(req.path, "SECRET-KEY-123")
+    || case req.query {
+      Some(q) -> string.contains(q, "SECRET-KEY-123")
+      None -> False
+    }
+  in_url
+  |> should.be_false
+}
+
+pub fn gemini_stream_url_omits_key_test() {
+  let url = gemini_stream.stream_url("gemini-test")
+  string.contains(url, "key=")
+  |> should.be_false
+  string.contains(url, "alt=sse")
+  |> should.be_true
 }
