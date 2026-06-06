@@ -96,10 +96,7 @@ fn cors_middleware(
 
   base
   |> maybe_set_header("access-control-allow-origin", allow_origin)
-  |> set_header(
-    "access-control-allow-methods",
-    "POST, GET, OPTIONS, PUT, DELETE",
-  )
+  |> set_header("access-control-allow-methods", "POST, GET, OPTIONS")
   |> set_header("access-control-allow-headers", "Content-Type, Authorization")
 }
 
@@ -239,10 +236,7 @@ pub fn cors_preflight(
   let base =
     response.new(200)
     |> response.set_body(mist.Bytes(bytes_tree.new()))
-    |> response.set_header(
-      "access-control-allow-methods",
-      "POST, GET, OPTIONS, PUT, DELETE",
-    )
+    |> response.set_header("access-control-allow-methods", "POST, GET, OPTIONS")
     |> response.set_header(
       "access-control-allow-headers",
       "Content-Type, Authorization",
