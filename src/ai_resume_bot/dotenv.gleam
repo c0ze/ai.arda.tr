@@ -68,12 +68,8 @@ fn parse_kv(line: String) -> Result(#(String, String), Nil) {
 
 fn unquote(value: String) -> String {
   case
-    {
-      string.starts_with(value, "\"") && string.ends_with(value, "\"")
-    }
-    || {
-      string.starts_with(value, "'") && string.ends_with(value, "'")
-    }
+    { string.starts_with(value, "\"") && string.ends_with(value, "\"") }
+    || { string.starts_with(value, "'") && string.ends_with(value, "'") }
   {
     True ->
       value

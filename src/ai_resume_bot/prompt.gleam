@@ -58,7 +58,13 @@ fn append_job(tree: StringTree, job: Job) -> StringTree {
   let tree =
     string_tree.append(
       tree,
-      "- **" <> job.title <> " at " <> job.company <> "** [" <> job.period <> "]:\n",
+      "- **"
+        <> job.title
+        <> " at "
+        <> job.company
+        <> "** ["
+        <> job.period
+        <> "]:\n",
     )
   let tree =
     list.fold(job.responsibilities, tree, fn(acc, resp) {

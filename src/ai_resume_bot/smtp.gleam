@@ -18,10 +18,7 @@ pub type SmtpError {
 }
 
 /// Send the contact email. The message body is formatted by `email.format_message`.
-pub fn send(
-  config: SmtpConfig,
-  payload: EmailPayload,
-) -> Result(Nil, SmtpError) {
+pub fn send(config: SmtpConfig, payload: EmailPayload) -> Result(Nil, SmtpError) {
   let body = email.format_message(config.to, payload)
   do_send(config.user, config.password, config.to, body)
 }

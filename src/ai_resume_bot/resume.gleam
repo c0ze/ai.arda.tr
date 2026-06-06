@@ -53,8 +53,7 @@ fn fetch_one(file: String, output_dir: String) -> Result(Nil, FetchError) {
       simplifile.write_bits(path, resp.body)
       |> result.map_error(fn(e) { WriteError(file, string.inspect(e)) })
     }
-    code ->
-      Error(HttpError(file, "status " <> int_to_string_fallback(code)))
+    code -> Error(HttpError(file, "status " <> int_to_string_fallback(code)))
   }
 }
 
@@ -100,13 +99,7 @@ pub fn load_from_disk(input_dir: String) -> Result(ResumeData, FetchError) {
     "education.json",
     models.education_decoder(),
   ))
-  Ok(ResumeData(
-    about:,
-    experience:,
-    projects:,
-    skills:,
-    education:,
-  ))
+  Ok(ResumeData(about:, experience:, projects:, skills:, education:))
 }
 
 fn load_file(

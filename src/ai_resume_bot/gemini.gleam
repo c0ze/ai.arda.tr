@@ -89,13 +89,19 @@ pub fn build_request_body(
       content_json(role, msg.content)
     })
 
-  let contents = list.append(history_contents, [content_json("user", user_message)])
+  let contents =
+    list.append(history_contents, [content_json("user", user_message)])
 
   json.object([
     #(
       "system_instruction",
       json.object([
-        #("parts", json.preprocessed_array([json.object([#("text", json.string(system_prompt))])])),
+        #(
+          "parts",
+          json.preprocessed_array([
+            json.object([#("text", json.string(system_prompt))]),
+          ]),
+        ),
       ]),
     ),
     #("contents", json.preprocessed_array(contents)),
