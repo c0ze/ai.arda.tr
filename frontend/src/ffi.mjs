@@ -3,9 +3,9 @@
 // Keeps browser-only concerns (localStorage, system theme preference,
 // markdown rendering, and DOMPurify sanitisation) out of Gleam.
 //
-// `marked` and `DOMPurify` are loaded globally from CDN <script> tags in
-// index.html. We intentionally fall back to a minimal renderer if either
-// library is missing so the app still shows plain text rather than crashing.
+// `marked` and `DOMPurify` are loaded globally from vendored <script> tags in
+// index.html (pinned copies under public/vendor/). If either is unavailable we
+// fall back to escaped plain text — never unsanitised HTML.
 
 import { Ok, Error } from "./gleam.mjs";
 
@@ -53,11 +53,19 @@ function escapeHtml(text) {
   });
 }
 
-// Render markdown -> sanitised HTML, mirroring the old script.js pipeline:
+// Render markdown -> sanitised HTML:
 //   marked.parse -> DOMPurify.sanitize -> rewrite <a ...> to open in a new tab.
+// DOMPurify is REQUIRED. If it (or marked) is missing we fall back to escaped
+// plain text and never return raw, unsanitised HTML (fail closed).
 export function render_markdown(text) {
+  // Without DOMPurify we cannot guarantee the HTML is safe, so escape and bail
+  // out rather than injecting unsanitised markup into the page.
+  if (typeof window === "undefined" || typeof window.DOMPurify === "undefined") {
+    return "<p>" + escapeHtml(text) + "</p>";
+  }
+
   let html;
-  if (typeof window !== "undefined" && typeof window.marked !== "undefined") {
+  if (typeof window.marked !== "undefined") {
     try {
       html = window.marked.parse(text);
     } catch (_) {
@@ -67,10 +75,7 @@ export function render_markdown(text) {
     html = "<p>" + escapeHtml(text) + "</p>";
   }
 
-  if (typeof window !== "undefined" && typeof window.DOMPurify !== "undefined") {
-    html = window.DOMPurify.sanitize(html, { ADD_ATTR: ["target"] });
-  }
-
+  html = window.DOMPurify.sanitize(html, { ADD_ATTR: ["target"] });
   return html.replace(/<a href/g, '<a target="_blank" rel="noopener noreferrer" href');
 }
 
