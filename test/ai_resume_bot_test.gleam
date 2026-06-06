@@ -26,46 +26,33 @@ fn fixture_resume() -> ResumeData {
       languages: "Languages:",
       languages_content: "English, Turkish, Japanese",
     ),
-    skills: Skills(
-      title: "Skills",
-      technical_skills: ["Go", "Gleam", "Erlang"],
-    ),
-    experience: Experience(
-      title: "Experience",
-      jobs: [
-        Job(
-          title: "Engineer",
-          company: "Acme",
-          period: "2020-now",
-          responsibilities: ["Built things", "Shipped things"],
+    skills: Skills(title: "Skills", technical_skills: ["Go", "Gleam", "Erlang"]),
+    experience: Experience(title: "Experience", jobs: [
+      Job(
+        title: "Engineer",
+        company: "Acme",
+        period: "2020-now",
+        responsibilities: ["Built things", "Shipped things"],
+      ),
+    ]),
+    education: Education(title: "Education", entries: [
+      EducationEntry(
+        degree: "BSc",
+        institution: "University",
+        period: "2010-2014",
+        description: "CS",
+        additional_info: Some(
+          models.AdditionalInfo(title: "Honors", items: ["Dean's list"]),
         ),
-      ],
-    ),
-    education: Education(
-      title: "Education",
-      entries: [
-        EducationEntry(
-          degree: "BSc",
-          institution: "University",
-          period: "2010-2014",
-          description: "CS",
-          additional_info: Some(models.AdditionalInfo(
-            title: "Honors",
-            items: ["Dean's list"],
-          )),
-        ),
-      ],
-    ),
-    projects: Projects(
-      title: "Projects",
-      entries: [
-        Project(
-          title: "ai.arda.tr",
-          technologies: "Gleam, Gemini",
-          description: "This bot",
-        ),
-      ],
-    ),
+      ),
+    ]),
+    projects: Projects(title: "Projects", entries: [
+      Project(
+        title: "ai.arda.tr",
+        technologies: "Gleam, Gemini",
+        description: "This bot",
+      ),
+    ]),
   )
 }
 
@@ -112,10 +99,9 @@ pub fn prompt_education_without_additional_info_test() {
   let data =
     ResumeData(
       ..data,
-      education: Education(
-        ..data.education,
-        entries: [EducationEntry(..edu, additional_info: None)],
-      ),
+      education: Education(..data.education, entries: [
+        EducationEntry(..edu, additional_info: None),
+      ]),
     )
   let out = prompt.build(data)
   string.contains(out, "**Honors**")

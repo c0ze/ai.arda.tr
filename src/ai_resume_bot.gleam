@@ -168,10 +168,7 @@ fn run_server() -> Nil {
   let wisp_handler =
     wisp_mist.handler(fn(req) { server.handle(req, config) }, secret)
 
-  logging.log(
-    logging.Info,
-    "Server listening on port " <> int.to_string(port),
-  )
+  logging.log(logging.Info, "Server listening on port " <> int.to_string(port))
 
   let assert Ok(_) =
     fn(req: request.Request(mist.Connection)) {
@@ -239,10 +236,7 @@ fn ensure_data_dir() -> Nil {
   case simplifile.is_directory(data_dir) {
     Ok(True) -> Nil
     _ -> {
-      logging.log(
-        logging.Info,
-        "Data directory not found. Fetching data...",
-      )
+      logging.log(logging.Info, "Data directory not found. Fetching data...")
       case resume.fetch_to_disk(data_dir) {
         Ok(_) -> Nil
         Error(err) -> {
@@ -269,8 +263,7 @@ fn maybe_build_frontend() -> Nil {
       logging.log(logging.Info, "Building Lustre frontend bundle...")
       let cmd = "gleam run -m lustre/dev build --minify --outdir=../public"
       case shell("frontend", cmd) {
-        Ok(_) ->
-          logging.log(logging.Info, "Frontend build complete.")
+        Ok(_) -> logging.log(logging.Info, "Frontend build complete.")
         Error(code) -> {
           logging.log(
             logging.Error,

@@ -4,7 +4,6 @@
 import ai_resume_bot/email.{type SmtpConfig}
 import ai_resume_bot/gemini
 import ai_resume_bot/models.{type ChatRequest}
-import shared.{ChatResponse}
 import ai_resume_bot/smtp
 import gleam/bytes_tree
 import gleam/http
@@ -16,6 +15,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/string
 import logging
 import mist
+import shared.{ChatResponse}
 import wisp.{type Request, type Response}
 
 pub type Config {
@@ -94,7 +94,10 @@ fn cors_middleware(
 
   base
   |> maybe_set_header("access-control-allow-origin", allow_origin)
-  |> set_header("access-control-allow-methods", "POST, GET, OPTIONS, PUT, DELETE")
+  |> set_header(
+    "access-control-allow-methods",
+    "POST, GET, OPTIONS, PUT, DELETE",
+  )
   |> set_header("access-control-allow-headers", "Content-Type, Authorization")
 }
 
@@ -120,11 +123,7 @@ fn maybe_set_header(
 fn handle_chat(req: Request, config: Config) -> Response {
   case req.method {
     http.Post -> do_chat(req, config)
-    _ ->
-      json_response(
-        405,
-        models.error_response("Method not allowed"),
-      )
+    _ -> json_response(405, models.error_response("Method not allowed"))
   }
 }
 
@@ -151,10 +150,7 @@ fn maybe_handle_email(reply: String, config: Config) -> Response {
     False ->
       json_response(
         200,
-        models.chat_response_to_json(ChatResponse(
-          reply: reply,
-          error: "",
-        )),
+        models.chat_response_to_json(ChatResponse(reply: reply, error: "")),
       )
     True -> {
       case email.extract(reply) {
@@ -174,20 +170,14 @@ fn maybe_handle_email(reply: String, config: Config) -> Response {
   }
 }
 
-fn send_and_respond(
-  extracted: email.Extracted,
-  config: Config,
-) -> Response {
+fn send_and_respond(extracted: email.Extracted, config: Config) -> Response {
   case config.smtp {
     None -> {
       logging.log(
         logging.Warning,
         "Email delivery is not configured; skipping contact send",
       )
-      json_response(
-        502,
-        models.error_response(email.contact_failure_message),
-      )
+      json_response(502, models.error_response(email.contact_failure_message))
     }
     Some(cfg) ->
       case smtp.send(cfg, extracted.payload) {
@@ -203,7 +193,8 @@ fn send_and_respond(
         }
         Ok(_) -> {
           logging.log(logging.Info, "Email notification sent successfully")
-          let final_reply = extracted.clean_reply <> email.contact_success_suffix
+          let final_reply =
+            extracted.clean_reply <> email.contact_success_suffix
           json_response(
             200,
             models.chat_response_to_json(ChatResponse(
@@ -242,8 +233,7 @@ pub fn cors_preflight(
       "Content-Type, Authorization",
     )
   case list.contains(allowed_origins, origin) {
-    True ->
-      response.set_header(base, "access-control-allow-origin", origin)
+    True -> response.set_header(base, "access-control-allow-origin", origin)
     False -> base
   }
 }

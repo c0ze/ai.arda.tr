@@ -72,11 +72,9 @@ fn start_sse(
     Ok(v) -> v
     Error(_) -> ""
   }
-  let resp = response.new(200)
-    |> response.set_header(
-      "access-control-allow-methods",
-      "POST, GET, OPTIONS",
-    )
+  let resp =
+    response.new(200)
+    |> response.set_header("access-control-allow-methods", "POST, GET, OPTIONS")
     |> response.set_header("access-control-allow-headers", "Content-Type")
   let resp = case list.contains(config.allowed_origins, origin) {
     True -> response.set_header(resp, "access-control-allow-origin", origin)
@@ -145,7 +143,10 @@ fn start_sse(
         StreamError(reason) -> {
           logging.log(logging.Error, "Gemini stream error: " <> reason)
           let _ =
-            send_sse_event(conn, shared.StreamError(message: "Internal AI Error"))
+            send_sse_event(
+              conn,
+              shared.StreamError(message: "Internal AI Error"),
+            )
           actor.stop()
         }
       }

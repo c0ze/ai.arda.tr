@@ -19,12 +19,12 @@ import gleam/json
 import gleam/list
 import gleam/string
 import lustre
-import shared
 import lustre/attribute
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
+import shared
 
 // ---------------------------------------------------------------------------
 // Config
@@ -134,10 +134,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   }
 }
 
-fn handle_stream_event(
-  model: Model,
-  json_str: String,
-) -> #(Model, Effect(Msg)) {
+fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) {
   case json.parse(json_str, shared.stream_event_decoder()) {
     Error(_) -> #(model, effect.none())
     Ok(evt) ->
@@ -177,8 +174,7 @@ fn handle_stream_event(
         }
 
         shared.StreamError(message) -> {
-          let error_text =
-            "System Malfunction: " <> message
+          let error_text = "System Malfunction: " <> message
           case model.stream_state {
             Streaming(bot_msg_id) -> {
               let model = replace_message_text(model, bot_msg_id, error_text)
@@ -228,11 +224,7 @@ fn send_current(model: Model) -> #(Model, Effect(Msg)) {
   }
 }
 
-fn push(
-  model: Model,
-  sender: Sender,
-  text: String,
-) -> #(Model, Int) {
+fn push(model: Model, sender: Sender, text: String) -> #(Model, Int) {
   let id = model.next_id
   let msg = ChatMessage(id: id, sender: sender, text: text)
   #(
@@ -283,10 +275,7 @@ fn next_theme(theme: Theme) -> Theme {
 // Effects
 // ---------------------------------------------------------------------------
 
-fn call_api_stream(
-  text: String,
-  history: List(ChatMessage),
-) -> Effect(Msg) {
+fn call_api_stream(text: String, history: List(ChatMessage)) -> Effect(Msg) {
   let wire_history =
     list.map(history, fn(m) {
       shared.ChatMessage(role: role_of(m.sender), content: m.text)
@@ -402,20 +391,17 @@ fn messages_container(model: Model, has_messages: Bool) -> Element(Msg) {
     Thinking -> [view_thinking()]
     _ -> []
   }
-  html.div(
-    [attribute.id("messages-container"), attribute.class(cls)],
-    [
-      html.div(
-        [attribute.id("messages")],
-        list.append(
-          list.map(model.history, fn(msg) {
-            view_message(msg, model.stream_state)
-          }),
-          tail,
-        ),
+  html.div([attribute.id("messages-container"), attribute.class(cls)], [
+    html.div(
+      [attribute.id("messages")],
+      list.append(
+        list.map(model.history, fn(msg) {
+          view_message(msg, model.stream_state)
+        }),
+        tail,
       ),
-    ],
-  )
+    ),
+  ])
 }
 
 fn view_message(msg: ChatMessage, stream_state: StreamState) -> Element(Msg) {
@@ -608,11 +594,7 @@ fn do_scroll_to_bottom(selector: String) -> Nil
 fn is_localhost() -> Bool
 
 @external(javascript, "./ffi.mjs", "stream_chat")
-fn do_stream_chat(
-  url: String,
-  body: String,
-  on_event: fn(String) -> Nil,
-) -> Nil
+fn do_stream_chat(url: String, body: String, on_event: fn(String) -> Nil) -> Nil
 
 // ---------------------------------------------------------------------------
 // Bootstrap
