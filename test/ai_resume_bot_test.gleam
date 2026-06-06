@@ -278,3 +278,23 @@ pub fn config_from_env_ignores_invalid_test() {
   cfg.max_requests |> should.equal(30)
   cfg.window_ms |> should.equal(60_000)
 }
+
+// ---------------------------------------------------------------------------
+// email.reply_with_outcome — the streaming and non-streaming paths must report
+// the contact-email result to the user consistently.
+// ---------------------------------------------------------------------------
+
+pub fn reply_with_outcome_sent_test() {
+  email.reply_with_outcome("Thanks!", True)
+  |> should.equal("Thanks!" <> email.contact_success_suffix)
+}
+
+pub fn reply_with_outcome_failed_surfaces_failure_test() {
+  let out = email.reply_with_outcome("Thanks!", False)
+  // A failed/unconfigured send must surface the failure message ...
+  string.contains(out, email.contact_failure_message)
+  |> should.be_true
+  // ... and must never claim success.
+  string.contains(out, email.contact_success_suffix)
+  |> should.be_false
+}

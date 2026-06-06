@@ -221,7 +221,7 @@ fn handle_email_if_needed(reply: String, config: StreamConfig) -> String {
                 logging.Warning,
                 "SMTP not configured; skipping email",
               )
-              extracted.clean_reply
+              email.reply_with_outcome(extracted.clean_reply, False)
             }
             Some(cfg) ->
               case smtp.send(cfg, extracted.payload) {
@@ -230,11 +230,11 @@ fn handle_email_if_needed(reply: String, config: StreamConfig) -> String {
                     logging.Error,
                     "Email send failed: " <> string.inspect(e),
                   )
-                  extracted.clean_reply
+                  email.reply_with_outcome(extracted.clean_reply, False)
                 }
                 Ok(_) -> {
                   logging.log(logging.Info, "Email sent successfully")
-                  extracted.clean_reply <> email.contact_success_suffix
+                  email.reply_with_outcome(extracted.clean_reply, True)
                 }
               }
           }
