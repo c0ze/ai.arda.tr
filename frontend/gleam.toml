@@ -25,6 +25,21 @@ lang = "en"
 title = "Arda's AI Construct"
 meta = [
   { name = "viewport", content = "width=device-width, initial-scale=1.0" },
+  { name = "description", content = "An AI assistant that answers questions about Arda — his work, projects, and background." },
+  { property = "og:type", content = "website" },
+  { property = "og:site_name", content = "Arda's AI Construct" },
+  { property = "og:url", content = "https://ai.arda.tr/" },
+  { property = "og:title", content = "Arda's AI Construct" },
+  { property = "og:description", content = "An AI assistant that answers questions about Arda — his work, projects, and background." },
+  { property = "og:image", content = "https://ai.arda.tr/og-image.png" },
+  { property = "og:image:width", content = "1200" },
+  { property = "og:image:height", content = "630" },
+  { property = "og:image:type", content = "image/png" },
+  { property = "og:image:alt", content = "Arda's AI Construct — an AI assistant that answers questions about Arda." },
+  { name = "twitter:card", content = "summary_large_image" },
+  { name = "twitter:title", content = "Arda's AI Construct" },
+  { name = "twitter:description", content = "An AI assistant that answers questions about Arda." },
+  { name = "twitter:image", content = "https://ai.arda.tr/og-image.png" },
 ]
 stylesheets = [
   { href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
@@ -36,7 +51,7 @@ scripts = [
   # no need for SRI (which Lustre's html config can't express on scripts anyway).
   { src = "/vendor/marked.min.js" },
   { src = "/vendor/purify.min.js" },
-  { content = "var _f=document.createElement('link');_f.rel='icon';_f.type='image/svg+xml';_f.href='/favicon.svg';document.head.appendChild(_f);document.addEventListener('DOMContentLoaded',function(){document.body.setAttribute('data-theme',localStorage.getItem('theme')||'light');});" },
+  { content = "var _c=document.createElement('link');_c.rel='canonical';_c.href='https://ai.arda.tr/';document.head.appendChild(_c);var _f=document.createElement('link');_f.rel='icon';_f.type='image/svg+xml';_f.href='/favicon.svg';document.head.appendChild(_f);document.addEventListener('DOMContentLoaded',function(){document.body.setAttribute('data-theme',localStorage.getItem('theme')||'light');});" },
 ]
 # The CF Web Analytics beacon lives in `body` (raw HTML) because Lustre's
 # `scripts` config can't express the required data-cf-beacon attribute.
