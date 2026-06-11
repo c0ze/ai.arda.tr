@@ -42,8 +42,8 @@ meta = [
   { name = "twitter:image", content = "https://ai.arda.tr/og-image.png" },
 ]
 stylesheets = [
-  { href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
-  { href = "/style.css?v=12" },
+  { href = "https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
+  { href = "/style.css?v=13" },
 ]
 scripts = [
   # Vendored under public/vendor/ (marked 18.0.5, DOMPurify 3.4.8) — pinned and

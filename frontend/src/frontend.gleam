@@ -1,7 +1,7 @@
 //// Lustre port of the chat UI that lives at ai.arda.tr.
 ////
 //// Shape mirrors the old `public/script.js`:
-////   - theme (light / dark) persisted in localStorage
+////   - theme (light / paper / dark / carbon) persisted in localStorage
 ////   - language toggle (en / jp) with translated strings + quick prompts
 ////   - chat history sent with each request to `/api/chat/stream` (SSE)
 ////   - markdown rendered through marked.js + DOMPurify (loaded from CDN
@@ -46,7 +46,9 @@ const max_history_messages = 20
 
 pub type Theme {
   Light
+  Paper
   Dark
+  Carbon
 }
 
 pub type Sender {
@@ -268,9 +270,12 @@ fn split_last(items: List(a)) -> #(List(a), Bool) {
 }
 
 fn next_theme(theme: Theme) -> Theme {
+  // Light -> Paper (HC light) -> Dark -> Carbon (HC dark) -> Light
   case theme {
-    Light -> Dark
-    Dark -> Light
+    Light -> Paper
+    Paper -> Dark
+    Dark -> Carbon
+    Carbon -> Light
   }
 }
 
@@ -544,9 +549,11 @@ fn input_footer(model: Model, s: Strings) -> Element(Msg) {
 // ---------------------------------------------------------------------------
 
 fn load_theme() -> Theme {
-  // Default to light to match resume.arda.tr; dark is opt-in via the toggle.
+  // Default to light to match resume.arda.tr; the rest are opt-in via the toggle.
   case do_storage_get("theme") {
+    Ok("paper") -> Paper
     Ok("dark") -> Dark
+    Ok("carbon") -> Carbon
     _ -> Light
   }
 }
@@ -562,7 +569,9 @@ fn apply_theme(theme: Theme) -> Nil {
 fn theme_to_string(theme: Theme) -> String {
   case theme {
     Light -> "light"
+    Paper -> "paper"
     Dark -> "dark"
+    Carbon -> "carbon"
   }
 }
 

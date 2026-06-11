@@ -63,6 +63,58 @@
     --shadow-lg:     0 4px 32px hsl(0 0% 0% / 0.6);
 }
 
+/* ─── Paper — high-contrast light (resume.arda.tr "paper") ─── */
+[data-theme="paper"] {
+    --bg-primary:    hsl(0 0% 100%);
+    --bg-secondary:  hsl(0 0% 100%);
+    --bg-tertiary:   hsl(0 0% 94%);
+    --bg-hover:      hsl(0 0% 90%);
+
+    --text-primary:  hsl(0 0% 4%);
+    --text-secondary:hsl(0 0% 24%);
+    --text-muted:    hsl(0 0% 24%);
+
+    --accent:        hsl(216 80% 20%);
+    --accent-hover:  hsl(216 80% 28%);
+    --accent-subtle: hsl(216 80% 20% / 0.08);
+
+    --border:        hsl(0 0% 32%);
+    --border-light:  hsl(0 0% 32%);
+
+    --user-bubble:   hsl(216 80% 20%);
+    --user-text:     hsl(0 0% 100%);
+    --bot-bubble:    hsl(0 0% 100%);
+
+    --shadow:        none;
+    --shadow-lg:     none;
+}
+
+/* ─── Carbon — high-contrast dark (resume.arda.tr "carbon") ─── */
+[data-theme="carbon"] {
+    --bg-primary:    hsl(0 0% 2%);
+    --bg-secondary:  hsl(0 0% 5%);
+    --bg-tertiary:   hsl(0 0% 12%);
+    --bg-hover:      hsl(0 0% 18%);
+
+    --text-primary:  hsl(0 0% 98%);
+    --text-secondary:hsl(0 0% 80%);
+    --text-muted:    hsl(0 0% 80%);
+
+    --accent:        hsl(213 95% 78%);
+    --accent-hover:  hsl(213 95% 84%);
+    --accent-subtle: hsl(213 95% 78% / 0.14);
+
+    --user-bubble:   hsl(213 95% 78%);
+    --user-text:     hsl(0 0% 2%);
+    --bot-bubble:    hsl(0 0% 5%);
+
+    --border:        hsl(0 0% 52%);
+    --border-light:  hsl(0 0% 52%);
+
+    --shadow:        none;
+    --shadow-lg:     none;
+}
+
 /* ─── Reset ───────────────────────────────────── */
 *, *::before, *::after {
     box-sizing: border-box;
@@ -104,7 +156,7 @@ body {
 }
 
 .header-left h1 {
-    font-family: 'Space Grotesk', Manrope, sans-serif;
+    font-family: 'Archivo', Manrope, sans-serif;
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--text-primary);
@@ -154,8 +206,10 @@ body {
     display: none;
 }
 
-[data-theme="dark"]  .theme-toggle .icon-moon { display: block; }
-[data-theme="light"] .theme-toggle .icon-sun  { display: block; }
+[data-theme="dark"]   .theme-toggle .icon-moon { display: block; }
+[data-theme="carbon"] .theme-toggle .icon-moon { display: block; }
+[data-theme="light"]  .theme-toggle .icon-sun  { display: block; }
+[data-theme="paper"]  .theme-toggle .icon-sun  { display: block; }
 
 /* ─── Language Toggle ─────────────────────────── */
 .language-toggle {
@@ -277,7 +331,7 @@ input:checked + .slider::before {
 }
 
 #welcome-screen h2 {
-    font-family: 'Space Grotesk', Manrope, sans-serif;
+    font-family: 'Archivo', Manrope, sans-serif;
     font-size: 1.5rem;
     font-weight: 700;
     margin-bottom: 0.625rem;
