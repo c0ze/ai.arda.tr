@@ -93,14 +93,6 @@ export function is_localhost() {
   return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0";
 }
 
-export function focus_element(selector) {
-  if (typeof document === "undefined") return;
-  requestAnimationFrame(() => {
-    const el = document.querySelector(selector);
-    if (el && typeof el.focus === "function") el.focus();
-  });
-}
-
 // Stream a POST request to the SSE endpoint. Calls `on_event` for each
 // parsed SSE event object. The callback receives a JSON string.
 export function stream_chat(url, body_json, on_event) {

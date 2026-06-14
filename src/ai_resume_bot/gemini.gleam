@@ -30,11 +30,6 @@ pub fn new(api_key: String, model: String, system_prompt: String) -> Service {
   Service(api_key:, model:, system_prompt:)
 }
 
-/// Append a suffix (e.g. job_requirements.md) to the system prompt.
-pub fn with_prompt_suffix(svc: Service, suffix: String) -> Service {
-  Service(..svc, system_prompt: svc.system_prompt <> suffix)
-}
-
 /// The (non-streaming) generateContent endpoint for a model. The API key is
 /// deliberately NOT part of the URL — it is sent in a header (see
 /// `build_request`) so it never lands in logs or error values.

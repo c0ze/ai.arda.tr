@@ -10,7 +10,6 @@
 
 import ai_resume_bot/email.{type SmtpConfig}
 import ai_resume_bot/models.{type EmailPayload}
-import gleam/dynamic.{type Dynamic}
 
 pub type SmtpError {
   NotConfigured
@@ -34,8 +33,3 @@ fn do_send(
   to: String,
   body: String,
 ) -> Result(Nil, SmtpError)
-
-/// Convenience re-export in case a caller wants to inspect raw gen_smtp errors.
-pub fn explain(d: Dynamic) -> String {
-  dynamic.classify(d)
-}

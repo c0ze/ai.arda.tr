@@ -8,6 +8,7 @@ import gleam/bit_array
 import gleam/dynamic/decode
 import gleam/http/request
 import gleam/httpc
+import gleam/int
 import gleam/json
 import gleam/list
 import gleam/result
@@ -53,13 +54,8 @@ fn fetch_one(file: String, output_dir: String) -> Result(Nil, FetchError) {
       simplifile.write_bits(path, resp.body)
       |> result.map_error(fn(e) { WriteError(file, string.inspect(e)) })
     }
-    code -> Error(HttpError(file, "status " <> int_to_string_fallback(code)))
+    code -> Error(HttpError(file, "status " <> int.to_string(code)))
   }
-}
-
-fn int_to_string_fallback(n: Int) -> String {
-  // Lightweight wrapper so we don't pull gleam/int in unnecessarily.
-  string.inspect(n)
 }
 
 fn join_path(dir: String, file: String) -> String {

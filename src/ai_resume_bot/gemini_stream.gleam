@@ -20,13 +20,6 @@ pub type StreamMsg {
   StreamError(reason: String)
 }
 
-/// Parsed text deltas forwarded to the SSE handler.
-pub type TextEvent {
-  TextDelta(String)
-  TextDone
-  TextError(String)
-}
-
 /// Start a streaming request to Gemini. Spawns a background process that
 /// sends `StreamMsg` values to `subject`. Returns immediately.
 pub fn stream_generate(
