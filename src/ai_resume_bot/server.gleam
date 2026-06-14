@@ -148,7 +148,10 @@ fn do_chat(req: Request, config: Config) -> Response {
 }
 
 fn dispatch(req: ChatRequest, config: Config) -> Response {
-  case gemini.generate(config.gemini, req.message, req.history) {
+  // Re-cap server-side: the client caps too, but a direct API caller can't be
+  // trusted to bound its own history (and the Gemini token cost it drives).
+  let history = shared.cap_history(req.history, shared.default_max_history)
+  case gemini.generate(config.gemini, req.message, history) {
     Error(err) -> {
       logging.log(logging.Error, "Gemini error: " <> string.inspect(err))
       json_response(500, models.error_response("Internal AI Error"))

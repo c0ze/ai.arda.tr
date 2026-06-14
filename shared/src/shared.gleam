@@ -27,6 +27,11 @@ pub type ChatResponse {
   ChatResponse(reply: String, error: String)
 }
 
+/// Default cap on how many past messages travel with a chat request. Applied
+/// on the client before sending and re-applied on the server, which must not
+/// trust a client to bound its own payload (and Gemini token cost). ~10 turns.
+pub const default_max_history = 20
+
 /// Keep only the most recent `max` messages of a conversation history, so a
 /// long chat doesn't grow the request payload (and token cost) without bound.
 /// A non-positive `max` keeps everything.
