@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot answers questions about Arda's career, skills, and experience using Google's Gemini API.
+AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot answers questions about Arda's career, skills, and experience using Google's Gemini API. It is deliberately scoped to Arda: a guardrail in the system prompt makes it decline off-topic requests (coding, homework, general chat) rather than act as a general-purpose assistant.
 
 ## Architecture
 
@@ -101,7 +101,7 @@ docker run -p 8080:8080 \
 1. At build time (Docker) or on first startup, resume JSON is fetched from GitHub (`c0ze/resume`).
 2. Data is cached to `./data/`.
 3. On boot, `resume.load_from_disk` reads and decodes all five files.
-4. `prompt.build` compiles the system prompt; if `job_requirements.md` exists, it is appended along with the `[[SEND_EMAIL]]` instructions.
+4. `prompt.build` compiles the system prompt. It opens with a scope guardrail (`scope_guardrail` in [prompt.gleam](src/ai_resume_bot/prompt.gleam)) that confines the bot to Arda-related topics, then the résumé sections. If `job_requirements.md` exists, it is appended along with the `[[SEND_EMAIL]]` instructions.
 
 ### API
 - `POST /api/chat` → `{"message": "...", "history": [...]}` → `{"reply": "..."}` (non-streaming).

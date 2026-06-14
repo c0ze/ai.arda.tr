@@ -1,6 +1,6 @@
 # AI Resume Bot (ai.arda.tr)
 
-A chatbot that answers questions about Arda's career, backed by Google's Gemini API.
+A chatbot that answers questions about Arda's career, backed by Google's Gemini API. A scope guardrail in the system prompt keeps it on-topic — it declines unrelated requests (coding, homework, general chat) instead of acting as a general-purpose assistant.
 
 ## Architecture
 
