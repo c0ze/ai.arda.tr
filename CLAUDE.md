@@ -122,7 +122,7 @@ docker run -p 8080:8080 \
 - The base system prompt is built once at startup; a per-request dynamic block (recent blog posts) is appended via `gemini.with_context` so the static prompt stays cached while the recent section stays fresh.
 
 ### Recent Blog Posts
-- `blog.gleam` fetches `BLOG_FEED_URL` (default `blog.arda.tr/rss.xml`) in an **unlinked** background process, parses the newest 3 items, and stores a markdown snippet in a single-slot ETS cache (`blog_cache_ffi.erl`), refreshing every `BLOG_REFRESH_SECONDS` (default 6h). The cache is overwritten each refresh, so it never grows; state is in-memory only (Cloud Run is ephemeral — a fresh instance just re-populates it).
+- `blog.gleam` fetches `BLOG_FEED_URL` (default `blog.arda.tr/rss.xml`), parses the newest 3 items, and stores a markdown snippet in a single-slot ETS cache (`blog_cache_ffi.erl`). The initial fetch is **synchronous at startup** (bounded by a 5s timeout) so the first request — even a cold-start one — has the posts; subsequent refreshes run every `BLOG_REFRESH_SECONDS` (default 6h) in an **unlinked** background process. The cache is overwritten each refresh, so it never grows; state is in-memory only (Cloud Run is ephemeral — a fresh instance just re-populates it). Each fetch logs its outcome.
 - Handlers read `blog.current()` per request and append it to the system instruction, so "what is Arda working on recently?" is answered from the latest posts. Fetch/parse failures keep the last good snippet (or omit the section entirely), so a feed outage never breaks chat.
 
 ### Contact Email Handoff
