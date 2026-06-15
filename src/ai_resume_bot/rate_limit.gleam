@@ -5,6 +5,12 @@
 //// cost guard. The counter lives in an ETS table (atomic `update_counter`,
 //// safe under Mist's per-request concurrency) behind `rate_limit_ffi.erl`;
 //// this module owns the pure client-key extraction and the small wrapper API.
+////
+//// Scope: the ETS table is per-BEAM-instance, so the limit is enforced
+//// per Cloud Run container, not globally. With autoscaling the effective
+//// ceiling is `max_requests * instance_count`, and scaling to zero resets the
+//// counters. That is acceptable here (a cheap per-instance abuse guard, not a
+//// billing quota); a global limit would need a shared store (e.g. Redis).
 
 import gleam/int
 import gleam/list

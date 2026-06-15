@@ -134,16 +134,17 @@ fn extract_text_parts(raw: String) -> List(String) {
   })
 }
 
-/// Parse a single Gemini response JSON and extract the text from the first
-/// candidate's first part — same structure as non-streaming, but each SSE
-/// event typically has just one part with the delta text.
+/// Parse a single Gemini response JSON and extract the first candidate's text.
+/// A streaming event usually carries a single part, but it can carry several
+/// (text split across parts); taking only the first would drop the rest, so
+/// concatenate them all — same as the non-streaming `gemini.reply_from_parts`.
 fn parse_gemini_json(body: String) -> Result(String, Nil) {
   json.parse(body, gemini.response_decoder())
   |> result.replace_error(Nil)
   |> result.try(fn(parts) {
     case parts {
       [] -> Error(Nil)
-      [first, ..] -> Ok(first)
+      _ -> Ok(string.concat(parts))
     }
   })
 }

@@ -82,25 +82,36 @@ env_vars=(
   "ALLOWED_ORIGINS=$ALLOWED_ORIGINS"
 )
 
-if [ -n "${GMAIL_USER:-}" ]; then
-  env_vars+=("GMAIL_USER=$GMAIL_USER")
-fi
-
-if [ -n "${GMAIL_APP_PASSWORD:-}" ]; then
-  env_vars+=("GMAIL_APP_PASSWORD=$GMAIL_APP_PASSWORD")
-fi
-
-if [ -n "${CONTACT_ADDRESS:-}" ]; then
-  env_vars+=("CONTACT_ADDRESS=$CONTACT_ADDRESS")
-fi
+# Optional, script-managed vars: set the ones present in .env, and explicitly
+# remove the ones that are absent. This keeps the script authoritative over its
+# own keys (so deleting GMAIL_* from .env actually unsets it on the service)
+# while --update-env-vars leaves vars this script does not manage untouched
+# (GEMINI_MODEL, RATE_LIMIT_*, LOG_REQUESTS, PUBLIC_DIR, ...).
+remove_vars=()
+for name in GMAIL_USER GMAIL_APP_PASSWORD CONTACT_ADDRESS; do
+  if [ -n "${!name:-}" ]; then
+    env_vars+=("$name=${!name}")
+  else
+    remove_vars+=("$name")
+  fi
+done
 
 env_vars_csv="$(IFS=,; printf '%s' "${env_vars[*]}")"
 
-gcloud run deploy "$SERVICE_NAME" \
-  --source . \
-  --region "$REGION" \
-  --project "$PROJECT_ID" \
-  --allow-unauthenticated \
-  --set-env-vars "$env_vars_csv"
+deploy_args=(
+  "$SERVICE_NAME"
+  --source .
+  --region "$REGION"
+  --project "$PROJECT_ID"
+  --allow-unauthenticated
+  --update-env-vars "$env_vars_csv"
+)
+
+if [ "${#remove_vars[@]}" -gt 0 ]; then
+  remove_vars_csv="$(IFS=,; printf '%s' "${remove_vars[*]}")"
+  deploy_args+=(--remove-env-vars "$remove_vars_csv")
+fi
+
+gcloud run deploy "${deploy_args[@]}"
 
 echo "Deployment complete!"

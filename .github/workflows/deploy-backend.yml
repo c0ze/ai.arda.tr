@@ -28,6 +28,14 @@ permissions:
   contents: 'read'
   id-token: 'write'
 
+# Serialize backend deploys: merging PRs back-to-back would otherwise spawn
+# concurrent `gcloud run deploy` runs that race, and with build caching an
+# older commit's run can finish last and serve a stale image. cancel-in-progress
+# means the newest commit wins (mirrors deploy-ui.yml's Pages concurrency).
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
 # Opt JavaScript actions into Node 24 ahead of GitHub's June 2026 default
 # (keeps the SHA pins below; just changes the runtime).
 env:
