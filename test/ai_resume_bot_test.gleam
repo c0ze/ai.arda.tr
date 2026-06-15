@@ -289,6 +289,17 @@ pub fn parse_sse_buffer_handles_multiple_events_in_one_chunk_test() {
   rest |> should.equal(<<>>)
 }
 
+pub fn parse_sse_buffer_concatenates_multipart_event_test() {
+  // A single SSE event whose candidate carries multiple text parts must yield
+  // the parts joined, not just the first (the streaming counterpart of
+  // reply_from_parts_concatenates_test).
+  let ev =
+    "data: {\"candidates\":[{\"content\":{\"parts\":"
+    <> "[{\"text\":\"foo\"},{\"text\":\"bar\"}]}}]}\n\n"
+  let #(deltas, _rest) = gemini_stream.parse_sse_buffer(<<>>, <<ev:utf8>>)
+  deltas |> should.equal(["foobar"])
+}
+
 pub fn flush_sse_buffer_drains_trailing_event_without_newline_test() {
   // A final event that never gets its terminating newline stays buffered ...
   let partial =
