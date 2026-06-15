@@ -96,11 +96,14 @@ fi
 
 env_vars_csv="$(IFS=,; printf '%s' "${env_vars[*]}")"
 
+# --update-env-vars (not --set-env-vars): this script only manages the secrets
+# below, so it must not wipe vars set elsewhere on the service (GEMINI_MODEL,
+# RATE_LIMIT_*, LOG_REQUESTS, PUBLIC_DIR). --set-env-vars replaces the whole set.
 gcloud run deploy "$SERVICE_NAME" \
   --source . \
   --region "$REGION" \
   --project "$PROJECT_ID" \
   --allow-unauthenticated \
-  --set-env-vars "$env_vars_csv"
+  --update-env-vars "$env_vars_csv"
 
 echo "Deployment complete!"

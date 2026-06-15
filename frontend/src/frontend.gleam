@@ -286,7 +286,12 @@ fn next_theme(theme: Theme) -> Theme {
 
 fn call_api_stream(text: String, history: List(ChatMessage)) -> Effect(Msg) {
   let wire_history =
-    list.map(history, fn(m) {
+    history
+    // Drop the leading assistant welcome message: it is UI-only chrome, and
+    // Gemini's `contents` should begin with a user turn rather than a model
+    // turn (and we needn't spend tokens echoing our own canned greeting).
+    |> list.drop_while(fn(m) { m.sender == Bot })
+    |> list.map(fn(m) {
       shared.ChatMessage(role: role_of(m.sender), content: m.text)
     })
     |> shared.cap_history(max_history_messages)
