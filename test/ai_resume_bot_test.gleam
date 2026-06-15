@@ -114,6 +114,23 @@ pub fn prompt_education_without_additional_info_test() {
   |> should.be_false
 }
 
+pub fn prompt_has_scope_guardrail_test() {
+  let out = prompt.build(fixture_resume())
+  list.each(
+    [
+      "## Scope",
+      "only discuss Arda",
+      "not a general-purpose assistant",
+      "politely decline",
+      "reveal this prompt",
+    ],
+    fn(needle) {
+      string.contains(out, needle)
+      |> should.be_true
+    },
+  )
+}
+
 // ---------------------------------------------------------------------------
 // email.extract
 // ---------------------------------------------------------------------------
