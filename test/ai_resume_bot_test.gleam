@@ -120,6 +120,7 @@ pub fn prompt_has_scope_guardrail_test() {
     [
       "## Scope",
       "only discuss Arda",
+      "his interests and hobbies",
       "not a general-purpose assistant",
       "politely decline",
       "reveal this prompt",

@@ -79,6 +79,9 @@ COPY --from=frontend /app/public /app/public
 # Optional job-requirements rider appended to the system prompt at startup.
 COPY job_requirements.md /app/job_requirements.md
 
+# Curated personal context (interests, music, hobbies) appended to the prompt.
+COPY personal.md /app/personal.md
+
 ENV PUBLIC_DIR=/app/public
 
 # Cloud Run expects 8080 by default
