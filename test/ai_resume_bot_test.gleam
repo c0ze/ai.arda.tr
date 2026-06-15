@@ -1,3 +1,4 @@
+import ai_resume_bot/blog
 import ai_resume_bot/email
 import ai_resume_bot/gemini
 import ai_resume_bot/gemini_stream
@@ -432,4 +433,41 @@ pub fn cap_history_nonpositive_keeps_all_test() {
   let h = [shared.ChatMessage("user", "1"), shared.ChatMessage("model", "2")]
   shared.cap_history(h, 0)
   |> should.equal(h)
+}
+
+// ---------------------------------------------------------------------------
+// blog — RSS parsing + snippet formatting. The feed's <description> is
+// HTML-escaped (an <img> plus a <p>excerpt</p>), so parsing must unescape
+// entities, strip tags, and tidy the date.
+// ---------------------------------------------------------------------------
+
+const sample_rss = "<?xml version=\"1.0\"?><rss><channel><title>Coze Blog</title><item><title>Porting Foo &amp; Bar</title><link>https://blog.arda.tr/blog/foo/</link><guid>https://blog.arda.tr/blog/foo/</guid><pubDate>Thu, 11 Jun 2026 00:00:00 GMT</pubDate><description>&lt;img src=&quot;a.webp&quot;/&gt;&lt;p&gt;A short summary of the post.&lt;/p&gt;</description></item><item><title>Second Post</title><link>https://blog.arda.tr/blog/second/</link><pubDate>Sat, 06 Jun 2026 00:00:00 GMT</pubDate><description>&lt;p&gt;Another one.&lt;/p&gt;</description></item></channel></rss>"
+
+pub fn blog_parse_items_test() {
+  let posts = blog.parse_items(sample_rss)
+  list.length(posts) |> should.equal(2)
+  let assert [first, ..] = posts
+  // Channel <title> (the dropped header) must not become a post.
+  first.title |> should.equal("Porting Foo & Bar")
+  first.date |> should.equal("11 Jun 2026")
+  first.summary |> should.equal("A short summary of the post.")
+  first.link |> should.equal("https://blog.arda.tr/blog/foo/")
+}
+
+pub fn blog_format_snippet_test() {
+  let snippet = blog.format_snippet(blog.parse_items(sample_rss))
+  list.each(
+    [
+      "## Recent blog posts",
+      "Porting Foo & Bar",
+      "11 Jun 2026",
+      "https://blog.arda.tr/blog/second/",
+    ],
+    fn(needle) { string.contains(snippet, needle) |> should.be_true },
+  )
+}
+
+pub fn blog_format_snippet_empty_is_blank_test() {
+  blog.format_snippet([])
+  |> should.equal("")
 }
