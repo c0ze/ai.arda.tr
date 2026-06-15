@@ -32,6 +32,8 @@ const data_dir = "./data"
 
 const job_requirements_path = "job_requirements.md"
 
+const personal_path = "personal.md"
+
 const job_requirements_suffix = "
 
 If a user presents a job opportunity, evaluate it against my requirements.
@@ -107,7 +109,10 @@ fn run_server() -> Nil {
     }
   }
 
-  let system_prompt = prompt.build(resume_data) |> maybe_append_job_requirements
+  let system_prompt =
+    prompt.build(resume_data)
+    |> maybe_append_personal
+    |> maybe_append_job_requirements
 
   let model_name = case envoy.get("GEMINI_MODEL") {
     Ok(v) if v != "" -> v
@@ -288,6 +293,16 @@ fn maybe_build_frontend() -> Nil {
       }
     }
     _ -> Nil
+  }
+}
+
+/// Append the curated personal.md (interests, music, hobbies) to the system
+/// prompt if present, so the bot can speak to who Arda is beyond the résumé.
+/// As with the résumé data, a missing file is not an error.
+fn maybe_append_personal(base: String) -> String {
+  case simplifile.read(personal_path) {
+    Ok(contents) -> base <> "\n\n" <> contents
+    Error(_) -> base
   }
 }
 
