@@ -9,6 +9,7 @@
 ////   5. On completion, send `done` with the full reply
 ////   6. Handle email tags if present
 
+import ai_resume_bot/blog
 import ai_resume_bot/email.{type SmtpConfig}
 import ai_resume_bot/gemini
 import ai_resume_bot/gemini_stream.{Chunk, Done, StreamError}
@@ -110,6 +111,8 @@ fn start_sse(
   // Re-cap server-side: the client caps too, but a direct API caller can't be
   // trusted to bound its own history (and the Gemini token cost it drives).
   let history = shared.cap_history(chat_req.history, shared.default_max_history)
+  // Recent blog posts (if cached) so "what's Arda working on lately?" works.
+  let recent = blog.current()
 
   let origin = case request.get_header(req, "origin") {
     Ok(v) -> v
@@ -133,6 +136,7 @@ fn start_sse(
       case
         gemini_stream.stream_generate(
           gemini_svc,
+          recent,
           chat_req.message,
           history,
           subject,

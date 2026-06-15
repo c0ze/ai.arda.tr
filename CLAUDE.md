@@ -23,9 +23,11 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │   ├── ai_resume_bot.gleam          # Entry point: CLI modes (fetch / server) + env loading
 │   ├── ai_resume_bot_ffi.erl        # Tiny Erlang FFI (halt_flush)
 │   ├── ai_resume_bot_smtp_ffi.erl   # gen_smtp_client shim for contact emails
+│   ├── blog_cache_ffi.erl           # Single-slot ETS cache for recent blog posts
 │   └── ai_resume_bot/
 │       ├── models.gleam    # Chat + resume types, JSON decoders
 │       ├── resume.gleam    # Fetch c0ze/resume JSON + load from disk
+│       ├── blog.gleam      # Fetch recent posts from RSS, cache + inject into prompt
 │       ├── prompt.gleam    # System prompt builder
 │       ├── gemini.gleam    # Direct REST client for generativelanguage.googleapis.com
 │       ├── email.gleam     # [[SEND_EMAIL]] tag extract + sanitize
@@ -88,6 +90,8 @@ docker run -p 8080:8080 \
 | `LOG_REQUESTS` | no | off | Per-request logs; off in prod, on in local `.env` |
 | `RATE_LIMIT_REQUESTS` | no | `30` | Max chat requests per window per client IP |
 | `RATE_LIMIT_WINDOW_SECONDS` | no | `60` | Rate-limit window length, in seconds |
+| `BLOG_FEED_URL` | no | `https://blog.arda.tr/rss.xml` | RSS feed for the "recent posts" prompt section |
+| `BLOG_REFRESH_SECONDS` | no | `21600` | Background refresh interval for the feed (default 6h) |
 | `GMAIL_USER` | no | — | SMTP user for contact handoff |
 | `GMAIL_APP_PASSWORD` | no | — | SMTP app password |
 | `CONTACT_ADDRESS` | no | `GMAIL_USER` | Recipient of contact emails |
@@ -115,6 +119,11 @@ docker run -p 8080:8080 \
 - Direct REST calls to `generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`.
 - Streaming variant uses `streamGenerateContent?alt=sse` via Erlang FFI (`ai_resume_bot_stream_ffi.erl`).
 - No SDK dependency. System instruction passed via `system_instruction`, history as `contents`.
+- The base system prompt is built once at startup; a per-request dynamic block (recent blog posts) is appended via `gemini.with_context` so the static prompt stays cached while the recent section stays fresh.
+
+### Recent Blog Posts
+- `blog.gleam` fetches `BLOG_FEED_URL` (default `blog.arda.tr/rss.xml`) in an **unlinked** background process, parses the newest 3 items, and stores a markdown snippet in a single-slot ETS cache (`blog_cache_ffi.erl`), refreshing every `BLOG_REFRESH_SECONDS` (default 6h). The cache is overwritten each refresh, so it never grows; state is in-memory only (Cloud Run is ephemeral — a fresh instance just re-populates it).
+- Handlers read `blog.current()` per request and append it to the system instruction, so "what is Arda working on recently?" is answered from the latest posts. Fetch/parse failures keep the last good snippet (or omit the section entirely), so a feed outage never breaks chat.
 
 ### Contact Email Handoff
 - Gemini emits a `[[SEND_EMAIL]]{...JSON...}[[/SEND_EMAIL]]` block in its reply.

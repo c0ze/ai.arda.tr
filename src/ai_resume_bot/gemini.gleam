@@ -57,12 +57,23 @@ pub fn build_request(
   })
 }
 
+/// Append a per-request dynamic context block (e.g. recent blog posts) to the
+/// base system prompt. Empty context leaves the prompt unchanged.
+pub fn with_context(system_prompt: String, extra: String) -> String {
+  case extra {
+    "" -> system_prompt
+    _ -> system_prompt <> "\n\n" <> extra
+  }
+}
+
 pub fn generate(
   svc: Service,
+  recent_context: String,
   user_message: String,
   history: List(ChatMessage),
 ) -> Result(String, GeminiError) {
-  let body = build_request_body(svc.system_prompt, history, user_message)
+  let system = with_context(svc.system_prompt, recent_context)
+  let body = build_request_body(system, history, user_message)
 
   use req <- result.try(build_request(svc, body))
 

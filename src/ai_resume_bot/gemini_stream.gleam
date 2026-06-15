@@ -24,12 +24,14 @@ pub type StreamMsg {
 /// sends `StreamMsg` values to `subject`. Returns immediately.
 pub fn stream_generate(
   svc: gemini.Service,
+  recent_context: String,
   user_message: String,
   history: List(ChatMessage),
   subject: Subject(StreamMsg),
 ) -> Result(Nil, String) {
+  let system = gemini.with_context(svc.system_prompt, recent_context)
   let body =
-    gemini.build_request_body(svc.system_prompt, history, user_message)
+    gemini.build_request_body(system, history, user_message)
     |> json.to_string
 
   let url = stream_url(svc.model)

@@ -4,6 +4,7 @@
 ////   - `gleam run -- fetch`     -> fetch resume JSON into ./data and exit
 ////   - `gleam run`              -> boot the HTTP server on $PORT (default 8080)
 
+import ai_resume_bot/blog
 import ai_resume_bot/dotenv
 import ai_resume_bot/email
 import ai_resume_bot/gemini
@@ -152,6 +153,24 @@ fn run_server() -> Nil {
       envoy.get("RATE_LIMIT_WINDOW_SECONDS"),
     )
   rate_limit.init()
+
+  // Recent blog posts are fetched in the background (default every 6h) and
+  // injected into the prompt on demand so "what's Arda working on lately?"
+  // works. Configurable via BLOG_FEED_URL / BLOG_REFRESH_SECONDS; failures
+  // degrade gracefully (the section is simply omitted).
+  let blog_feed_url = case envoy.get("BLOG_FEED_URL") {
+    Ok(v) if v != "" -> v
+    _ -> blog.default_feed_url
+  }
+  let blog_refresh_ms = case envoy.get("BLOG_REFRESH_SECONDS") {
+    Ok(v) ->
+      case int.parse(v) {
+        Ok(n) if n > 0 -> n * 1000
+        _ -> 21_600_000
+      }
+    Error(_) -> 21_600_000
+  }
+  blog.start(blog_feed_url, blog_refresh_ms)
 
   let config =
     Config(
