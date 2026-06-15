@@ -7,6 +7,7 @@ import ai_resume_bot/models.{
 }
 import ai_resume_bot/prompt
 import ai_resume_bot/rate_limit
+import gleam/bit_array
 import gleam/http/request
 import gleam/list
 import gleam/option.{None, Some}
@@ -207,6 +208,80 @@ pub fn gemini_stream_url_omits_key_test() {
   |> should.be_false
   string.contains(url, "alt=sse")
   |> should.be_true
+}
+
+// ---------------------------------------------------------------------------
+// gemini.reply_from_parts — a candidate's text parts must be concatenated, not
+// truncated to the first part.
+// ---------------------------------------------------------------------------
+
+pub fn reply_from_parts_concatenates_test() {
+  gemini.reply_from_parts(["Hello, ", "world", "!"])
+  |> should.equal(Ok("Hello, world!"))
+}
+
+pub fn reply_from_parts_empty_is_error_test() {
+  case gemini.reply_from_parts([]) {
+    Error(gemini.EmptyResponse) -> Nil
+    _ -> panic as "expected EmptyResponse"
+  }
+}
+
+// ---------------------------------------------------------------------------
+// gemini_stream SSE buffering — a `data:` line (or a multi-byte character)
+// split across chunk boundaries must be reassembled, not dropped.
+// ---------------------------------------------------------------------------
+
+/// Build a Gemini SSE `data:` event carrying a single text delta. `text` must
+/// not contain characters that need JSON escaping.
+fn sse_event(text: String) -> String {
+  "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\""
+  <> text
+  <> "\"}]}}]}\n\n"
+}
+
+pub fn parse_sse_buffer_reassembles_split_line_test() {
+  let prefix = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hel"
+  let suffix = "lo world\"}]}}]}\n\n"
+  // First fragment has no newline yet, so nothing is emitted and it is buffered.
+  let #(d1, pending) = gemini_stream.parse_sse_buffer(<<>>, <<prefix:utf8>>)
+  d1 |> should.equal([])
+  // The completing fragment yields the full delta.
+  let #(d2, rest) = gemini_stream.parse_sse_buffer(pending, <<suffix:utf8>>)
+  d2 |> should.equal(["hello world"])
+  rest |> should.equal(<<>>)
+}
+
+pub fn parse_sse_buffer_reassembles_split_multibyte_char_test() {
+  // "あ" is UTF-8 E3 81 82; split it across the two fragments. Decoding the
+  // first fragment alone would fail, so a byte-level buffer is required.
+  let prefix = "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\""
+  let suffix = "\"}]}}]}\n\n"
+  let frag1 = bit_array.append(<<prefix:utf8>>, <<227>>)
+  let frag2 = bit_array.append(<<129, 130>>, <<suffix:utf8>>)
+  let #(d1, pending) = gemini_stream.parse_sse_buffer(<<>>, frag1)
+  d1 |> should.equal([])
+  let #(d2, _rest) = gemini_stream.parse_sse_buffer(pending, frag2)
+  d2 |> should.equal(["あ"])
+}
+
+pub fn parse_sse_buffer_handles_multiple_events_in_one_chunk_test() {
+  let chunk = sse_event("a") <> sse_event("b")
+  let #(deltas, rest) = gemini_stream.parse_sse_buffer(<<>>, <<chunk:utf8>>)
+  deltas |> should.equal(["a", "b"])
+  rest |> should.equal(<<>>)
+}
+
+pub fn flush_sse_buffer_drains_trailing_event_without_newline_test() {
+  // A final event that never gets its terminating newline stays buffered ...
+  let partial =
+    "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"bye\"}]}}]}"
+  let #(deltas, pending) =
+    gemini_stream.parse_sse_buffer(<<>>, <<partial:utf8>>)
+  deltas |> should.equal([])
+  // ... until flushed at stream end.
+  gemini_stream.flush_sse_buffer(pending)
+  |> should.equal(["bye"])
 }
 
 // ---------------------------------------------------------------------------

@@ -37,8 +37,9 @@ const cloud_run_base = "https://ai-arda-tr-api-599610058688.asia-northeast1.run.
 
 /// Cap on how many past messages are sent with each request, to bound token
 /// cost / latency on long conversations (~the last 10 exchanges). The full
-/// conversation is still shown in the UI.
-const max_history_messages = 20
+/// conversation is still shown in the UI. Shared with the server, which
+/// re-applies the same cap on untrusted input.
+const max_history_messages = shared.default_max_history
 
 // ---------------------------------------------------------------------------
 // Model

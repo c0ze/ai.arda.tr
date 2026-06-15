@@ -91,7 +91,14 @@ pub fn handle_stream(
 }
 
 type SseState {
-  SseState(accumulated: String, sent_thinking: Bool, config: StreamConfig)
+  SseState(
+    accumulated: String,
+    sent_thinking: Bool,
+    // Bytes from an incomplete trailing SSE line, carried between Chunk
+    // messages so a `data:` line split across chunks isn't dropped.
+    pending: BitArray,
+    config: StreamConfig,
+  )
 }
 
 fn start_sse(
@@ -100,7 +107,9 @@ fn start_sse(
   config: StreamConfig,
 ) -> response.Response(ResponseData) {
   let gemini_svc = config.gemini
-  let history = chat_req.history
+  // Re-cap server-side: the client caps too, but a direct API caller can't be
+  // trusted to bound its own history (and the Gemini token cost it drives).
+  let history = shared.cap_history(chat_req.history, shared.default_max_history)
 
   let origin = case request.get_header(req, "origin") {
     Ok(v) -> v
@@ -136,7 +145,12 @@ fn start_sse(
         }
       }
 
-      SseState(accumulated: "", sent_thinking: False, config: config)
+      SseState(
+        accumulated: "",
+        sent_thinking: False,
+        pending: <<>>,
+        config: config,
+      )
     },
     loop: fn(state, message, conn) {
       // Send thinking event on first message if not yet sent
@@ -150,8 +164,11 @@ fn start_sse(
 
       case message {
         Chunk(data) -> {
-          let deltas = gemini_stream.parse_sse_chunk(data)
+          let #(deltas, pending) =
+            gemini_stream.parse_sse_buffer(state.pending, data)
           let new_text = list.fold(deltas, "", fn(acc, d) { acc <> d })
+          // Always carry the updated buffer forward, even with no new text yet.
+          let state = SseState(..state, pending: pending)
           case new_text {
             "" -> actor.continue(state)
             _ -> {
@@ -168,7 +185,11 @@ fn start_sse(
         }
 
         Done -> {
-          let full_reply = state.accumulated
+          // Drain any bytes still buffered (final event without a trailing
+          // newline) so the complete reply isn't missing its tail.
+          let tail = gemini_stream.flush_sse_buffer(state.pending)
+          let tail_text = list.fold(tail, "", fn(acc, d) { acc <> d })
+          let full_reply = state.accumulated <> tail_text
           let final_reply = handle_email_if_needed(full_reply, state.config)
           let _ = send_sse_event(conn, shared.StreamDone(text: final_reply))
           actor.stop()

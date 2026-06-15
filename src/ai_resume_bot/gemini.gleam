@@ -135,12 +135,17 @@ fn content_json(role: String, text: String) -> json.Json {
 fn decode_reply(body: String) -> Result(String, GeminiError) {
   json.parse(body, response_decoder())
   |> result.map_error(fn(e) { DecodeError(string.inspect(e)) })
-  |> result.try(fn(parts) {
-    case parts {
-      [] -> Error(EmptyResponse)
-      [first, ..] -> Ok(first)
-    }
-  })
+  |> result.try(reply_from_parts)
+}
+
+/// Join a candidate's text parts into a single reply. Gemini can split one
+/// candidate's text across several parts; taking only the first would truncate
+/// the reply, so concatenate them all. An empty part list means no content.
+pub fn reply_from_parts(parts: List(String)) -> Result(String, GeminiError) {
+  case parts {
+    [] -> Error(EmptyResponse)
+    _ -> Ok(string.concat(parts))
+  }
 }
 
 pub fn response_decoder() -> decode.Decoder(List(String)) {
