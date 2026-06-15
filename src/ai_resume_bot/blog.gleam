@@ -17,12 +17,15 @@ import gleam/httpc
 import gleam/list
 import gleam/result
 import gleam/string
+import logging
 
 pub const default_feed_url = "https://blog.arda.tr/rss.xml"
 
 const max_posts = 3
 
-const fetch_timeout_ms = 10_000
+// Kept short because the initial fetch is synchronous at startup — we don't
+// want a slow/unreachable feed to hold up boot for long.
+const fetch_timeout_ms = 5000
 
 const summary_max_chars = 280
 
@@ -40,27 +43,43 @@ pub fn current() -> String {
   cache_get()
 }
 
-/// Initialise the cache and start the background refresher. Call once at
-/// startup. The first fetch happens in the background, so this never blocks
-/// boot on the network.
+/// Initialise the cache, do a synchronous initial fetch, then start the
+/// background refresher. Call once at startup.
+///
+/// The initial fetch is synchronous (bounded by `fetch_timeout_ms`) so the very
+/// first request — even the one that triggers a Cloud Run cold start — already
+/// has the posts, rather than racing the background fetch. On failure the cache
+/// stays empty and the loop retries; boot continues regardless.
 pub fn start(feed_url: String, interval_ms: Int) -> Nil {
   cache_init()
+  refresh_once(feed_url)
   spawn_loop(fn() { loop(feed_url, interval_ms) })
 }
 
 fn loop(feed_url: String, interval_ms: Int) -> Nil {
-  // Refresh immediately on (re)start, then once per interval.
-  refresh_once(feed_url)
+  // `start` did the initial fetch; from here just refresh once per interval.
   process.sleep(interval_ms)
+  refresh_once(feed_url)
   loop(feed_url, interval_ms)
 }
 
 /// Fetch + parse + format, storing the snippet only when we actually got posts
-/// — a transient failure keeps the previously cached copy.
+/// — a transient failure keeps the previously cached copy. The outcome is
+/// logged so feed problems are visible in Cloud Run logs.
 fn refresh_once(feed_url: String) -> Nil {
   case fetch_snippet(feed_url) {
-    "" -> Nil
-    snippet -> cache_put(snippet)
+    "" ->
+      logging.log(
+        logging.Warning,
+        "blog: no recent posts fetched (keeping any cached copy): " <> feed_url,
+      )
+    snippet -> {
+      cache_put(snippet)
+      logging.log(
+        logging.Info,
+        "blog: refreshed recent posts from " <> feed_url,
+      )
+    }
   }
 }
 
