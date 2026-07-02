@@ -11,6 +11,7 @@ import gleam/bytes_tree
 import gleam/http
 import gleam/http/request
 import gleam/http/response
+import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -131,6 +132,10 @@ fn handle_chat(req: Request, config: Config) -> Response {
       json_response(
         429,
         models.error_response("Too many requests. Please slow down."),
+      )
+      |> set_header(
+        "retry-after",
+        int.to_string(rate_limit.retry_after_seconds(config.rate_limit)),
       )
     True ->
       case req.method {

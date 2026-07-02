@@ -2,7 +2,8 @@
 ////
 //// Shape mirrors the old `public/script.js`:
 ////   - theme (light / paper / dark / carbon) persisted in localStorage
-////   - language toggle (en / jp) with translated strings + quick prompts
+////   - language switcher (en / jp / tr) with translated strings + quick
+////     prompts, persisted in localStorage like the theme
 ////   - chat history sent with each request to `/api/chat/stream` (SSE)
 ////   - markdown rendered through marked.js + DOMPurify (loaded from CDN
 ////     globals in `index.html` and invoked through `ffi.mjs`)
@@ -12,7 +13,7 @@
 //// animation plays. Chunks are appended progressively with markdown
 //// rendered live.
 
-import frontend/i18n.{type Language, type Strings, En, Jp}
+import frontend/i18n.{type Language, type Strings, En, Jp, Tr}
 import frontend/icons
 import gleam/int
 import gleam/json
@@ -85,16 +86,18 @@ pub type Model {
 fn init(_flags) -> #(Model, Effect(Msg)) {
   let theme = load_theme()
   apply_theme(theme)
+  let language = load_language()
+  apply_language(language)
   let model =
     Model(
       theme: theme,
-      language: En,
+      language: language,
       input: "",
       history: [],
       next_id: 0,
       stream_state: Idle,
     )
-  reset_with_welcome(model, En)
+  reset_with_welcome(model, language)
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +106,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
 
 pub type Msg {
   UserToggledTheme
-  UserToggledLanguage(Bool)
+  UserPickedLanguage(Language)
   UserTypedInput(String)
   UserPressedKey(String)
   UserClickedSend
@@ -120,13 +123,16 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       #(Model(..model, theme: next), effect.none())
     }
 
-    UserToggledLanguage(is_jp) -> {
-      let lang = case is_jp {
-        True -> Jp
-        False -> En
+    UserPickedLanguage(lang) ->
+      // Re-clicking the active language must not wipe the conversation.
+      case lang == model.language {
+        True -> #(model, effect.none())
+        False -> {
+          save_language(lang)
+          apply_language(lang)
+          reset_with_welcome(model, lang)
+        }
       }
-      reset_with_welcome(model, lang)
-    }
 
     UserTypedInput(text) -> #(Model(..model, input: text), effect.none())
 
@@ -371,30 +377,44 @@ fn header(model: Model, s: Strings) -> Element(Msg) {
 }
 
 fn language_toggle(language: Language) -> Element(Msg) {
-  let is_jp = language == Jp
-  html.div([attribute.class("language-toggle")], [
-    html.span([attribute.class("toggle-label")], [html.text("EN")]),
-    html.label(
-      [
-        attribute.class("switch"),
-        attribute.attribute(
-          "aria-label",
-          "Toggle language between English and Japanese",
-        ),
-      ],
-      [
-        html.input([
-          attribute.type_("checkbox"),
-          attribute.id("lang-toggle"),
-          attribute.checked(is_jp),
-          attribute.attribute("aria-label", "Switch to Japanese"),
-          event.on_check(UserToggledLanguage),
-        ]),
-        html.span([attribute.class("slider")], []),
-      ],
-    ),
-    html.span([attribute.class("toggle-label")], [html.text("JP")]),
-  ])
+  html.div(
+    [
+      attribute.class("language-toggle"),
+      attribute.attribute("role", "group"),
+      attribute.attribute("aria-label", "Language"),
+    ],
+    [
+      language_button(En, "EN", "Switch to English", language),
+      language_button(Jp, "JP", "Switch to Japanese", language),
+      language_button(Tr, "TR", "Switch to Turkish", language),
+    ],
+  )
+}
+
+fn language_button(
+  lang: Language,
+  label: String,
+  aria_label: String,
+  current: Language,
+) -> Element(Msg) {
+  let is_active = lang == current
+  let class = case is_active {
+    True -> "lang-btn active"
+    False -> "lang-btn"
+  }
+  html.button(
+    [
+      attribute.type_("button"),
+      attribute.class(class),
+      attribute.attribute("aria-label", aria_label),
+      attribute.attribute("aria-pressed", case is_active {
+        True -> "true"
+        False -> "false"
+      }),
+      event.on_click(UserPickedLanguage(lang)),
+    ],
+    [html.text(label)],
+  )
 }
 
 fn messages_container(model: Model, has_messages: Bool) -> Element(Msg) {
@@ -582,6 +602,47 @@ fn theme_to_string(theme: Theme) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// Language persistence (localStorage via FFI, mirroring the theme)
+// ---------------------------------------------------------------------------
+
+fn load_language() -> Language {
+  case do_storage_get("language") {
+    Ok("jp") -> Jp
+    Ok("tr") -> Tr
+    _ -> En
+  }
+}
+
+fn save_language(language: Language) -> Nil {
+  do_storage_set("language", language_to_string(language))
+}
+
+/// Keep `<html lang="...">` in sync with the UI locale (the static value baked
+/// into index.html is only the pre-hydration default).
+fn apply_language(language: Language) -> Nil {
+  do_set_document_lang(lang_code(language))
+}
+
+/// Storage keys: short site-local identifiers ("jp" matches the historic
+/// script.js value, so existing visitors keep their choice).
+fn language_to_string(language: Language) -> String {
+  case language {
+    En -> "en"
+    Jp -> "jp"
+    Tr -> "tr"
+  }
+}
+
+/// BCP-47 codes for the `lang` attribute (Japanese is "ja", not "jp").
+fn lang_code(language: Language) -> String {
+  case language {
+    En -> "en"
+    Jp -> "ja"
+    Tr -> "tr"
+  }
+}
+
+// ---------------------------------------------------------------------------
 // FFI bindings
 // ---------------------------------------------------------------------------
 
@@ -593,6 +654,9 @@ fn do_storage_set(key: String, value: String) -> Nil
 
 @external(javascript, "./ffi.mjs", "set_body_theme")
 fn do_set_body_theme(theme: String) -> Nil
+
+@external(javascript, "./ffi.mjs", "set_document_lang")
+fn do_set_document_lang(lang: String) -> Nil
 
 @external(javascript, "./ffi.mjs", "render_markdown")
 fn render_markdown(text: String) -> String

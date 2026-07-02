@@ -43,6 +43,14 @@ fn parse_positive(raw: Result(String, Nil), fallback: Int) -> Int {
   }
 }
 
+/// The value for a `retry-after` header on 429 responses: the full rate-limit
+/// window, in whole seconds (rounded up, minimum 1). Conservative on purpose —
+/// the fixed window means a client's earliest slot may arrive sooner, but a
+/// client that waits the full window is always clear.
+pub fn retry_after_seconds(config: Config) -> Int {
+  int.max({ config.window_ms + 999 } / 1000, 1)
+}
+
 /// Derive the rate-limit key from the `x-forwarded-for` header.
 ///
 /// This service runs directly on Cloud Run (`*.run.app`), where Google's front

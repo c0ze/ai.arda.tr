@@ -211,65 +211,38 @@ body {
 [data-theme="light"]  .theme-toggle .icon-sun  { display: block; }
 [data-theme="paper"]  .theme-toggle .icon-sun  { display: block; }
 
-/* ─── Language Toggle ─────────────────────────── */
+/* ─── Language Toggle (EN / JP / TR segmented control) ── */
 .language-toggle {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 2px;
+    padding: 2px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
 }
 
-.toggle-label {
+.lang-btn {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.7rem;
     font-weight: 500;
-    color: var(--text-muted);
     letter-spacing: 0.05em;
-}
-
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 38px;
-    height: 20px;
+    color: var(--text-muted);
+    background-color: transparent;
+    border: none;
+    border-radius: 16px;
+    padding: 0.2rem 0.55rem;
     cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
+.lang-btn:hover {
+    color: var(--accent);
 }
 
-.slider {
-    position: absolute;
-    cursor: pointer;
-    inset: 0;
-    background-color: var(--bg-tertiary);
-    transition: 0.25s;
-    border-radius: 20px;
-    border: 1px solid var(--border-light);
-}
-
-.slider::before {
-    position: absolute;
-    content: "";
-    height: 14px;
-    width: 14px;
-    left: 2px;
-    bottom: 2px;
-    background-color: var(--text-secondary);
-    transition: 0.25s;
-    border-radius: 50%;
-}
-
-input:checked + .slider {
+.lang-btn.active {
     background-color: var(--accent);
-    border-color: var(--accent);
-}
-
-input:checked + .slider::before {
-    transform: translateX(18px);
-    background-color: var(--bg-primary);
+    color: var(--bg-primary);
 }
 
 /* ─── Main Chat Area ──────────────────────────── */

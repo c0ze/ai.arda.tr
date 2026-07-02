@@ -15,6 +15,7 @@ on:
       - 'shared/manifest.toml'
       - 'gleam.toml'
       - 'manifest.toml'
+      - 'personal.md'
       - 'job_requirements.md'
       - '.github/workflows/deploy-backend.yml'
   # Fired by c0ze/resume (via repository_dispatch) when the résumé content

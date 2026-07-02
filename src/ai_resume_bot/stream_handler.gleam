@@ -20,6 +20,7 @@ import gleam/bytes_tree
 import gleam/erlang/process
 import gleam/http/request
 import gleam/http/response
+import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -71,7 +72,13 @@ pub fn handle_stream(
     )
   {
     False ->
-      with_cors(error_response(429, "Too many requests. Please slow down."))
+      with_cors(
+        error_response(429, "Too many requests. Please slow down.")
+        |> response.set_header(
+          "retry-after",
+          int.to_string(rate_limit.retry_after_seconds(config.rate_limit)),
+        ),
+      )
     True ->
       // Read the request body
       case mist.read_body(req, 1_000_000) {

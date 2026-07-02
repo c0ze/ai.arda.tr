@@ -1,9 +1,11 @@
-//// Translated UI strings and quick-topic prompts, ported 1:1 from the
-//// `translations` object in the old `public/script.js`.
+//// Translated UI strings and quick-topic prompts. EN/JP were ported 1:1 from
+//// the `translations` object in the old `public/script.js`; TR was added
+//// natively in the Lustre port.
 
 pub type Language {
   En
   Jp
+  Tr
 }
 
 pub type Strings {
@@ -63,6 +65,24 @@ pub fn strings(language: Language) -> Strings {
         prompt_skills: "Ardaの技術的なスキルは何ですか？",
         prompt_visa: "Ardaの日本でのビザステータスはどうなっていますか？",
         prompt_about_bot: "ArdaのAIアシスタント、そのアーキテクチャ、そしてどのように構築されたか教えてください。",
+      )
+    Tr ->
+      Strings(
+        header_title: "Arda'nın AI Konstrüktü",
+        welcome_title: "Merhaba, ben Arda'nın Yapay Zekâ Asistanı",
+        welcome_subtitle: "Arda'nın deneyimi, yetenekleri ya da geçmişi hakkında bana her şeyi sorabilirsiniz.",
+        welcome_msg: "Merhaba, ben Arda'nın asistanıyım. Bana Arda'nın yeteneklerini, deneyimini, eğitimini, projelerini, hatta ilgi alanlarını ve müziğini sorabilirsiniz. İlginç bir pozisyonunuz varsa sizin adınıza Arda'yla iletişime de geçebilirim.",
+        input_placeholder: "Mesajınızı yazın...",
+        btn_experience: "Deneyim",
+        btn_education: "Eğitim",
+        btn_skills: "Yetenekler",
+        btn_visa: "Vize Durumu",
+        btn_about_bot: "Bot Hakkında",
+        prompt_experience: "Bana Arda'nın iş deneyiminden bahseder misin?",
+        prompt_education: "Bana Arda'nın eğitiminden bahseder misin?",
+        prompt_skills: "Arda'nın teknik yetenekleri neler?",
+        prompt_visa: "Arda'nın Japonya'daki vize durumu nedir?",
+        prompt_about_bot: "Bana Arda'nın yapay zekâ asistanından, mimarisinden ve nasıl geliştirildiğinden bahseder misin?",
       )
   }
 }

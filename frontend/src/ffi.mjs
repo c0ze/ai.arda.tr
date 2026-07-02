@@ -32,6 +32,14 @@ export function set_body_theme(theme) {
   }
 }
 
+// Keep <html lang="..."> in sync with the selected UI locale so screen
+// readers and translation tools pick the right language.
+export function set_document_lang(lang) {
+  if (typeof document !== "undefined" && document.documentElement) {
+    document.documentElement.setAttribute("lang", lang);
+  }
+}
+
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (ch) => {
     switch (ch) {

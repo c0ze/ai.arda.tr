@@ -385,6 +385,27 @@ pub fn config_from_env_ignores_invalid_test() {
   cfg.window_ms |> should.equal(60_000)
 }
 
+// retry_after_seconds feeds the `retry-after` header on 429 responses, so it
+// must be whole seconds, rounded up, and never zero.
+
+pub fn retry_after_seconds_is_full_window_test() {
+  rate_limit.Config(max_requests: 30, window_ms: 60_000)
+  |> rate_limit.retry_after_seconds
+  |> should.equal(60)
+}
+
+pub fn retry_after_seconds_rounds_partial_seconds_up_test() {
+  rate_limit.Config(max_requests: 1, window_ms: 1500)
+  |> rate_limit.retry_after_seconds
+  |> should.equal(2)
+}
+
+pub fn retry_after_seconds_never_below_one_test() {
+  rate_limit.Config(max_requests: 1, window_ms: 0)
+  |> rate_limit.retry_after_seconds
+  |> should.equal(1)
+}
+
 // ---------------------------------------------------------------------------
 // email.reply_with_outcome — the streaming and non-streaming paths must report
 // the contact-email result to the user consistently.

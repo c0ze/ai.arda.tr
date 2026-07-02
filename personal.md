@@ -13,8 +13,15 @@ Arda is an active musician and producer in the metal scene.
 - **Pagan** — His atmospheric black metal band from Turkey: dark, melodic, and
   aggressive. Website: https://pagan.tr
 - **The Seventh Shadow** — His AI-generated gothic metal project, exploring
-  themes of alienation and artificiality (release: *Alienation by Design*). It
-  grew out of his experiments with AI music tools such as Suno.
+  themes of alienation and artificiality. It grew out of his experiments with
+  AI music tools such as Suno. Two albums so far: *Alienation by Design* and
+  *Anti-Nativity*. The second album, *Anti-Nativity*, has its own site at
+  https://anti-nativity.arda.tr with rich album lore, per-song concepts, and
+  voice-coded lyrics.
+- **Arda** — A project of original songs written in J.R.R. Tolkien's Sindarin
+  (Elvish), with lyrics in Tengwar script alongside English translations,
+  presented on a synced-lyrics site: https://lind.arda.tr. (Yes, the project
+  shares his name — Arda is also the name of Tolkien's world.)
 - His music and discography are on Discogs (as Arda Karaduman), Metal Archives
   (under the name "Talciron"), and Last.fm (username `c0ze`).
 
