@@ -81,12 +81,20 @@ Once the secrets are set, **pushing backend changes to `main` deploys automatica
 
 ## Auto-refresh on résumé changes
 
-The bot bakes the résumé JSON into its image at **build time** (`gleam run -- fetch`), so the running service holds a snapshot from its last deploy. To make résumé edits propagate automatically, this deploy also accepts a `repository_dispatch` event of type `resume-updated`, and the source repo ([`c0ze/resume`](https://github.com/c0ze/resume)) fires it whenever its content changes.
+The bot bakes the résumé JSON into its image at **build time** (`gleam run -- fetch`), so the running service holds a snapshot from its last deploy. `deploy-backend.yml` therefore runs on a **daily schedule** (`0 3 * * *`, 12:00 JST) so résumé edits propagate on their own. **No setup and no credentials.**
 
-**One-time setup:**
+Staleness is bounded at 24 hours. After editing the résumé, refresh immediately with:
 
-1. Create a **fine-grained PAT** scoped to **`c0ze/ai.arda.tr`** with **Contents: Read and write** (that scope authorizes the `POST /repos/{owner}/{repo}/dispatches` API).
-2. In **`c0ze/resume`**, add it as the Actions secret **`BOT_DEPLOY_TOKEN`**.
-3. `c0ze/resume`'s `notify-bot.yml` workflow then dispatches `resume-updated` to this repo whenever `content/**` changes, triggering a backend redeploy that re-fetches the latest résumé.
+```bash
+gh workflow run deploy-backend.yml --repo c0ze/ai.arda.tr
+```
 
-Until the PAT is set, refresh manually with `gh workflow run deploy-backend.yml` (or the Actions tab).
+### Why not a push notification
+
+This used to be a `repository_dispatch` of type `resume-updated`, fired by [`c0ze/resume`](https://github.com/c0ze/resume) and authenticated with a fine-grained PAT in a `BOT_DEPLOY_TOKEN` secret. The PAT was minted 2026-06-06 with a 30-day expiry, died around 2026-07-06, and **nothing surfaced it for six weeks** — the sending workflow only ran on résumé content pushes, so the bot quietly answered visitors from a stale résumé until an unrelated change happened to trigger it again.
+
+The obvious fix is keyless auth, and this repo already does that for GCP — the deploy authenticates by Workload Identity Federation with no stored key. But GitHub's own API **does not accept GitHub Actions OIDC tokens**; they federate to external providers only. So a GitHub→GitHub `repository_dispatch` always needs a bearer credential: a PAT that expires, or a GitHub App whose private key does not.
+
+A schedule needs neither. The credential was removed rather than rotated, which is why there is nothing here to expire.
+
+**Cost note:** this deploy builds the container from source (`source: '.'`), so a scheduled run is a full Cloud Build image build, push and deploy — not a lightweight restart. At daily that is ~365 builds and 365 stored images a year for a document that changes a handful of times. If Artifact Registry storage grows, either widen the cron to weekly (`0 3 * * 1`) or add an Artifact Registry cleanup policy.

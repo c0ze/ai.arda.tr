@@ -18,11 +18,20 @@ on:
       - 'personal.md'
       - 'job_requirements.md'
       - '.github/workflows/deploy-backend.yml'
-  # Fired by c0ze/resume (via repository_dispatch) when the résumé content
-  # changes, so the bot re-fetches the latest résumé at build time. See
-  # DEPLOYMENT_OPTIONS.md → "Auto-refresh on résumé changes".
-  repository_dispatch:
-    types: [resume-updated]
+  # The bot bakes the résumé in at build time, so it needs redeploying when the
+  # résumé changes in c0ze/resume. That used to be a repository_dispatch fired
+  # from that repo, authenticated with a fine-grained PAT — which expired after
+  # 30 days and then failed silently for six weeks while the bot answered
+  # visitors from a stale résumé. GitHub's own API does not accept Actions OIDC
+  # tokens (those federate to external providers, which is what the WIF auth
+  # below uses for GCP), so that hop always needed a bearer credential of some
+  # kind. A schedule needs none, so the credential is gone entirely.
+  #
+  # 03:00 UTC is 12:00 JST. Staleness is bounded at 24h; for an immediate
+  # refresh after editing the résumé, run this workflow manually:
+  #   gh workflow run deploy-backend.yml --repo c0ze/ai.arda.tr
+  schedule:
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 permissions:
