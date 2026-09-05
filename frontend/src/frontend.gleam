@@ -190,7 +190,17 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
           let error_text = "System Malfunction: " <> message
           case model.stream_state {
             Streaming(bot_msg_id) -> {
-              let model = replace_message_text(model, bot_msg_id, error_text)
+              let has_partial_text =
+                list.any(model.history, fn(msg) {
+                  msg.id == bot_msg_id && msg.text != ""
+                })
+              let model = case has_partial_text {
+                True -> {
+                  let #(model, _) = push(model, Bot, error_text)
+                  model
+                }
+                False -> replace_message_text(model, bot_msg_id, error_text)
+              }
               #(Model(..model, stream_state: Idle), scroll_to_bottom())
             }
             _ -> {

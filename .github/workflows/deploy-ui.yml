@@ -46,6 +46,15 @@ jobs:
           gleam deps download
           gleam run -m lustre/dev build --minify --outdir=../public
 
+      - name: Set up Node for browser-boundary tests
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+
+      - name: Test streaming client
+        working-directory: frontend
+        run: gleam build && node --test test/*.test.mjs
+
       - name: Setup Pages
         uses: actions/configure-pages@1f0c5cde4bc74cd7e1254d0cb4de8d49e9068c7d # v4
 

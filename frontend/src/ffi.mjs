@@ -104,57 +104,80 @@ export function is_localhost() {
 // Stream a POST request to the SSE endpoint. Calls `on_event` for each
 // parsed SSE event object. The callback receives a JSON string.
 export function stream_chat(url, body_json, on_event) {
+  let settled = false;
+  let reader;
+  const controller = new AbortController();
+  const onDeadline = () => {
+    fail("Response timed out. Please try again.");
+    controller.abort();
+  };
+  let timer = setTimeout(onDeadline, 45000);
+
+  function emit(event) {
+    if (settled) return;
+    if (event.type === "done" || event.type === "error") {
+      settled = true;
+      clearTimeout(timer);
+      if (reader) reader.cancel().catch(() => {});
+    }
+    on_event(JSON.stringify(event));
+  }
+  function fail(message) {
+    emit({ type: "error", message });
+  }
+
   fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body_json,
+    signal: controller.signal,
   })
-    .then((resp) => {
-      if (!resp.ok) {
-        on_event(JSON.stringify({ type: "error", message: "HTTP " + resp.status }));
+    .then(async (resp) => {
+      if (settled) {
+        if (resp.body) await resp.body.cancel();
         return;
       }
-      const reader = resp.body.getReader();
+      if (!resp.ok || !resp.body) {
+        if (resp.body) resp.body.cancel().catch(() => {});
+        fail(resp.ok ? "Empty response body" : "HTTP " + resp.status);
+        return;
+      }
+      reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
 
-      function pump() {
-        return reader.read().then(({ done, value }) => {
-          if (done) {
-            // Process any remaining buffered data
-            if (buffer.trim()) processBuffer();
-            return;
-          }
-          buffer += decoder.decode(value, { stream: true });
-          processBuffer();
-          return pump();
-        });
-      }
-
-      function processBuffer() {
-        // SSE events are separated by double newlines
-        const parts = buffer.split("\n\n");
-        // Keep the last (possibly incomplete) part in the buffer
+      while (!settled) {
+        const { done, value } = await reader.read();
+        if (settled) return;
+        if (!done && value.byteLength > 0) {
+          clearTimeout(timer);
+          timer = setTimeout(onDeadline, 45000);
+        }
+        buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+        // Keep incomplete frames buffered across reads, including split CRLFs.
+        const parts = buffer.split(/\r?\n\r?\n/);
         buffer = parts.pop() || "";
         for (const part of parts) {
-          for (const line of part.split("\n")) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-              try {
-                // Validate it's JSON before forwarding
-                JSON.parse(data);
-                on_event(data);
-              } catch (_) {
-                // Skip malformed data lines
-              }
-            }
+          const data = part.split(/\r?\n/)
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).replace(/^ /, ""))
+            .join("\n");
+          let event;
+          try { event = JSON.parse(data); } catch (_) { continue; }
+          // Match shared.stream_event_decoder before treating an event as final.
+          if (!event || typeof event !== "object") continue;
+          if (event.type === "thinking" ||
+              ((event.type === "chunk" || event.type === "done") && typeof event.text === "string") ||
+              (event.type === "error" && typeof event.message === "string")) {
+            emit(event);
           }
+          if (settled) return;
+        }
+        if (done) {
+          fail("Response ended before completion. Please try again.");
+          return;
         }
       }
-
-      return pump();
     })
-    .catch((err) => {
-      on_event(JSON.stringify({ type: "error", message: String(err) }));
-    });
+    .catch((err) => { fail(String(err)); });
 }

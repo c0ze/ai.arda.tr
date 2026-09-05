@@ -68,6 +68,15 @@ jobs:
         working-directory: frontend
         run: gleam deps download
 
+      - name: Set up Node for browser-boundary tests
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+
+      - name: Test streaming client
+        working-directory: frontend
+        run: gleam build && node --test test/*.test.mjs
+
       - name: Build Lustre bundle
         working-directory: frontend
         run: gleam run -m lustre/dev build --minify --outdir=../public

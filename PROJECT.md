@@ -66,6 +66,8 @@ gleam deps download
 gleam run                   # builds Lustre bundle into ./public then boots HTTP server on $PORT (default 8080)
 gleam run -- fetch          # refresh resume JSON into ./data
 gleam test                  # pure-logic tests (backend only)
+# Frontend transport regressions (Node 24; no npm dependencies):
+(cd frontend && gleam build && node --test test/*.test.mjs)
 
 # `gleam run` detects frontend/gleam.toml and shells out to
 # `gleam run -m lustre/dev build --minify --outdir=../public` inside frontend/
@@ -116,6 +118,9 @@ docker run -p 8080:8080 \
 - `POST /api/chat` → `{"message": "...", "history": [...]}` → `{"reply": "..."}` (non-streaming).
 - `POST /api/chat/stream` → same request body → SSE stream of `{type, ...}` events (streaming).
   - SSE events: `thinking` → `chunk` (text delta) → `done` (full reply) or `error`.
+  - The frontend accepts LF/CRLF framing, settles once on a valid terminal event,
+    and reports truncated or stalled responses as errors (45s idle deadline), releasing
+    the busy composer. Its transport tests run in CI and before UI publication.
   - Handled at the raw Mist level (Wisp cannot do streaming responses).
 - `GET /*` → static files from `PUBLIC_DIR`.
 - Error shapes: 400 `Invalid JSON`, 500 `Internal AI Error`, 502 contact-email failure.
