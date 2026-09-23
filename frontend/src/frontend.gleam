@@ -210,6 +210,11 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
           }
         }
 
+        // Speech events are consumed by the voice module (see ffi.mjs).
+        shared.StreamVoice(_)
+        | shared.StreamSpeech(..)
+        | shared.StreamSpeechEnd(_) -> #(model, effect.none())
+
         shared.StreamError(message) -> {
           let error_text = "System Malfunction: " <> message
           case model.stream_state {
