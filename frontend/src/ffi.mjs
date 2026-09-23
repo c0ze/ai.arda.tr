@@ -8,6 +8,7 @@
 // fall back to escaped plain text — never unsanitised HTML.
 
 import { Ok, Error } from "./gleam.mjs";
+import { orb, crackle, reducedMotion } from "./onebit.mjs";
 
 export function storage_get(key) {
   try {
@@ -180,4 +181,94 @@ export function stream_chat(url, body_json, on_event) {
       }
     })
     .catch((err) => { fail(String(err)); });
+}
+
+// ---------------------------------------------------------------------------
+// The construct: a 1-bit orb that revolves constantly and sizzles on every
+// streamed chunk, plus a crackling block cursor that trails the streaming
+// reply. Both canvases are created here, inside elements whose Lustre vnodes
+// have no children (the orb host) or whose inner HTML Lustre only replaces
+// when the markdown changes (the reply). Lustre never diffs these canvases,
+// so re-renders do not recreate them.
+// ---------------------------------------------------------------------------
+
+let construct = null; // { canvas, orb }
+
+function ensureOrb(selector) {
+  if (typeof document === "undefined") return null;
+  if (construct && construct.canvas.isConnected) return construct;
+  const host = document.querySelector(selector);
+  if (!host) return null;
+  if (construct) construct.orb.destroy();
+  const canvas = document.createElement("canvas");
+  canvas.className = "px";
+  host.replaceChildren(canvas);
+  construct = { canvas, orb: orb(canvas, { size: 44, speed: 0.6 }) };
+  return construct;
+}
+
+export function mount_orb(selector) {
+  ensureOrb(selector);
+}
+
+// One crackle of the orb, sized like the reference sketch. Skipped under
+// prefers-reduced-motion: there the orb draws still frames, and the last
+// sizzle would otherwise stay frozen on it after the reply ends.
+export function sizzle_orb(selector) {
+  const c = ensureOrb(selector);
+  if (c && !reducedMotion()) c.orb.sizzle(0.5 + Math.random() * 0.5);
+}
+
+// While the model is thinking no chunks arrive, so keep the orb simmering
+// until the first chunk (or the end) turns it off.
+let simmer = 0;
+export function simmer_orb(selector, on) {
+  clearInterval(simmer);
+  simmer = 0;
+  if (!on || reducedMotion()) return;
+  const c = ensureOrb(selector);
+  if (c) simmer = setInterval(() => c.orb.sizzle(0.3), 320);
+}
+
+let cursor = null; // { canvas, anim }
+
+// Descend into the last block of the rendered reply so the cursor sits right
+// after the final word rather than on a line of its own.
+const TRAIL = /^(P|UL|OL|LI|BLOCKQUOTE|H[1-6])$/;
+function trailTarget(el, skip) {
+  for (;;) {
+    let last = el.lastChild;
+    while (last && (last === skip || (last.nodeType === 3 && !last.textContent.trim()))) {
+      last = last.previousSibling;
+    }
+    if (last && last.nodeType === 1 && TRAIL.test(last.tagName)) el = last;
+    else return el;
+  }
+}
+
+// Put the crackle cursor at the end of the element matched by `selector`.
+// Call it after every render of the streaming reply (Lustre replaces the
+// reply's inner HTML when the markdown changes, which detaches the cursor).
+export function trail_cursor(selector) {
+  if (typeof document === "undefined") return;
+  const host = document.querySelector(selector);
+  if (!host) return stop_cursor();
+  if (!cursor) {
+    const canvas = document.createElement("canvas");
+    canvas.className = "px cursor";
+    canvas.setAttribute("aria-hidden", "true");
+    cursor = { canvas, anim: null };
+  }
+  const target = trailTarget(host, cursor.canvas);
+  if (cursor.canvas.parentNode !== target || target.lastChild !== cursor.canvas) {
+    target.appendChild(cursor.canvas);
+  }
+  if (!cursor.anim) cursor.anim = crackle(cursor.canvas);
+}
+
+export function stop_cursor() {
+  if (!cursor) return;
+  cursor.anim?.destroy();
+  cursor.canvas.remove();
+  cursor = null;
 }
