@@ -360,7 +360,8 @@ export function dithered(canvas, src, opts = {}) {
     let mean = 0;
     for (let i = 0; i < W * H; i++) { base[i] = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) / 255; mean += base[i]; }
     mean /= W * H;
-    const inv = o.invert === "auto" ? (palette(canvas).light ? true : mean > 0.6) : o.invert;
+    // "auto" always picks the sparse print: ink goes on the minority tone, on light and dark grounds alike
+    const inv = o.invert === "auto" ? mean > 0.6 : o.invert;
     for (let i = 0; i < base.length; i++) {
       const v = inv ? 1 - base[i] : base[i];
       base[i] = Math.min(1, Math.max(0, (v - 0.5) * o.contrast + 0.5 + o.lift));
