@@ -138,13 +138,91 @@ function onResize(canvas, fn) {
 
 /* ---------------------------------------------------------------- forest: the scrolling night scene */
 
+/* ---------------------------------------------------------------- the valley's residents */
+
+// A werewolf and a bat, drawn as small vector rigs and thresholded to 1 bit, so they scale with the scene
+// and animate smoothly. Each returns a mask (1 = body) in its own box, plus where that box sits.
+const creatureCanvas = () => {
+  const c = document.createElement("canvas");
+  return { c, g: c.getContext("2d", { willReadFrequently: true }) };
+};
+function rasterize(cc, w, h, paint) {
+  w = Math.max(1, Math.ceil(w)); h = Math.max(1, Math.ceil(h));
+  if (cc.c.width !== w || cc.c.height !== h) { cc.c.width = w; cc.c.height = h; }
+  const g = cc.g;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, w, h);
+  g.fillStyle = g.strokeStyle = "#000"; g.lineCap = "round"; g.lineJoin = "round";
+  paint(g);
+  const a = g.getImageData(0, 0, w, h).data, m = new Uint8Array(w * h);
+  for (let i = 0; i < m.length; i++) m[i] = a[i * 4 + 3] > 110 ? 1 : 0;
+  return { m, w, h };
+}
+const ease = p => p * p * (3 - 2 * p);
+
+/* the werewolf: gallops on all fours, sits back on its haunches to howl. phase = stride, h = 0 run … 1 howl */
+function paintWolf(g, u, ox, oy, phase, h) {
+  g.translate(ox, oy); g.scale(u, u);
+  const TAU = Math.PI * 2, bob = (1 - h) * 0.35 * Math.sin(phase * TAU * 2), hip = [-3, -5.2 + 3.2 * h + bob];
+  const leg = (x, y, a1, a2, l1, l2, w1, w2) => {
+    const kx = x + Math.sin(a1) * l1, ky = y + Math.cos(a1) * l1;
+    const px = kx + Math.sin(a1 + a2) * l2, py = ky + Math.cos(a1 + a2) * l2;
+    g.lineWidth = w1; g.beginPath(); g.moveTo(x, y); g.lineTo(kx, ky); g.stroke();
+    g.lineWidth = w2; g.beginPath(); g.moveTo(kx, ky); g.lineTo(px, py); g.stroke();
+  };
+  const mix = (a, b) => a + (b - a) * h;
+  // hind legs: gallop swing, or folded under the haunch when sitting
+  for (const [k, dx] of [[0, 0], [0.5, -0.5]]) {
+    const sw = Math.sin((phase + k * 0.12) * TAU);
+    leg(hip[0] + dx, hip[1], mix(-0.9 * sw, 1.45), mix(0.55 + 0.5 * Math.max(0, sw), -2.5), 2.7, 2.9, 1.4, 0.8);
+  }
+  // tail: streams out behind at a run, lies along the ground while sitting
+  g.lineWidth = 1.3; g.beginPath(); g.moveTo(hip[0] - 0.6, hip[1] - 1.1);
+  g.quadraticCurveTo(mix(-6.2, -5.6), mix(-7.6, -0.6), mix(-7.8, -7.6), mix(-5.4, -0.4) + bob); g.stroke();
+  // the body pitches up around the hips to sit; the drawing is in running coordinates, shifted down with the hips
+  g.save(); g.translate(hip[0], hip[1]); g.rotate(-h * 0.6); g.translate(-hip[0], -hip[1]); g.translate(0, 3.2 * h);
+  g.beginPath(); g.ellipse(0, -6 + bob, 4.3, 1.8, 0, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(2.4, -5.7 + bob, 2.1, 2.3, 0, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(-2.8, -5.8 + bob, 1.9, 2 + 0.6 * h, 0, 0, TAU); g.fill();
+  for (const [k, dx] of [[0.5, 0], [0.62, 0.5]]) {
+    const sw = Math.sin((phase + k) * TAU), s = 1 + 0.16 * h; // front legs straighten and reach the ground
+    leg(2.8 + dx, -5 + bob, mix(0.85 * sw, -0.62 + dx * 0.2), mix(-0.2 - 0.6 * Math.max(0, -sw), 0.05), 2.6 * s, 2.8 * s, 1.2, 0.75);
+  }
+  g.beginPath(); g.moveTo(2.2, -7.2 + bob); g.lineTo(4.6, -9.2 + bob); g.lineTo(6.2, -7.6 + bob); g.lineTo(3.6, -5.2 + bob); g.fill();
+  // muzzle to the moon
+  g.translate(5.2, -8.4 + bob); g.rotate(-h * 0.95); g.translate(-5.2, 8.4 - bob);
+  g.beginPath(); g.ellipse(5.6, -8.4 + bob, 1.5, 1.15, 0, 0, TAU); g.fill();
+  g.beginPath(); g.moveTo(6.4, -9 + bob); g.lineTo(9, -8.3 + bob); g.lineTo(9, -7.8 + bob); g.lineTo(6.4, -7.5 + bob); g.fill();
+  g.beginPath(); g.moveTo(4.7, -9.2 + bob); g.lineTo(5, -10.9 + bob); g.lineTo(5.6, -9.4 + bob); g.fill();
+  g.beginPath(); g.moveTo(5.6, -9.4 + bob); g.lineTo(6, -10.8 + bob); g.lineTo(6.4, -9.2 + bob); g.fill();
+  g.restore();
+}
+
+/* the bat: f = wing flap (+1 up … -1 down); f ≈ 0 is the spread silhouette you see against the moon */
+function paintBat(g, u, ox, oy, f) {
+  g.translate(ox, oy); g.scale(u, u);
+  const wing = [[0.7, -0.8], [2.2, -1.9], [4.4, -2.2], [6.5, -1.2], [6, 0.6], [5.2, -0.2], [4.3, 1.4], [3.4, 0.4], [2.2, 1.8], [1.3, 0.7], [0.7, 1]];
+  for (const side of [1, -1]) {
+    g.beginPath();
+    wing.forEach(([x, y], i) => { const yy = y - f * 2.6 * Math.pow(x / 6.5, 1.2); i ? g.lineTo(side * x, yy) : g.moveTo(side * x, yy); });
+    g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(side * 0.6, -1.6); g.lineTo(side * 0.45, -2.8); g.lineTo(side * 0.1, -1.9); g.fill();
+  }
+  g.beginPath(); g.ellipse(0, 0.2, 0.85, 1.6, 0, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.ellipse(0, -1.3, 0.75, 0.75, 0, 0, Math.PI * 2); g.fill();
+}
+
 /**
  * A moonlit spruce valley in fog, scrolling sideways in parallax, ordered-dithered to 1 bit.
- * opts: seed, speed (1 = default drift), maxWidth (low-res pixel cap, for CPU), onMast(x, y) in CSS px.
+ * Now and then a werewolf crosses the valley and howls, or a bat hangs in front of the moon; they take
+ * turns, one roughly every creatureEvery seconds. summon("wolf" | "bat") calls one up right away.
+ * opts: seed, speed (1 = default drift), maxWidth (low-res pixel cap, for CPU), onMast(x, y) in CSS px,
+ * creatures (bool), creatureFirst / creatureEvery (seconds), onCreature(kind, moment) for "howl" etc.
  */
 export function forest(canvas, opts = {}) {
-  const o = { seed: 2004, speed: 1, maxWidth: 640, px: 2, fps: 30, onMast: null, ...opts };
-  let SW, SH, VH, OY, Z, P, PX, sky, strips, fog, E, img, ctx, mast;
+  const o = { seed: 2004, speed: 1, maxWidth: 640, px: 2, fps: 30, onMast: null, creatures: true, creatureFirst: 40, creatureEvery: 60, onCreature: null, ...opts };
+  let SW, SH, VH, OY, Z, P, PX, sky, strips, fog, E, img, ctx, mast, moonAt, lastT = 0, summoned = null, howled = -1;
+  const cc = creatureCanvas(), tc = creatureCanvas();
+  const DUR = { wolf: 13, bat: 11 };
   const FGW = 256, FGH = 96;
 
   function build() {
@@ -162,6 +240,7 @@ export function forest(canvas, opts = {}) {
     // sky: haze, stars, moon + halo (static)
     sky = new Float32Array(SW * SH);
     const moon = { x: SW * 0.8, y: OY + VH * 0.3, r: Z * 0.075 }, crater = tile2(o.seed + 5, 8, 8);
+    moonAt = moon;
     for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
       let L = Math.min(0.34, 0.34 * Math.pow(Math.max(0, (y - OY) / VH - 0.22) / 0.36, 1.7));
       if (y < OY + VH * 0.5 && R() < 0.0022) L = 0.5 + R() * 0.5;
@@ -262,14 +341,94 @@ export function forest(canvas, opts = {}) {
         d[j] = C[0]; d[j + 1] = C[1]; d[j + 2] = C[2]; d[j + 3] = 255;
       }
     }
+    drawCreature(t, d, offs, light ? ink : ground, light ? ground : ink, signal);
     ctx.putImageData(img, 0, 0);
     if (o.onMast) o.onMast(mastSx < SW ? mastSx * PX : null, mast.top * PX);
+  }
+
+  // which resident, if any, is out at time t, and how far into its walk-on
+  function creatureAt(t) {
+    if (summoned && t - summoned.t0 >= 0 && t - summoned.t0 < DUR[summoned.kind]) return { kind: summoned.kind, lt: t - summoned.t0, id: "s" + summoned.t0 };
+    if (!o.creatures || t < o.creatureFirst) return null;
+    const k = Math.floor((t - o.creatureFirst) / o.creatureEvery), start = o.creatureFirst + k * o.creatureEvery, kind = k % 2 ? "bat" : "wolf";
+    return t - start < DUR[kind] ? { kind, lt: t - start, id: k } : null;
+  }
+
+  // where the wolf should sit: the spot nearest the centre that stays in a clearing between the near
+  // spruce stands for the whole howl, allowing for both the stands and the ground scrolling by
+  const stops = new Map();
+  function stopFor(ev, t, u, ground) {
+    if (stops.has(ev.id)) return stops.get(ev.id);
+    const near = strips[0], t0 = t - ev.lt, drift = strips[1].speed * o.speed * (Z / 300), rows = [ground - 12 * u, ground - 6 * u, ground - 1];
+    const nearOff = T => (T * near.speed * o.speed * (Z / 300)) % P;
+    const covered = x => {
+      let n = 0;
+      for (let T = t0 + 5; T <= t0 + 8.7; T += 0.3) for (let dx = -11 * u; dx <= 11 * u; dx += 2) for (const yy of rows) {
+        const X = x - drift * (T - t0 - 5) + dx, Y = Math.round(yy);
+        if (Y >= near.y0 && Y < SH && near.a[(Y - near.y0) * P + ((((X + nearOff(T)) | 0) % P) + P) % P] !== 255) n++;
+      }
+      return n;
+    };
+    let best = SW * 0.5, bestScore = Infinity;
+    for (let x = SW * 0.3; x <= SW * 0.72; x += 4) { const sc = covered(x) * 1000 + Math.abs(x - SW * 0.5); if (sc < bestScore) { bestScore = sc; best = x; } }
+    stops.clear(); stops.set(ev.id, best);
+    return best;
+  }
+
+  function drawCreature(t, d, offs, dark, lit, signal) {
+    lastT = t;
+    const ev = creatureAt(t);
+    if (!ev) return;
+    const put = (x, y, C) => { if (x < 0 || y < 0 || x >= SW || y >= SH) return; const j = (y * SW + x) * 4; d[j] = C[0]; d[j + 1] = C[1]; d[j + 2] = C[2]; };
+    const near = strips[0], hidden = (x, y) => y >= near.y0 && near.a[(y - near.y0) * P + (((x + offs[0]) | 0) % P)] !== 255;
+    const blit = (r, ox, oy, occlude) => {
+      ox = Math.round(ox); oy = Math.round(oy);
+      for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) {
+        const X = ox + x, Y = oy + y;
+        if (occlude && hidden(X, Y)) continue;
+        if (r.m[y * r.w + x]) { put(X, Y, dark); continue; }
+        // a moonlit rim: solid on the side facing the moon (upper right), half-toned on the shadow side,
+        // so the silhouette reads against dark trees as well as bright mist
+        const m = (dx, dy) => { const xx = x + dx, yy = y + dy; return xx >= 0 && yy >= 0 && xx < r.w && yy < r.h && r.m[yy * r.w + xx]; };
+        if (m(-1, 0) || m(0, 1)) put(X, Y, lit);
+        else if (((X + Y) & 1) === 0 && (m(1, 0) || m(0, -1))) put(X, Y, lit);
+      }
+    };
+    if (ev.kind === "wolf") {
+      const u = Math.max(1.6, Z * 0.013), L = 20 * u, ground = OY + VH * 0.93, lt = ev.lt;
+      const cx = stopFor(ev, t, u, ground);
+      let x, h = 0;
+      // while it sits it stays put on the ground, which scrolls with the middle forest
+      const drift = strips[1].speed * o.speed * (Z / 300), sx = cx - drift * 3.7;
+      if (lt < 5) { const p = lt / 5; x = -L + (cx + L) * (1 - (1 - p) * (1 - p)); }
+      else if (lt < 8.7) { x = cx - drift * (lt - 5); h = lt < 5.6 ? ease((lt - 5) / 0.6) : lt < 8.2 ? 1 : 1 - ease((lt - 8.2) / 0.5); }
+      else { const p = (lt - 8.7) / 4.3; x = sx + (SW + L - sx) * p * p; }
+      const phase = (x + L) / (7 * u);
+      const r = rasterize(cc, 22 * u + 4, 19 * u + 4, g => paintWolf(g, u, 9 * u + 2, 17 * u + 2, phase, h));
+      blit(r, x - 9 * u - 2, ground - 17 * u - 2, false); // always in front: a stop behind a spruce would hide the howl
+      if (lt >= 5.6 && lt < 8.2) {
+        if (howled !== ev.id) { howled = ev.id; o.onCreature?.("wolf", "howl"); }
+        const n = Math.floor(7 * Math.min(1, (lt - 5.6) / 1.4)), fs = Math.max(10, Math.round(u * 3.4)), text = "AWOO" + "O".repeat(n);
+        const tr = rasterize(tc, fs * text.length * 0.7 + 6, fs * 1.3 + 4, g => { g.font = `700 ${fs}px "IBM Plex Mono", ui-monospace, monospace`; g.textBaseline = "top"; g.fillText(text, 2, 2); });
+        // above and ahead of the raised muzzle, rising a little as the howl goes on
+        const tx = Math.round(x + 3 * u), ty = Math.round(ground - 17 * u - fs - (lt - 5.6) * u * 0.8);
+        for (let y = 0; y < tr.h; y++) for (let xx = 0; xx < tr.w; xx++) if (tr.m[y * tr.w + xx]) put(tx + xx, ty + y, signal);
+      }
+    } else {
+      const m = moonAt, u = (1.8 * m.r) / 13, lt = ev.lt, TAU = Math.PI * 2;
+      let x, y, f;
+      if (lt < 4) { const p = ease(lt / 4); x = SW + 8 * u + (m.x - SW - 8 * u) * p; y = m.y + Z * 0.22 * (1 - p) + Math.sin(lt * 5) * u * 0.4; f = Math.sin(lt * TAU * 4.5) * (1 - 0.8 * p); }
+      else if (lt < 7.5) { x = m.x; y = m.y + Math.sin(lt * 2.4) * 0.6; f = 0.12 * Math.sin(lt * TAU * 0.9); }
+      else { const p = (lt - 7.5) / 3.5; x = m.x - Z * 0.3 * p; y = m.y + (SH - m.y + 8 * u) * p * p; f = Math.sin(lt * TAU * 5); }
+      const r = rasterize(cc, 14 * u + 4, 9 * u + 4, g => paintBat(g, u, 7 * u + 2, 4.8 * u + 2, f));
+      blit(r, x - 7 * u - 2, y - 4.8 * u - 2, false);
+    }
   }
 
   build();
   const a = animate(canvas, draw, { fps: o.fps });
   const unres = onResize(canvas, () => { build(); a.redraw(); });
-  return { ...a, destroy() { a.destroy(); unres(); } };
+  return { ...a, summon(kind) { if (!a.reduced && DUR[kind]) summoned = { kind, t0: lastT + 0.05 }; }, destroy() { a.destroy(); unres(); } };
 }
 
 /* ---------------------------------------------------------------- treeline: the family signature */
@@ -476,3 +635,4 @@ export function crackle(canvas, opts = {}) {
   }, { fps: o.fps });
   return anim;
 }
+export const __rigs = { paintWolf, paintBat }; // for the rig test page in design-previews
