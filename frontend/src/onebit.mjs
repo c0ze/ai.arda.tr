@@ -241,12 +241,35 @@ function paintBat(g, u, ox, oy, f) {
  * Now and then a werewolf crosses the valley and howls at the moon, or a bat hangs in front of it; they take
  * turns, one roughly every creatureEvery seconds. summon("wolf" | "bat") calls one up right away.
  * opts: seed, speed (1 = default drift), maxWidth (low-res pixel cap, for CPU), onMast(x, y) in CSS px,
- * creatures (bool), creatureFirst / creatureEvery (seconds), onCreature(kind, moment) for "howl" etc.
+ * creatures (bool), creatureFirst / creatureEvery (seconds), onCreature(kind, moment) for "howl" etc.,
+ * werewolfSprite: { src, frames: 8, run: [0, 5], rise: 6, howl: 7 }: a horizontal sheet (e.g. exported from
+ * Aseprite), dark figure with light rim lines on transparency. Its shading is dithered to 1 bit here. Without
+ * it (or until it loads) the werewolf is drawn from the vector rig.
  */
 export function forest(canvas, opts = {}) {
-  const o = { seed: 2004, speed: 1, maxWidth: 640, px: 2, fps: 30, onMast: null, creatures: true, creatureFirst: 40, creatureEvery: 60, onCreature: null, ...opts };
+  const o = { seed: 2004, speed: 1, maxWidth: 640, px: 2, fps: 30, onMast: null, creatures: true, creatureFirst: 40, creatureEvery: 60, onCreature: null, werewolfSprite: null, ...opts };
   let SW, SH, VH, OY, Z, P, PX, sky, strips, fog, E, img, ctx, mast, moonAt, lastT = 0, summoned = null, howled = -1;
   const cc = creatureCanvas();
+  // the werewolf sprite sheet, scaled per scene size into masks + shading
+  let sheet = null, sheetFrames = null, sheetH = 0;
+  if (o.werewolfSprite?.src) loadImage(o.werewolfSprite.src).then(im => { sheet = im; sheetFrames = null; });
+  function spriteFrames(targetH) {
+    if (!sheet) return null;
+    if (sheetFrames && sheetH === targetH) return sheetFrames;
+    const n = o.werewolfSprite.frames || 8, fw = sheet.naturalWidth / n, fh = sheet.naturalHeight;
+    const w = Math.max(1, Math.round(fw * targetH / fh)), h = targetH;
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const g = c.getContext("2d", { willReadFrequently: true }); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+    sheetFrames = [];
+    for (let i = 0; i < n; i++) {
+      g.clearRect(0, 0, w, h); g.drawImage(sheet, i * fw, 0, fw, fh, 0, 0, w, h);
+      const px = g.getImageData(0, 0, w, h).data, m = new Uint8Array(w * h), lum = new Float32Array(w * h);
+      for (let k = 0; k < w * h; k++) { const al = px[k * 4 + 3]; if (al > 110) { m[k] = 1; lum[k] = (px[k * 4] / 255) * (255 / al); } }
+      sheetFrames.push({ m, lum, w, h });
+    }
+    sheetH = targetH;
+    return sheetFrames;
+  }
   const DUR = { wolf: 13, bat: 11 };
   const FGW = 256, FGH = 96;
 
@@ -411,7 +434,12 @@ export function forest(canvas, opts = {}) {
       for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) {
         const X = ox + x, Y = oy + y;
         if (occlude && hidden(X, Y)) continue;
-        if (r.m[y * r.w + x]) { put(X, Y, dark); continue; }
+        if (r.m[y * r.w + x]) {
+          // the sprite's own moonlit lines, ordered-dithered like the rest of the valley
+          const l = r.lum ? r.lum[y * r.w + x] : 0;
+          put(X, Y, l > 0.08 && l * 0.95 > B8[((Y & 7) << 3) + (X & 7)] ? lit : dark);
+          continue;
+        }
         // a moonlit rim: solid on the side facing the moon (upper right), half-toned on the shadow side,
         // so the silhouette reads against dark trees as well as bright mist
         const m = (dx, dy) => { const xx = x + dx, yy = y + dy; return xx >= 0 && yy >= 0 && xx < r.w && yy < r.h && r.m[yy * r.w + xx]; };
@@ -429,8 +457,17 @@ export function forest(canvas, opts = {}) {
       else if (lt < 8.7) { x = cx - drift * (lt - 5); h = lt < 5.6 ? ease((lt - 5) / 0.6) : lt < 8.2 ? 1 : 1 - ease((lt - 8.2) / 0.5); }
       else { const p = (lt - 8.7) / 4.3; x = sx + (SW + L - sx) * p * p; }
       const phase = (x + L) / (11 * u); // one full stride cycle every 11 units
-      const r = rasterize(cc, 24 * u + 4, 22 * u + 4, g => paintWerewolf(g, u, 11 * u + 2, 20 * u + 2, phase, h));
-      blit(r, x - 11 * u - 2, ground - 20 * u - 2, false); // always in front: a stop behind a spruce would hide the howl
+      // behind the foremost spruce line, in front of everything else; stopFor() picks a clearing for the howl
+      const frames = spriteFrames(Math.round(21 * u));
+      if (frames) {
+        const S = o.werewolfSprite, [r0, r1] = S.run || [0, 5], cyc = r1 - r0 + 1;
+        const fi = lt >= 5 && lt < 8.7 ? (lt < 5.35 || lt >= 8.3 ? S.rise ?? 6 : S.howl ?? 7) : r0 + (Math.floor(phase * cyc) % cyc);
+        const f = frames[fi];
+        blit(f, x - f.w / 2, ground - f.h + 1, true);
+      } else {
+        const r = rasterize(cc, 24 * u + 4, 22 * u + 4, g => paintWerewolf(g, u, 11 * u + 2, 20 * u + 2, phase, h));
+        blit(r, x - 11 * u - 2, ground - 20 * u - 2, true);
+      }
       if (lt >= 5.6 && lt < 8.2 && howled !== ev.id) { howled = ev.id; o.onCreature?.("wolf", "howl"); }
     } else {
       const m = moonAt, u = (1.8 * m.r) / 13, lt = ev.lt, TAU = Math.PI * 2;

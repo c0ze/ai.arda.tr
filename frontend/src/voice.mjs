@@ -195,7 +195,10 @@ function decode(b64) {
   const bin = atob(b64), bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   // callback form: older Safari has no promise-returning decodeAudioData
-  return new Promise((resolve, reject) => ctx.decodeAudioData(bytes.buffer, resolve, reject));
+  return new Promise((resolve, reject) => {
+    const p = ctx.decodeAudioData(bytes.buffer, resolve, reject);
+    p?.catch?.(() => {}); // newer browsers also return a promise; the callbacks already handle the failure
+  });
 }
 
 /* ---------------------------------------------------------------- speaker */
