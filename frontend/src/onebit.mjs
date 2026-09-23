@@ -159,41 +159,66 @@ function rasterize(cc, w, h, paint) {
 }
 const ease = p => p * p * (3 - 2 * p);
 
-/* the werewolf: gallops on all fours, sits back on its haunches to howl. phase = stride, h = 0 run … 1 howl */
-function paintWolf(g, u, ox, oy, phase, h) {
+/* the werewolf: a man's frame with a wolf's head, running upright and hunched; it stops, straightens,
+   throws its arms out and howls at the moon. phase = stride, h = 0 run … 1 howl. Units: ground at y = 0,
+   about 17 units tall; +x is the direction it runs. */
+function paintWerewolf(g, u, ox, oy, phase, h) {
   g.translate(ox, oy); g.scale(u, u);
-  const TAU = Math.PI * 2, bob = (1 - h) * 0.35 * Math.sin(phase * TAU * 2), hip = [-3, -5.2 + 3.2 * h + bob];
-  const leg = (x, y, a1, a2, l1, l2, w1, w2) => {
-    const kx = x + Math.sin(a1) * l1, ky = y + Math.cos(a1) * l1;
-    const px = kx + Math.sin(a1 + a2) * l2, py = ky + Math.cos(a1 + a2) * l2;
-    g.lineWidth = w1; g.beginPath(); g.moveTo(x, y); g.lineTo(kx, ky); g.stroke();
-    g.lineWidth = w2; g.beginPath(); g.moveTo(kx, ky); g.lineTo(px, py); g.stroke();
+  const TAU = Math.PI * 2, th = phase * TAU, mix = (a, b) => a + (b - a) * h;
+  const bob = (1 - h) * 0.45 * Math.abs(Math.sin(th));
+  const limb = (x, y, segs) => { // segs: [angle from straight down (+ = forward), length, width], angles accumulate
+    let a = 0;
+    for (const [da, len, w] of segs) {
+      a += da; const nx = x + Math.sin(a) * len, ny = y + Math.cos(a) * len;
+      g.lineWidth = w; g.beginPath(); g.moveTo(x, y); g.lineTo(nx, ny); g.stroke(); x = nx; y = ny;
+    }
+    return [x, y, a];
   };
-  const mix = (a, b) => a + (b - a) * h;
-  // hind legs: gallop swing, or folded under the haunch when sitting
-  for (const [k, dx] of [[0, 0], [0.5, -0.5]]) {
-    const sw = Math.sin((phase + k * 0.12) * TAU);
-    leg(hip[0] + dx, hip[1], mix(-0.9 * sw, 1.45), mix(0.55 + 0.5 * Math.max(0, sw), -2.5), 2.7, 2.9, 1.4, 0.8);
+  const claws = (x, y, a) => { for (const k of [-0.5, 0, 0.5]) { g.lineWidth = 0.35; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.sin(a + k) * 0.9, y + Math.cos(a + k) * 0.9); g.stroke(); } };
+  const pelvis = [0, -8.2 + bob];
+  // legs: digitigrade (thigh, shin, long foot); running swing, or planted wide to howl
+  for (const side of [0, 1]) {
+    const t = th + side * Math.PI, sw = Math.sin(t), lift = Math.max(0, Math.sin(t + 1.3));
+    limb(pelvis[0], pelvis[1], [
+      [mix(0.75 * sw, side ? -0.3 : 0.35), 3.9, 1.7],
+      [mix(-0.35 - 1.1 * lift, -0.35), 3.3, 1.2],
+      [mix(1.05 + 0.4 * lift, 0.9), 1.9, 0.8],
+    ]);
   }
-  // tail: streams out behind at a run, lies along the ground while sitting
-  g.lineWidth = 1.3; g.beginPath(); g.moveTo(hip[0] - 0.6, hip[1] - 1.1);
-  g.quadraticCurveTo(mix(-6.2, -5.6), mix(-7.6, -0.6), mix(-7.8, -7.6), mix(-5.4, -0.4) + bob); g.stroke();
-  // the body pitches up around the hips to sit; the drawing is in running coordinates, shifted down with the hips
-  g.save(); g.translate(hip[0], hip[1]); g.rotate(-h * 0.6); g.translate(-hip[0], -hip[1]); g.translate(0, 3.2 * h);
-  g.beginPath(); g.ellipse(0, -6 + bob, 4.3, 1.8, 0, 0, TAU); g.fill();
-  g.beginPath(); g.ellipse(2.4, -5.7 + bob, 2.1, 2.3, 0, 0, TAU); g.fill();
-  g.beginPath(); g.ellipse(-2.8, -5.8 + bob, 1.9, 2 + 0.6 * h, 0, 0, TAU); g.fill();
-  for (const [k, dx] of [[0.5, 0], [0.62, 0.5]]) {
-    const sw = Math.sin((phase + k) * TAU), s = 1 + 0.16 * h; // front legs straighten and reach the ground
-    leg(2.8 + dx, -5 + bob, mix(0.85 * sw, -0.62 + dx * 0.2), mix(-0.2 - 0.6 * Math.max(0, -sw), 0.05), 2.6 * s, 2.8 * s, 1.2, 0.75);
+  // tail
+  g.lineWidth = 1.1; g.beginPath(); g.moveTo(pelvis[0] - 0.6, pelvis[1] - 0.4);
+  g.quadraticCurveTo(mix(-3.2, -2.2), pelvis[1] + mix(-0.6, 1.4), mix(-4.6, -3), pelvis[1] + mix(0.4, 3.4)); g.stroke();
+  // torso leans into the run, arches back to howl; broad hunched shoulders
+  const lean = mix(0.5, -0.18), sx = pelvis[0] + Math.sin(lean) * 6.2, sy = pelvis[1] - Math.cos(lean) * 6.2;
+  const px = Math.cos(lean), py = Math.sin(lean); // perpendicular to the spine
+  g.beginPath();
+  g.moveTo(pelvis[0] - px * 1.2, pelvis[1] - py * 1.2); g.lineTo(pelvis[0] + px * 1.1, pelvis[1] + py * 1.1);
+  g.lineTo(sx + px * 1.9, sy + py * 1.9); g.lineTo(sx - px * 2.3, sy - py * 2.3); g.closePath(); g.fill();
+  g.beginPath(); g.ellipse(sx - px * 0.4, sy - py * 0.4 + 0.3, 2.2, 1.6, lean, 0, TAU); g.fill();
+  // mane: fur bristling off the back of the neck and shoulders
+  for (let k = 0; k < 4; k++) {
+    const f = 0.35 + k * 0.2, bx = pelvis[0] + (sx - pelvis[0]) * f - px * 1.7, by = pelvis[1] + (sy - pelvis[1]) * f - py * 1.7;
+    g.beginPath(); g.moveTo(bx + Math.sin(lean) * 0.7, by - Math.cos(lean) * 0.7); g.lineTo(bx - px * 1.2 - Math.sin(lean) * 0.6, by - py * 1.2 + 0.2); g.lineTo(bx - Math.sin(lean) * 0.5, by + Math.cos(lean) * 0.5); g.fill();
   }
-  g.beginPath(); g.moveTo(2.2, -7.2 + bob); g.lineTo(4.6, -9.2 + bob); g.lineTo(6.2, -7.6 + bob); g.lineTo(3.6, -5.2 + bob); g.fill();
-  // muzzle to the moon
-  g.translate(5.2, -8.4 + bob); g.rotate(-h * 0.95); g.translate(-5.2, 8.4 - bob);
-  g.beginPath(); g.ellipse(5.6, -8.4 + bob, 1.5, 1.15, 0, 0, TAU); g.fill();
-  g.beginPath(); g.moveTo(6.4, -9 + bob); g.lineTo(9, -8.3 + bob); g.lineTo(9, -7.8 + bob); g.lineTo(6.4, -7.5 + bob); g.fill();
-  g.beginPath(); g.moveTo(4.7, -9.2 + bob); g.lineTo(5, -10.9 + bob); g.lineTo(5.6, -9.4 + bob); g.fill();
-  g.beginPath(); g.moveTo(5.6, -9.4 + bob); g.lineTo(6, -10.8 + bob); g.lineTo(6.4, -9.2 + bob); g.fill();
+  // arms: swing against the legs with bent elbows; flung out wide and raised to howl
+  for (const side of [0, 1]) {
+    const sw = Math.sin(th + side * Math.PI + Math.PI);
+    const [hx, hy, a] = limb(sx, sy + 0.4, [
+      [mix(1.15 * sw, side ? -2.0 : 2.05), 3.4, 1.3],
+      [mix(0.6 + 0.5 * Math.max(0, sw), side ? -0.75 : 0.7), 3.3, 1],
+    ]);
+    claws(hx, hy, a);
+  }
+  // wolf head on a thick neck: muzzle forward at a run, thrown back to the sky to howl
+  const na = lean + mix(0.55, -0.1), hx = sx + Math.sin(na) * 1.7, hy = sy - Math.cos(na) * 1.7;
+  g.lineWidth = 1.6; g.beginPath(); g.moveTo(sx, sy); g.lineTo(hx, hy); g.stroke();
+  g.save(); g.translate(hx, hy); g.rotate(mix(0.15, -1.25));
+  g.beginPath(); g.ellipse(0, 0, 1.45, 1.15, 0, 0, TAU); g.fill();
+  g.beginPath(); g.moveTo(0.7, -0.75); g.lineTo(3.1, -0.3); g.lineTo(3.1, 0.05); g.lineTo(0.8, 0.2); g.fill(); // upper jaw
+  g.save(); g.translate(0.8, 0.2); g.rotate(0.35 * h); // the jaw drops as it howls
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(2.1, 0.15); g.lineTo(1.9, 0.5); g.lineTo(0, 0.75); g.fill(); g.restore();
+  g.beginPath(); g.moveTo(-0.5, -0.8); g.lineTo(-0.15, -2.5); g.lineTo(0.35, -0.9); g.fill(); // ears
+  g.beginPath(); g.moveTo(-1.15, -0.55); g.lineTo(-1.35, -2.2); g.lineTo(-0.45, -0.95); g.fill();
   g.restore();
 }
 
@@ -213,7 +238,7 @@ function paintBat(g, u, ox, oy, f) {
 
 /**
  * A moonlit spruce valley in fog, scrolling sideways in parallax, ordered-dithered to 1 bit.
- * Now and then a werewolf crosses the valley and howls, or a bat hangs in front of the moon; they take
+ * Now and then a werewolf crosses the valley and howls at the moon, or a bat hangs in front of it; they take
  * turns, one roughly every creatureEvery seconds. summon("wolf" | "bat") calls one up right away.
  * opts: seed, speed (1 = default drift), maxWidth (low-res pixel cap, for CPU), onMast(x, y) in CSS px,
  * creatures (bool), creatureFirst / creatureEvery (seconds), onCreature(kind, moment) for "howl" etc.
@@ -221,7 +246,7 @@ function paintBat(g, u, ox, oy, f) {
 export function forest(canvas, opts = {}) {
   const o = { seed: 2004, speed: 1, maxWidth: 640, px: 2, fps: 30, onMast: null, creatures: true, creatureFirst: 40, creatureEvery: 60, onCreature: null, ...opts };
   let SW, SH, VH, OY, Z, P, PX, sky, strips, fog, E, img, ctx, mast, moonAt, lastT = 0, summoned = null, howled = -1;
-  const cc = creatureCanvas(), tc = creatureCanvas();
+  const cc = creatureCanvas();
   const DUR = { wolf: 13, bat: 11 };
   const FGW = 256, FGH = 96;
 
@@ -395,7 +420,7 @@ export function forest(canvas, opts = {}) {
       }
     };
     if (ev.kind === "wolf") {
-      const u = Math.max(1.6, Z * 0.013), L = 20 * u, ground = OY + VH * 0.93, lt = ev.lt;
+      const u = Math.max(1.5, Z * 0.012), L = 14 * u, ground = OY + VH * 0.93, lt = ev.lt;
       const cx = stopFor(ev, t, u, ground);
       let x, h = 0;
       // while it sits it stays put on the ground, which scrolls with the middle forest
@@ -403,23 +428,16 @@ export function forest(canvas, opts = {}) {
       if (lt < 5) { const p = lt / 5; x = -L + (cx + L) * (1 - (1 - p) * (1 - p)); }
       else if (lt < 8.7) { x = cx - drift * (lt - 5); h = lt < 5.6 ? ease((lt - 5) / 0.6) : lt < 8.2 ? 1 : 1 - ease((lt - 8.2) / 0.5); }
       else { const p = (lt - 8.7) / 4.3; x = sx + (SW + L - sx) * p * p; }
-      const phase = (x + L) / (7 * u);
-      const r = rasterize(cc, 22 * u + 4, 19 * u + 4, g => paintWolf(g, u, 9 * u + 2, 17 * u + 2, phase, h));
-      blit(r, x - 9 * u - 2, ground - 17 * u - 2, false); // always in front: a stop behind a spruce would hide the howl
-      if (lt >= 5.6 && lt < 8.2) {
-        if (howled !== ev.id) { howled = ev.id; o.onCreature?.("wolf", "howl"); }
-        const n = Math.floor(7 * Math.min(1, (lt - 5.6) / 1.4)), fs = Math.max(10, Math.round(u * 3.4)), text = "AWOO" + "O".repeat(n);
-        const tr = rasterize(tc, fs * text.length * 0.7 + 6, fs * 1.3 + 4, g => { g.font = `700 ${fs}px "IBM Plex Mono", ui-monospace, monospace`; g.textBaseline = "top"; g.fillText(text, 2, 2); });
-        // above and ahead of the raised muzzle, rising a little as the howl goes on
-        const tx = Math.round(x + 3 * u), ty = Math.round(ground - 17 * u - fs - (lt - 5.6) * u * 0.8);
-        for (let y = 0; y < tr.h; y++) for (let xx = 0; xx < tr.w; xx++) if (tr.m[y * tr.w + xx]) put(tx + xx, ty + y, signal);
-      }
+      const phase = (x + L) / (11 * u); // one full stride cycle every 11 units
+      const r = rasterize(cc, 24 * u + 4, 22 * u + 4, g => paintWerewolf(g, u, 11 * u + 2, 20 * u + 2, phase, h));
+      blit(r, x - 11 * u - 2, ground - 20 * u - 2, false); // always in front: a stop behind a spruce would hide the howl
+      if (lt >= 5.6 && lt < 8.2 && howled !== ev.id) { howled = ev.id; o.onCreature?.("wolf", "howl"); }
     } else {
       const m = moonAt, u = (1.8 * m.r) / 13, lt = ev.lt, TAU = Math.PI * 2;
       let x, y, f;
       if (lt < 4) { const p = ease(lt / 4); x = SW + 8 * u + (m.x - SW - 8 * u) * p; y = m.y + Z * 0.22 * (1 - p) + Math.sin(lt * 5) * u * 0.4; f = Math.sin(lt * TAU * 4.5) * (1 - 0.8 * p); }
       else if (lt < 7.5) { x = m.x; y = m.y + Math.sin(lt * 2.4) * 0.6; f = 0.12 * Math.sin(lt * TAU * 0.9); }
-      else { const p = (lt - 7.5) / 3.5; x = m.x - Z * 0.3 * p; y = m.y + (SH - m.y + 8 * u) * p * p; f = Math.sin(lt * TAU * 5); }
+      else { const p = (lt - 7.5) / 3.5; x = m.x - Z * 0.25 * p; y = m.y - (m.y + 8 * u) * p * p; f = Math.sin(lt * TAU * 5); } // climbs away off the top
       const r = rasterize(cc, 14 * u + 4, 9 * u + 4, g => paintBat(g, u, 7 * u + 2, 4.8 * u + 2, f));
       blit(r, x - 7 * u - 2, y - 4.8 * u - 2, false);
     }
@@ -635,4 +653,4 @@ export function crackle(canvas, opts = {}) {
   }, { fps: o.fps });
   return anim;
 }
-export const __rigs = { paintWolf, paintBat }; // for the rig test page in design-previews
+export const __rigs = { paintWerewolf, paintBat }; // for the rig test page in design-previews
