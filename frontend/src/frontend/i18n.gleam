@@ -11,8 +11,11 @@ pub type Language {
 pub type Strings {
   Strings(
     header_title: String,
-    welcome_title: String,
-    welcome_subtitle: String,
+    construct_title: String,
+    construct_subline: String,
+    status_ready: String,
+    status_thinking: String,
+    status_writing: String,
     welcome_msg: String,
     input_placeholder: String,
     btn_experience: String,
@@ -33,8 +36,11 @@ pub fn strings(language: Language) -> Strings {
     En ->
       Strings(
         header_title: "Arda's AI Construct",
-        welcome_title: "Hi, I'm Arda's AI Assistant",
-        welcome_subtitle: "Ask me anything about Arda's experience, skills, or background.",
+        construct_title: "Ask the construct",
+        construct_subline: "a model that has read Arda's résumé, blog and projects · it can pass messages on",
+        status_ready: "ready",
+        status_thinking: "thinking…",
+        status_writing: "writing…",
         welcome_msg: "Hello, I am Arda's assistant. You can ask me about Arda's skills, experience, education, projects, and even his interests and music. If you have an interesting position, I can contact Arda on your behalf as well.",
         input_placeholder: "Message Arda's AI...",
         btn_experience: "Experience",
@@ -51,8 +57,11 @@ pub fn strings(language: Language) -> Strings {
     Jp ->
       Strings(
         header_title: "ArdaのAIコンストラクト",
-        welcome_title: "こんにちは、ArdaのAIアシスタントです",
-        welcome_subtitle: "Ardaの経験、スキル、経歴について何でも聞いてください。",
+        construct_title: "コンストラクトに聞く",
+        construct_subline: "Ardaの履歴書・ブログ・プロジェクトを読んだモデル · Ardaへの伝言も取り次げます",
+        status_ready: "待機中",
+        status_thinking: "考え中…",
+        status_writing: "応答中…",
         welcome_msg: "こんにちは、Ardaのアシスタントです。Ardaのスキル、経験、学歴、プロジェクト、さらには趣味や音楽活動について私に聞いてください。もし興味深いポジションがあれば、あなたに代わってArdaに連絡することもできます。",
         input_placeholder: "メッセージを入力...",
         btn_experience: "経歴",
@@ -69,8 +78,11 @@ pub fn strings(language: Language) -> Strings {
     Tr ->
       Strings(
         header_title: "Arda'nın AI Konstrüktü",
-        welcome_title: "Merhaba, ben Arda'nın Yapay Zekâ Asistanı",
-        welcome_subtitle: "Arda'nın deneyimi, yetenekleri ya da geçmişi hakkında bana her şeyi sorabilirsiniz.",
+        construct_title: "Konstrükte sor",
+        construct_subline: "Arda'nın özgeçmişini, blogunu ve projelerini okumuş bir model · mesajınızı Arda'ya iletebilir",
+        status_ready: "hazır",
+        status_thinking: "düşünüyor…",
+        status_writing: "yazıyor…",
         welcome_msg: "Merhaba, ben Arda'nın asistanıyım. Bana Arda'nın yeteneklerini, deneyimini, eğitimini, projelerini, hatta ilgi alanlarını ve müziğini sorabilirsiniz. İlginç bir pozisyonunuz varsa sizin adınıza Arda'yla iletişime de geçebilirim.",
         input_placeholder: "Mesajınızı yazın...",
         btn_experience: "Deneyim",
