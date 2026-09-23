@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { stream_chat } from '../build/dev/javascript/frontend/ffi.mjs';
+import { stream_chat, reveal_prefix } from '../build/dev/javascript/frontend/ffi.mjs';
+import { createSpeaker, requestFields, setVoiceEnabled, voiceEnabled } from '../build/dev/javascript/frontend/voice.mjs';
 
 async function collect(t, chunks, { delayed = false } = {}) {
   const events = [];
@@ -112,4 +113,80 @@ test('a missing response body reports an empty response rather than HTTP 200', a
     stream_chat('https://example.test/chat', '{}', (raw) => resolve(JSON.parse(raw)));
   });
   assert.deepEqual(event, { type: 'error', message: 'Empty response body' });
+});
+
+// ---------------------------------------------------------------------------
+// Voice replies
+// ---------------------------------------------------------------------------
+
+test('voice and speech events reach the app before done, in order', async (t) => {
+  const speech = { type: 'speech', seq: 0, start: 0, end: 3, audio: null, mime: 'audio/mpeg', marks: [] };
+  assert.deepEqual(await collect(t, [
+    'data: {"type":"thinking"}\n\n',
+    'data: {"type":"voice","on":true}\n\n',
+    'data: {"type":"chunk","text":"Hi."}\n\n',
+    'data: ' + JSON.stringify(speech) + '\n\n',
+    'data: {"type":"speech_end","upto":3}\n\n',
+    'data: {"type":"done","text":"Hi."}\n\n',
+  ]), [
+    { type: 'thinking' }, { type: 'voice', on: true }, { type: 'chunk', text: 'Hi.' },
+    speech, { type: 'speech_end', upto: 3 }, { type: 'done', text: 'Hi.' },
+  ]);
+});
+
+test('malformed speech events are dropped without ending the stream', async (t) => {
+  assert.deepEqual(await collect(t, [
+    'data: {"type":"voice"}\n\n',
+    'data: {"type":"speech","start":0,"end":3}\n\n',
+    'data: {"type":"speech_end","upto":"3"}\n\n',
+    'data: {"type":"done","text":"ok"}\n\n',
+  ]), [{ type: 'done', text: 'ok' }]);
+});
+
+test('reveal_prefix never shows half a character or a dangling marker', () => {
+  assert.equal(reveal_prefix('Hi **Arda** there', 7), 'Hi **Ar**');
+  assert.equal(reveal_prefix('see [my blog](https://x.y) ok', 16), 'see my blog');
+  assert.equal(reveal_prefix('see [my blog](u)', 10), 'see my bl');
+  assert.equal(reveal_prefix('a 👋 b', 3), 'a ');
+  assert.equal(reveal_prefix('use `gleam` now', 7), 'use `gl`');
+  assert.equal(reveal_prefix('all of it', -1), 'all of it');
+  assert.equal(reveal_prefix('all of it', 99), 'all of it');
+});
+
+// A browser-ish `window` with localStorage and no Web Audio, for this test only.
+function fakeWindow(t) {
+  const m = new Map();
+  globalThis.window = { localStorage: { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) } };
+  t.after(() => { delete globalThis.window; });
+}
+
+test('voice defaults on, persists a mute, and a muted request has no voice fields', (t) => {
+  fakeWindow(t);
+  assert.equal(voiceEnabled(), true);
+  assert.deepEqual(requestFields('ja'), { voice: true, lang: 'ja' });
+  setVoiceEnabled(false);
+  assert.equal(window.localStorage.getItem('voice'), 'off');
+  assert.equal(voiceEnabled(), false);
+  assert.deepEqual(requestFields('ja'), {});
+  setVoiceEnabled(true);
+});
+
+test('without Web Audio a voiced reply is shown at once, like text-only', (t) => {
+  fakeWindow(t);
+  const calls = [];
+  const s = createSpeaker({ onReveal: (n) => calls.push(['reveal', n]), onEnd: () => calls.push(['end']) });
+  s.handle({ type: 'thinking' });
+  s.handle({ type: 'voice', on: true });
+  s.handle({ type: 'chunk', text: 'Hi.' });
+  s.handle({ type: 'done', text: 'Hi.' });
+  s.stop();
+  assert.deepEqual(calls, [['reveal', Infinity], ['end']]);
+});
+
+test('voice:false from the server means no gating at all', (t) => {
+  fakeWindow(t);
+  const calls = [];
+  const s = createSpeaker({ onReveal: (n) => calls.push(n), onEnd: () => calls.push('end') });
+  s.handle({ type: 'voice', on: false });
+  assert.deepEqual(calls, [Infinity, 'end']);
 });

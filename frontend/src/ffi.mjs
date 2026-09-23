@@ -9,6 +9,7 @@
 
 import { Ok, Error } from "./gleam.mjs";
 import { orb, crackle, reducedMotion } from "./onebit.mjs";
+import { unlockAudio, voiceEnabled, setVoiceEnabled, createSpeaker } from "./voice.mjs";
 
 export function storage_get(key) {
   try {
@@ -169,7 +170,12 @@ export function stream_chat(url, body_json, on_event) {
           if (!event || typeof event !== "object") continue;
           if (event.type === "thinking" ||
               ((event.type === "chunk" || event.type === "done") && typeof event.text === "string") ||
-              (event.type === "error" && typeof event.message === "string")) {
+              (event.type === "error" && typeof event.message === "string") ||
+              // Voice replies (only sent when the request asked for voice).
+              (event.type === "voice" && typeof event.on === "boolean") ||
+              (event.type === "speech" && Number.isInteger(event.seq) &&
+                Number.isInteger(event.start) && Number.isInteger(event.end)) ||
+              (event.type === "speech_end" && Number.isInteger(event.upto))) {
             emit(event);
           }
           if (settled) return;
@@ -271,4 +277,71 @@ export function stop_cursor() {
   cursor.anim?.destroy();
   cursor.canvas.remove();
   cursor = null;
+}
+
+// ---------------------------------------------------------------------------
+// Voice: the construct reads its replies aloud through voice.mjs (a verbatim
+// copy of design-previews/onebit/voice.js; do not fork). One speaker per
+// reply; it gates how much of the reply is visible so the text appears as it
+// is spoken, and its loudness makes the orb sizzle.
+// ---------------------------------------------------------------------------
+
+export function voice_enabled() {
+  return voiceEnabled();
+}
+
+export function set_voice_enabled(on) {
+  setVoiceEnabled(on);
+}
+
+// Must run inside the user's send gesture, or the browser keeps audio muted.
+export function unlock_audio() {
+  unlockAudio();
+}
+
+let speaker = null;
+let lastLevelAt = 0;
+
+// `on_reveal(n)`: show the first n UTF-16 units of the raw reply; -1 = all.
+// Callbacks from a speaker that has since been replaced are dropped.
+export function speech_begin(orb_selector, on_reveal, on_end) {
+  speech_stop();
+  const s = createSpeaker({
+    onReveal: (n) => { if (speaker === s) on_reveal(n === Infinity ? -1 : n); },
+    onLevel: (level) => {
+      // Sizzle at ~9 Hz scaled by loudness: the orb's heat then tracks the voice.
+      const now = performance.now();
+      if (level < 0.03 || now - lastLevelAt < 110 || reducedMotion()) return;
+      lastLevelAt = now;
+      const c = ensureOrb(orb_selector);
+      if (c) c.orb.sizzle(level * 0.6);
+    },
+    onEnd: () => { if (speaker === s) { speaker = null; on_end(); } },
+  });
+  speaker = s;
+}
+
+export function speech_feed(json) {
+  if (!speaker) return;
+  try { speaker.handle(JSON.parse(json)); } catch (_) {}
+}
+
+export function speech_stop() {
+  const s = speaker;
+  speaker = null;
+  if (s) s.stop();
+}
+
+// The part of a reply the voice has reached, safe to render as markdown:
+// never half a surrogate pair, a half-typed link shows as its label, and an
+// open ** or ` is closed so the word being spoken is not framed by markers.
+export function reveal_prefix(text, n) {
+  if (n < 0 || n >= text.length) return text;
+  let s = text.slice(0, n);
+  const last = s.charCodeAt(s.length - 1);
+  if (last >= 0xd800 && last <= 0xdbff) s = s.slice(0, -1);
+  s = s.replace(/\[([^\]\n]*)(\]\([^)\n]*)?$/, "$1");
+  if ((s.match(/\*\*/g) || []).length % 2) s += "**";
+  if ((s.match(/`/g) || []).length % 2) s += "`";
+  return s;
 }

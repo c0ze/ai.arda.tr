@@ -15,6 +15,11 @@
 //// thinks and sizzles on every chunk; a crackling block cursor trails the
 //// reply while it streams. Chunks are appended progressively with markdown
 //// rendered live.
+////
+//// Voice: unless muted (the `♪` toggle, persisted by voice.mjs), requests ask
+//// for speech too. The speaker in `ffi.mjs` / `voice.mjs` plays it through a
+//// robot filter and reports how far the voice has got; the reply is shown
+//// only up to there (`Speaking`), so it is written as it is spoken.
 
 import frontend/i18n.{type Language, type Strings, En, Jp, Tr}
 import gleam/dynamic/decode
@@ -72,6 +77,14 @@ pub type ChatMessage {
   ChatMessage(id: Int, sender: Sender, text: String)
 }
 
+/// How much of a reply the voice lets us show.
+pub type Speech {
+  /// No gating: every message shows all of its text.
+  Silent
+  /// Message `msg_id` shows its first `shown` UTF-16 units while spoken.
+  Speaking(msg_id: Int, shown: Int)
+}
+
 /// Tracks the current state of a streaming response.
 pub type StreamState {
   /// No request in flight.
@@ -90,6 +103,8 @@ pub type Model {
     history: List(ChatMessage),
     next_id: Int,
     stream_state: StreamState,
+    voice_on: Bool,
+    speech: Speech,
   )
 }
 
@@ -106,6 +121,8 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       history: [],
       next_id: 0,
       stream_state: Idle,
+      voice_on: do_voice_enabled(),
+      speech: Silent,
     )
   let #(model, effects) = reset_with_welcome(model, language)
   #(model, effect.batch([effects, orb_mount()]))
@@ -122,7 +139,10 @@ pub type Msg {
   UserPressedEnter
   UserClickedSend
   UserPickedPrompt(String)
+  UserToggledVoice
   StreamEventReceived(String)
+  SpeechRevealed(Int)
+  SpeechEnded
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -153,7 +173,38 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
     UserPickedPrompt(prompt) -> send_current(Model(..model, input: prompt))
 
+    UserToggledVoice -> {
+      let on = !model.voice_on
+      // Muting makes the current speaker stop and reveal everything, which
+      // comes back as SpeechRevealed(-1) and SpeechEnded.
+      #(
+        Model(..model, voice_on: on),
+        effect.from(fn(_dispatch) { do_set_voice_enabled(on) }),
+      )
+    }
+
     StreamEventReceived(json_str) -> handle_stream_event(model, json_str)
+
+    SpeechRevealed(shown) -> {
+      let speech = case shown < 0, model.speech, model.stream_state {
+        True, _, _ -> Silent
+        False, Speaking(msg_id: id, ..), _ -> Speaking(msg_id: id, shown:)
+        False, Silent, Streaming(id) -> Speaking(msg_id: id, shown:)
+        False, Silent, _ -> Silent
+      }
+      #(
+        Model(..model, speech: speech),
+        effect.batch([scroll_to_bottom(), cursor_trail()]),
+      )
+    }
+
+    SpeechEnded -> {
+      let model = Model(..model, speech: Silent)
+      case model.stream_state {
+        Idle -> #(model, settle())
+        _ -> #(model, effect.none())
+      }
+    }
   }
 }
 
@@ -201,7 +252,14 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
               // Replace with the final complete text (may include email
               // success suffix from the server).
               let model = replace_message_text(model, bot_msg_id, text)
-              #(Model(..model, stream_state: Idle), settle())
+              // Still speaking: the cursor stays until the voice is done.
+              case model.speech {
+                Speaking(..) -> #(
+                  Model(..model, stream_state: Idle),
+                  orb_simmer(False),
+                )
+                Silent -> #(Model(..model, stream_state: Idle), settle())
+              }
             }
             _ -> {
               let #(model, _) = push(model, Bot, text)
@@ -217,6 +275,7 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
 
         shared.StreamError(message) -> {
           let error_text = "System Malfunction: " <> message
+          let model = Model(..model, speech: Silent)
           case model.stream_state {
             Streaming(bot_msg_id) -> {
               let has_partial_text =
@@ -252,10 +311,11 @@ fn reset_with_welcome(model: Model, lang: Language) -> #(Model, Effect(Msg)) {
       next_id: 0,
       stream_state: Idle,
       input: "",
+      speech: Silent,
     )
   let #(with_welcome, _) = push(cleared, Bot, s.welcome_msg)
   // A language switch mid-reply drops the stream, so quiet the construct.
-  #(with_welcome, settle())
+  #(with_welcome, effect.batch([speech_stop(), settle()]))
 }
 
 fn send_current(model: Model) -> #(Model, Effect(Msg)) {
@@ -268,9 +328,16 @@ fn send_current(model: Model) -> #(Model, Effect(Msg)) {
       // History sent to the backend is everything BEFORE the new user message,
       // matching the old script.js slice(0, -1) behaviour.
       let #(history_before_user, _) = split_last(with_user.history)
-      let effect = call_api_stream(text, history_before_user)
+      let effect =
+        call_api_stream(
+          text,
+          history_before_user,
+          model.voice_on,
+          lang_code(model.language),
+        )
       #(
-        Model(..with_user, input: "", stream_state: Thinking),
+        // A new question interrupts the previous reply's voice.
+        Model(..with_user, input: "", stream_state: Thinking, speech: Silent),
         effect.batch([effect, scroll_to_bottom(), cursor_trail()]),
       )
     }
@@ -330,7 +397,12 @@ fn next_theme(theme: Theme) -> Theme {
 // Effects
 // ---------------------------------------------------------------------------
 
-fn call_api_stream(text: String, history: List(ChatMessage)) -> Effect(Msg) {
+fn call_api_stream(
+  text: String,
+  history: List(ChatMessage),
+  voice_on: Bool,
+  lang: String,
+) -> Effect(Msg) {
   let wire_history =
     history
     // Drop the leading assistant welcome message: it is UI-only chrome, and
@@ -341,15 +413,30 @@ fn call_api_stream(text: String, history: List(ChatMessage)) -> Effect(Msg) {
       shared.ChatMessage(role: role_of(m.sender), content: m.text)
     })
     |> shared.cap_history(max_history_messages)
+  // Muted: no voice fields at all, exactly the text-only request.
   let body =
-    shared.chat_request_to_json(shared.ChatRequest(
-      message: text,
-      history: wire_history,
-    ))
+    shared.stream_request_to_json(
+      shared.ChatRequest(message: text, history: wire_history),
+      shared.VoiceOptions(on: voice_on, lang: lang),
+    )
     |> json.to_string
 
+  // Synchronous effect: runs inside the send gesture, so audio may start.
   effect.from(fn(dispatch) {
+    do_speech_stop()
+    case voice_on {
+      True -> {
+        do_unlock_audio()
+        do_speech_begin(
+          orb_host,
+          fn(shown) { dispatch(SpeechRevealed(shown)) },
+          fn() { dispatch(SpeechEnded) },
+        )
+      }
+      False -> Nil
+    }
     do_stream_chat(stream_endpoint(), body, fn(json_str) {
+      do_speech_feed(json_str)
       dispatch(StreamEventReceived(json_str))
     })
   })
@@ -393,6 +480,10 @@ fn cursor_trail() -> Effect(Msg) {
   effect.before_paint(fn(_dispatch, _root) { do_trail_cursor(streaming_reply) })
 }
 
+fn speech_stop() -> Effect(Msg) {
+  effect.from(fn(_dispatch) { do_speech_stop() })
+}
+
 /// The reply is over (done, error or cleared): stop the cursor and simmer.
 fn settle() -> Effect(Msg) {
   effect.batch([
@@ -428,6 +519,7 @@ fn header(model: Model, s: Strings) -> Element(Msg) {
     html.span([attribute.class("bar-title")], [html.text(s.header_title)]),
     html.span([attribute.class("sp")], []),
     language_toggle(model.language),
+    voice_toggle(model.voice_on, s),
     theme_toggle(model.theme),
   ])
 }
@@ -447,6 +539,35 @@ fn theme_toggle(theme: Theme) -> Element(Msg) {
       event.on_click(UserCycledTheme),
     ],
     [html.text(theme_name(theme))],
+  )
+}
+
+/// Mute / unmute the construct's voice. The label is constant for screen
+/// readers; `aria-pressed` carries the state.
+fn voice_toggle(on: Bool, s: Strings) -> Element(Msg) {
+  html.button(
+    [
+      attribute.type_("button"),
+      attribute.class("voice-toggle"),
+      attribute.attribute("aria-label", s.voice_label),
+      attribute.title(s.voice_label),
+      attribute.attribute("aria-pressed", case on {
+        True -> "true"
+        False -> "false"
+      }),
+      event.on_click(UserToggledVoice),
+    ],
+    [
+      html.span([attribute.class("voice-glyph")], [html.text("♪")]),
+      // The state word is dropped on phones, where the struck-through ♪
+      // alone shows "muted".
+      html.span([attribute.class("voice-word")], [
+        html.text(case on {
+          True -> " " <> s.voice_on
+          False -> " " <> s.voice_off
+        }),
+      ]),
+    ],
   )
 }
 
@@ -494,10 +615,12 @@ fn language_button(
 /// The orb, the heading, and a live status line. The orb host has no Lustre
 /// children, so the canvas `ffi.mjs` puts in it survives every re-render.
 fn construct(model: Model, s: Strings) -> Element(Msg) {
-  let #(status, busy) = case model.stream_state {
-    Idle -> #(s.status_ready, False)
-    Thinking -> #(s.status_thinking, True)
-    Streaming(id) ->
+  let #(status, busy) = case model.speech, model.stream_state {
+    Speaking(shown: n, ..), _ if n > 0 -> #(s.status_speaking, True)
+    Speaking(..), _ -> #(s.status_thinking, True)
+    Silent, Idle -> #(s.status_ready, False)
+    Silent, Thinking -> #(s.status_thinking, True)
+    Silent, Streaming(id) ->
       case list.any(model.history, fn(m) { m.id == id && m.text != "" }) {
         True -> #(s.status_writing, True)
         False -> #(s.status_thinking, True)
@@ -538,7 +661,7 @@ fn messages_container(model: Model, s: Strings) -> Element(Msg) {
       [attribute.id("messages")],
       list.append(
         list.map(model.history, fn(msg) {
-          view_message(msg, model.stream_state, s)
+          view_message(msg, model.stream_state, model.speech, s)
         }),
         tail,
       ),
@@ -549,14 +672,22 @@ fn messages_container(model: Model, s: Strings) -> Element(Msg) {
 fn view_message(
   msg: ChatMessage,
   stream_state: StreamState,
+  speech: Speech,
   s: Strings,
 ) -> Element(Msg) {
-  let is_streaming_this = case stream_state {
-    Streaming(id) if id == msg.id -> True
-    _ -> False
+  // While spoken, a reply shows only as far as the voice has got.
+  let shown = case speech {
+    Speaking(msg_id: id, shown:) if id == msg.id ->
+      reveal_prefix(msg.text, shown)
+    _ -> msg.text
+  }
+  let is_streaming_this = case stream_state, speech {
+    Streaming(id), _ if id == msg.id -> True
+    _, Speaking(msg_id: id, ..) if id == msg.id -> True
+    _, _ -> False
   }
   let is_error = string.starts_with(msg.text, "System Malfunction: ")
-  let text = case msg.text {
+  let text = case shown {
     // Waiting for the first chunk: an empty column for the crackle cursor.
     "" -> html.div([attribute.class("txt")], [])
     _ ->
@@ -564,7 +695,7 @@ fn view_message(
         "",
         "div",
         [attribute.class("txt")],
-        render_markdown(msg.text),
+        render_markdown(shown),
       )
   }
   html.div(
@@ -815,6 +946,31 @@ fn do_trail_cursor(selector: String) -> Nil
 
 @external(javascript, "./ffi.mjs", "stop_cursor")
 fn do_stop_cursor() -> Nil
+
+@external(javascript, "./ffi.mjs", "voice_enabled")
+fn do_voice_enabled() -> Bool
+
+@external(javascript, "./ffi.mjs", "set_voice_enabled")
+fn do_set_voice_enabled(on: Bool) -> Nil
+
+@external(javascript, "./ffi.mjs", "unlock_audio")
+fn do_unlock_audio() -> Nil
+
+@external(javascript, "./ffi.mjs", "speech_begin")
+fn do_speech_begin(
+  orb_selector: String,
+  on_reveal: fn(Int) -> Nil,
+  on_end: fn() -> Nil,
+) -> Nil
+
+@external(javascript, "./ffi.mjs", "speech_feed")
+fn do_speech_feed(json: String) -> Nil
+
+@external(javascript, "./ffi.mjs", "speech_stop")
+fn do_speech_stop() -> Nil
+
+@external(javascript, "./ffi.mjs", "reveal_prefix")
+fn reveal_prefix(text: String, shown: Int) -> String
 
 // ---------------------------------------------------------------------------
 // Bootstrap

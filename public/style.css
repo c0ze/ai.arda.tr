@@ -181,14 +181,21 @@ canvas.px {
     color: var(--bg);
 }
 
-.theme-toggle {
+.theme-toggle,
+.voice-toggle {
     min-width: 10ch;
     padding: 4px 7px;
     border: 1px solid currentColor;
     text-align: center;
 }
 
-.theme-toggle:hover { color: var(--sig); }
+.voice-toggle { min-width: 7ch; }
+
+.theme-toggle:hover,
+.voice-toggle:hover { color: var(--sig); }
+
+/* Muted: dimmed, like an inactive language. */
+.voice-toggle[aria-pressed="false"] { border-color: var(--rule-2); }
 
 /* ─── The construct ───────────────────────────── */
 #chat-area {
@@ -546,6 +553,10 @@ canvas.px.cursor {
     }
 
     .bar-title { display: none; }
+
+    .voice-toggle { min-width: 0; padding: 4px 8px; }
+    .voice-toggle .voice-word { display: none; }
+    .voice-toggle[aria-pressed="false"] .voice-glyph { text-decoration: line-through; }
 
     .ai-id {
         padding: 16px 0 14px;
