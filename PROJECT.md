@@ -45,9 +45,9 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │   ├── gleam.toml          # target = "javascript", [tools.lustre.*] config
 │   └── src/
 │       ├── frontend.gleam  # Lustre app: init/update/view, API effect, FFI
-│       ├── frontend/i18n.gleam    # EN/JP translations + quick-prompt strings
-│       ├── frontend/icons.gleam   # Inline SVG icons (via element.unsafe_raw_html)
-│       └── ffi.mjs         # localStorage, matchMedia, marked+DOMPurify, scroll
+│       ├── frontend/i18n.gleam    # EN/JP/TR translations + quick-prompt strings
+│       ├── ffi.mjs         # localStorage, marked+DOMPurify, scroll, SSE client, orb/cursor mounting
+│       └── onebit.mjs      # Verbatim copy of design-previews/onebit/onebit.js (1-bit orb + crackle); do not fork
 ├── public/                 # Hand-written style.css + favicon + CNAME + built Lustre bundle
 ├── data/                   # Resume JSON fetched from c0ze/resume
 ├── Dockerfile              # BEAM release on erlang:28-alpine
@@ -140,6 +140,12 @@ docker run -p 8080:8080 \
 - `email.extract` parses the payload, strips the tags, sanitizes header-injection vectors.
 - `smtp.send` dispatches via the `gen_smtp_client` Erlang shim.
 - Without SMTP configuration (`GMAIL_*`), the user gets `contact_failure_message` and an error log.
+
+### Frontend design (One Bit Forest)
+- Follows the family design system (`../DESIGN-SYSTEM.md`, section ai.arda.tr). Styles are hand-written in `public/style.css`; bump `style.css?v=` in `frontend/gleam.toml` when it changes.
+- Renditions: `night` (default), `night-hc`, `xerox`, `xerox-hc`, stored in localStorage `theme` and applied as `body[data-theme]`. Legacy ids migrate on read (`light`→xerox, `paper`→xerox-hc, `dark`→night, `carbon`→night-hc) in both the pre-hydration script (`frontend/gleam.toml`) and `theme_from_string` (`frontend.gleam`); keep the two in sync.
+- The construct orb and the crackle cursor are canvases created by `ffi.mjs`, outside Lustre's vdom: the orb mounts into `#construct-orb` (a vnode with no children, so re-renders never touch it); the cursor is re-appended to the end of `.msg.is-streaming .txt` in a `before_paint` effect after each chunk. The orb sizzles on every chunk, simmers between `thinking` and the first chunk, and does neither under `prefers-reduced-motion`.
+- `onebit.mjs` must stay byte-identical to `design-previews/onebit/onebit.js`; change the shared copy first.
 
 ### CORS
 - Origins validated against `ALLOWED_ORIGINS`, delimited by `;`.
