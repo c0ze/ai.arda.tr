@@ -51,10 +51,13 @@ function rgb(c, fallback) {
 
 function palette(el) {
   const cs = getComputedStyle(el);
+  const ground = rgb(cs.getPropertyValue("--ob-ground"), [6, 7, 8]);
   return {
     ink: rgb(cs.getPropertyValue("--ob-ink"), [228, 224, 212]),
-    ground: rgb(cs.getPropertyValue("--ob-ground"), [6, 7, 8]),
+    ground,
     signal: rgb(cs.getPropertyValue("--ob-signal"), [198, 255, 58]),
+    // on a light ground ink is dark, so pictures must print as positives (ink = darkness)
+    light: (0.299 * ground[0] + 0.587 * ground[1] + 0.114 * ground[2]) / 255 > 0.5,
   };
 }
 
@@ -141,7 +144,7 @@ function onResize(canvas, fn) {
  */
 export function forest(canvas, opts = {}) {
   const o = { seed: 2004, speed: 1, maxWidth: 640, px: 2, fps: 30, onMast: null, ...opts };
-  let SW, SH, P, PX, sky, strips, fog, E, img, ctx, mast;
+  let SW, SH, VH, OY, Z, P, PX, sky, strips, fog, E, img, ctx, mast;
   const FGW = 256, FGH = 96;
 
   function build() {
@@ -151,17 +154,20 @@ export function forest(canvas, opts = {}) {
     canvas.width = SW; canvas.height = SH;
     ctx = canvas.getContext("2d");
     img = ctx.createImageData(SW, SH);
-    const R = rng(o.seed), U = SW / 480;
+    // The scene is laid out in a band VH tall, anchored to the bottom; on portrait screens the band is
+    // landscape-shaped and plain night sky fills the space above it. Z is the scale of trees and moon.
+    VH = Math.min(SH, Math.round(SW * 1.1)); OY = SH - VH; Z = Math.min(VH, SW / 1.3);
+    const R = rng(o.seed), U = Z / 300;
 
     // sky: haze, stars, moon + halo (static)
     sky = new Float32Array(SW * SH);
-    const moon = { x: SW * 0.8, y: SH * 0.3, r: SH * 0.075 }, crater = tile2(o.seed + 5, 8, 8);
+    const moon = { x: SW * 0.8, y: OY + VH * 0.3, r: Z * 0.075 }, crater = tile2(o.seed + 5, 8, 8);
     for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
-      let L = Math.min(0.34, 0.34 * Math.pow(Math.max(0, y / SH - 0.22) / 0.36, 1.7));
-      if (y < SH * 0.5 && R() < 0.0022) L = 0.5 + R() * 0.5;
+      let L = Math.min(0.34, 0.34 * Math.pow(Math.max(0, (y - OY) / VH - 0.22) / 0.36, 1.7));
+      if (y < OY + VH * 0.5 && R() < 0.0022) L = 0.5 + R() * 0.5;
       const dm = Math.hypot(x - moon.x, y - moon.y);
       if (dm < moon.r) L = 0.9 - 0.25 * crater(x / moon.r * 4, y / moon.r * 4) * (1 - dm / moon.r);
-      else L += 0.2 * Math.exp(-(dm - moon.r) / (SH * 0.05));
+      else L += 0.2 * Math.exp(-(dm - moon.r) / (Z * 0.05));
       sky[y * SW + x] = L;
     }
 
@@ -173,17 +179,17 @@ export function forest(canvas, opts = {}) {
     const solid = L => Math.round(Math.max(0, Math.min(1, L)) * 127);
 
     const ridgeF = pfbm(o.seed + 66, 7), ridge2F = pfbm(o.seed + 67, 11);
-    const ridge = mk(Math.floor(SH * 0.3), 1.5, 0.5, 0.5), ridge2 = mk(Math.floor(SH * 0.4), 3.5, 0.5, 0.5);
+    const ridge = mk(Math.floor(OY + VH * 0.3), 1.5, 0.5, 0.5), ridge2 = mk(Math.floor(OY + VH * 0.4), 3.5, 0.5, 0.5);
     for (let x = 0; x < P; x++) {
-      const ry = Math.floor(SH * (0.5 + 0.2 * (ridgeF(x / P) - 0.5) * 2.2));
-      for (let y = ry; y < SH; y++) put(ridge, x, y, mist(0.5 + 0.12 * Math.max(0, 1 - (y - ry) / (SH * 0.04))));
-      const r2 = Math.floor(SH * (0.58 + 0.14 * (ridge2F(x / P) - 0.5) * 2));
-      for (let y = r2; y < SH; y++) put(ridge2, x, y, mist(0.42 + 0.12 * Math.min(1, (y - r2) / (SH * 0.08))));
+      const ry = Math.floor(OY + VH * (0.5 + 0.2 * (ridgeF(x / P) - 0.5) * 2.2));
+      for (let y = ry; y < SH; y++) put(ridge, x, y, mist(0.5 + 0.12 * Math.max(0, 1 - (y - ry) / (VH * 0.04))));
+      const r2 = Math.floor(OY + VH * (0.58 + 0.14 * (ridge2F(x / P) - 0.5) * 2));
+      for (let y = r2; y < SH; y++) put(ridge2, x, y, mist(0.42 + 0.12 * Math.min(1, (y - r2) / (VH * 0.08))));
     }
     // the radio mast, on the highest point of the far ridge
     let best = 1e9, bx = 0;
-    for (let x = 0; x < P; x++) { const ry = SH * (0.5 + 0.2 * (ridgeF(x / P) - 0.5) * 2.2); if (ry < best) { best = ry; bx = x; } }
-    mast = { x: bx, top: Math.floor(best - SH * 0.12), base: Math.floor(best) };
+    for (let x = 0; x < P; x++) { const ry = OY + VH * (0.5 + 0.2 * (ridgeF(x / P) - 0.5) * 2.2); if (ry < best) { best = ry; bx = x; } }
+    mast = { x: bx, top: Math.floor(best - Z * 0.12), base: Math.floor(best) };
     for (let y = mast.top; y < mast.base; y++) {
       const k = (y - mast.top) / (mast.base - mast.top);
       put(ridge, bx, y, solid(0.05));
@@ -197,9 +203,9 @@ export function forest(canvas, opts = {}) {
       [1.02, 0, 11, 0.24, 0.4, 0.3, 0, 0, 0, 32, true],
     ];
     const layers = defs.map(([by, lum, step, h0, h1, wf, mfw, tfw, floor, speed, clustered]) => {
-      const baseY = Math.floor(SH * by), top = Math.floor(SH * (by - h1 * 1.4));
+      const baseY = Math.floor(OY + VH * by), top = Math.floor(OY + VH * by - Z * h1 * 1.4);
       const s = mk(Math.max(0, top), speed, tfw, mfw);
-      for (let y = baseY; y < SH; y++) for (let x = 0; x < P; x++) put(s, x, y, mist(floor * (1 - 0.35 * Math.min(1, (y - baseY) / (SH * 0.12)))));
+      for (let y = baseY; y < SH; y++) for (let x = 0; x < P; x++) put(s, x, y, mist(floor * (1 - 0.35 * Math.min(1, (y - baseY) / (VH * 0.12)))));
       const plant = (cx, h) => {
         const w = h * wf * (0.8 + R() * 0.4), tip = baseY - h;
         for (let y = Math.max(s.y0, Math.floor(tip)); y <= baseY && y < SH; y++) {
@@ -212,10 +218,10 @@ export function forest(canvas, opts = {}) {
         // near spruces come in stands with clearings between, so the valley shows through as it scrolls
         for (let c = 0; c < 6; c++) {
           const cx = (c / 6) * P + R() * P / 12, n = 2 + Math.floor(R() * 3);
-          for (let k = 0; k < n; k++) plant(cx + k * (6 + R() * 10) * U, SH * (h0 + R() * (h1 - h0)));
+          for (let k = 0; k < n; k++) plant(cx + k * (6 + R() * 10) * U, Z * (h0 + R() * (h1 - h0)));
         }
       } else {
-        for (let x = 0; x < P; x += (step + R() * step * 1.4) * U) plant(x, SH * (h0 + R() * (h1 - h0)));
+        for (let x = 0; x < P; x += (step + R() * step * 1.4) * U) plant(x, Z * (h0 + R() * (h1 - h0)));
       }
       return s;
     });
@@ -228,27 +234,29 @@ export function forest(canvas, opts = {}) {
   }
 
   function draw(t) {
-    const { ink, ground, signal } = palette(canvas), d = img.data;
-    const offs = strips.map(s => (t * s.speed * o.speed * (SW / 480)) % P);
+    const { ink, ground, signal, light } = palette(canvas), d = img.data;
+    const offs = strips.map(s => (t * s.speed * o.speed * (Z / 300)) % P);
     const fogOff = t * 6 * o.speed, blink = Math.floor(t * 1.4) % 2 === 0;
     const mastSx = ((mast.x - offs[4]) % P + P) % P;
     for (let y = 0; y < SH; y++) {
-      const yn = y / SH;
+      const yn = (y - OY) / VH;
       const band = Math.exp(-(((yn - 0.7) / 0.05) ** 2)) * 0.5 + Math.exp(-(((yn - 0.84) / 0.06) ** 2)) * 0.4 + Math.exp(-(((yn - 0.6) / 0.04) ** 2)) * 0.2;
-      const fy = Math.floor(yn * FGH), row = (y & 7) * 8;
+      const fy = Math.max(0, Math.min(FGH - 1, Math.floor(yn * FGH))), row = (y & 7) * 8;
       for (let x = 0; x < SW; x++) {
         const i = y * SW + x;
-        let L = sky[i], fw = 0.05;
+        let L = sky[i], fw = 0.05, kind = 0; // 0 sky, 1 solid, 2 mist
         for (let k = 0; k < strips.length; k++) {
           const s = strips[k];
           if (y < s.y0) continue;
           const v = s.a[(y - s.y0) * P + (((x + offs[k]) | 0) % P)];
           if (v === 255) continue;
-          if (v < 128) { L = v / 127; fw = s.treeFw; } else { L = (v - 128) / 126; fw = s.mistFw; }
+          if (v < 128) { L = v / 127; fw = s.treeFw; kind = 1; } else { L = (v - 128) / 126; fw = s.mistFw; kind = 2; }
           break;
         }
+        // xerox: the same valley on an overcast day, printed as a positive: pale sky and mist, black spruces
+        if (light) L = kind === 0 ? 1 - 0.32 * L : kind === 2 ? 0.55 + 0.45 * L : L;
         if (band > 0.01 && fw > 0) L += fw * band * Math.max(0, fog[fy * FGW + (((x * 0.7 + fogOff * (1 + fy / FGH)) | 0) % FGW)] - 0.32) * 1.25;
-        let C = L > B8[row + (x & 7)] ? ink : ground;
+        let C = (light ? 1 - L : L) > B8[row + (x & 7)] ? ink : ground;
         if (blink && Math.abs(x - mastSx) <= 1 && Math.abs(y - mast.top) <= 1) C = signal;
         const j = i * 4;
         d[j] = C[0]; d[j + 1] = C[1]; d[j + 2] = C[2]; d[j + 3] = 255;
@@ -325,9 +333,10 @@ function loadImage(src) {
 export function dithered(canvas, src, opts = {}) {
   const o = { px: 2, invert: "auto", contrast: 1.25, lift: 0, motion: "drift", fps: 14, fallbackSeed: null, ...opts };
   let W = 0, H = 0, base = null, E, ctx, img, hot = false, dev = 0, devT0 = 0, curT = 0, fogT;
-  let anim = null, unres = () => {}, dead = false;
+  let anim = null, unres = () => {}, dead = false, source = null, builtLight = null;
 
   function build(image) {
+    source = image; builtLight = palette(canvas).light;
     W = Math.max(1, Math.round(canvas.clientWidth / o.px)); H = Math.max(1, Math.round(canvas.clientHeight / o.px));
     canvas.width = W; canvas.height = H; ctx = canvas.getContext("2d", { willReadFrequently: true });
     base = new Float32Array(W * H); E = new Float32Array(W * H); img = ctx.createImageData(W, H);
@@ -351,7 +360,7 @@ export function dithered(canvas, src, opts = {}) {
     let mean = 0;
     for (let i = 0; i < W * H; i++) { base[i] = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) / 255; mean += base[i]; }
     mean /= W * H;
-    const inv = o.invert === "auto" ? mean > 0.6 : o.invert;
+    const inv = o.invert === "auto" ? (palette(canvas).light ? true : mean > 0.6) : o.invert;
     for (let i = 0; i < base.length; i++) {
       const v = inv ? 1 - base[i] : base[i];
       base[i] = Math.min(1, Math.max(0, (v - 0.5) * o.contrast + 0.5 + o.lift));
@@ -360,7 +369,9 @@ export function dithered(canvas, src, opts = {}) {
 
   function draw(t) {
     if (!base) return;
-    const { ink, ground, signal } = palette(canvas), F = hot ? signal : ink, d = img.data;
+    const pal = palette(canvas);
+    if (pal.light !== builtLight) build(source); // the rendition flipped between light and dark: re-print
+    const { ink, ground, signal } = pal, F = hot ? signal : ink, d = img.data;
     curT = t;
     if (dev > 0) dev = Math.max(0, 1 - (t - devT0) / 0.9);
     const drift = o.motion === "drift" && !(anim && anim.reduced);
@@ -442,7 +453,8 @@ export function orb(canvas, opts = {}) {
   const anim = animate(canvas, draw, { fps: o.fps });
   return {
     ...anim,
-    sizzle(amount = 1) { heat = Math.min(1.2, Math.max(heat, 0) + amount * 0.6); if (anim.reduced) anim.redraw(); },
+    // under reduced motion the orb stays still: a sizzle would freeze as a single noisy frame
+    sizzle(amount = 1) { if (!anim.reduced) heat = Math.min(1.2, Math.max(heat, 0) + amount * 0.6); },
   };
 }
 
