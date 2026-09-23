@@ -408,7 +408,7 @@ fn view(model: Model) -> Element(Msg) {
     header(model, s),
     html.main([attribute.id("chat-area")], [
       construct(model, s),
-      messages_container(model),
+      messages_container(model, s),
     ]),
     input_footer(model, s),
   ])
@@ -523,9 +523,9 @@ fn construct(model: Model, s: Strings) -> Element(Msg) {
   ])
 }
 
-fn messages_container(model: Model) -> Element(Msg) {
+fn messages_container(model: Model, s: Strings) -> Element(Msg) {
   let tail = case model.stream_state {
-    Thinking -> [view_pending()]
+    Thinking -> [view_pending(s)]
     _ -> []
   }
   html.div([attribute.id("messages-container")], [
@@ -533,7 +533,7 @@ fn messages_container(model: Model) -> Element(Msg) {
       [attribute.id("messages")],
       list.append(
         list.map(model.history, fn(msg) {
-          view_message(msg, model.stream_state)
+          view_message(msg, model.stream_state, s)
         }),
         tail,
       ),
@@ -541,7 +541,11 @@ fn messages_container(model: Model) -> Element(Msg) {
   ])
 }
 
-fn view_message(msg: ChatMessage, stream_state: StreamState) -> Element(Msg) {
+fn view_message(
+  msg: ChatMessage,
+  stream_state: StreamState,
+  s: Strings,
+) -> Element(Msg) {
   let is_streaming_this = case stream_state {
     Streaming(id) if id == msg.id -> True
     _ -> False
@@ -567,14 +571,14 @@ fn view_message(msg: ChatMessage, stream_state: StreamState) -> Element(Msg) {
       ]),
       attribute.attribute("data-msg-id", int.to_string(msg.id)),
     ],
-    [who(msg.sender), text],
+    [who(msg.sender, s), text],
   )
 }
 
 /// Sent, but the server has not said `thinking` yet.
-fn view_pending() -> Element(Msg) {
+fn view_pending(s: Strings) -> Element(Msg) {
   html.div([attribute.class("msg bot is-streaming")], [
-    who(Bot),
+    who(Bot, s),
     html.div([attribute.class("txt")], []),
   ])
 }
@@ -586,10 +590,10 @@ fn sender_class(sender: Sender) -> String {
   }
 }
 
-fn who(sender: Sender) -> Element(Msg) {
+fn who(sender: Sender, s: Strings) -> Element(Msg) {
   let label = case sender {
-    User -> "you ▸"
-    Bot -> "construct ▸"
+    User -> s.who_you
+    Bot -> s.who_construct
   }
   html.div([attribute.class("who")], [html.text(label)])
 }
@@ -658,9 +662,7 @@ fn input_footer(model: Model, s: Strings) -> Element(Msg) {
       ),
     ]),
     html.p([attribute.class("input-hint")], [
-      html.text(
-        "Arda's AI can make mistakes. Consider verifying important information.",
-      ),
+      html.text(s.disclaimer),
     ]),
   ])
 }

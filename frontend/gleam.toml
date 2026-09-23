@@ -25,20 +25,20 @@ lang = "en"
 title = "Arda's AI Construct"
 meta = [
   { name = "viewport", content = "width=device-width, initial-scale=1.0" },
-  { name = "description", content = "An AI assistant that answers questions about Arda — his work, projects, and background." },
+  { name = "description", content = "Answers questions about Arda's work, projects and music, and can pass a message on to him." },
   { property = "og:type", content = "website" },
   { property = "og:site_name", content = "Arda's AI Construct" },
   { property = "og:url", content = "https://ai.arda.tr/" },
   { property = "og:title", content = "Arda's AI Construct" },
-  { property = "og:description", content = "An AI assistant that answers questions about Arda — his work, projects, and background." },
+  { property = "og:description", content = "Answers questions about Arda's work, projects and music, and can pass a message on to him." },
   { property = "og:image", content = "https://ai.arda.tr/og-image.png" },
   { property = "og:image:width", content = "1200" },
   { property = "og:image:height", content = "630" },
   { property = "og:image:type", content = "image/png" },
-  { property = "og:image:alt", content = "Arda's AI Construct — an AI assistant that answers questions about Arda." },
+  { property = "og:image:alt", content = "Arda's AI Construct: an AI assistant that answers questions about Arda." },
   { name = "twitter:card", content = "summary_large_image" },
   { name = "twitter:title", content = "Arda's AI Construct" },
-  { name = "twitter:description", content = "An AI assistant that answers questions about Arda." },
+  { name = "twitter:description", content = "Answers questions about Arda's work, projects and music." },
   { name = "twitter:image", content = "https://ai.arda.tr/og-image.png" },
 ]
 stylesheets = [
