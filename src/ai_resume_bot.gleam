@@ -13,6 +13,7 @@ import ai_resume_bot/rate_limit
 import ai_resume_bot/resume
 import ai_resume_bot/server.{Config}
 import ai_resume_bot/stream_handler.{StreamConfig}
+import ai_resume_bot/tts
 import argv
 import envoy
 import gleam/erlang/process
@@ -193,12 +194,19 @@ fn run_server() -> Nil {
 
   let secret = wisp.random_string(64)
 
+  // Voice replies (Cloud Text-to-Speech). On by default; see tts.gleam for
+  // VOICE_ENABLED / TTS_* settings. The probe only logs (and, if the API
+  // refuses us, stops offering voice for a while); it never blocks startup.
+  let tts_config = tts.config_from_env(fn(name) { envoy.get(name) })
+  process.spawn_unlinked(fn() { tts.probe(tts_config) })
+
   let stream_config =
     StreamConfig(
       gemini: gemini_service,
       smtp: smtp_config,
       allowed_origins: allowed_origins,
       rate_limit: rate_limit_config,
+      tts: tts_config,
     )
 
   let wisp_handler =
