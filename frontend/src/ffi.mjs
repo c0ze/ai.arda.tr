@@ -334,14 +334,18 @@ export function speech_stop() {
 
 // The part of a reply the voice has reached, safe to render as markdown:
 // never half a surrogate pair, a half-typed link shows as its label, and an
-// open ** or ` is closed so the word being spoken is not framed by markers.
+// open ** or ` is closed so the word being spoken is not framed by markers (or dropped, if nothing
+// follows it yet).
 export function reveal_prefix(text, n) {
   if (n < 0 || n >= text.length) return text;
   let s = text.slice(0, n);
   const last = s.charCodeAt(s.length - 1);
   if (last >= 0xd800 && last <= 0xdbff) s = s.slice(0, -1);
+  if (s.endsWith("*") && text.charAt(s.length) === "*") s = s.slice(0, -1); // half a ** marker
   s = s.replace(/\[([^\]\n]*)(\]\([^)\n]*)?$/, "$1");
-  if ((s.match(/\*\*/g) || []).length % 2) s += "**";
-  if ((s.match(/`/g) || []).length % 2) s += "`";
+  // an opener with nothing after it yet (the voice rests right before a bold word) is dropped, not
+  // closed: "**" + "**" is not bold, so closing it would flash a literal "****"
+  if ((s.match(/\*\*/g) || []).length % 2) s = s.endsWith("**") ? s.slice(0, -2) : s + "**";
+  if ((s.match(/`/g) || []).length % 2) s = s.endsWith("`") ? s.slice(0, -1) : s + "`";
   return s;
 }

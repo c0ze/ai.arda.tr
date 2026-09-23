@@ -153,6 +153,14 @@ test('reveal_prefix never shows half a character or a dangling marker', () => {
   assert.equal(reveal_prefix('all of it', 99), 'all of it');
 });
 
+test('reveal_prefix drops a bold or code opener that has nothing after it yet', () => {
+  // the voice often rests right before a bold word; closing the empty opener would show "****"
+  assert.equal(reveal_prefix('はい、Ardaは**Go**の経験', 10), 'はい、Ardaは');
+  assert.equal(reveal_prefix('はい、Ardaは**Go**の経験', 9), 'はい、Ardaは', 'half a ** marker');
+  assert.equal(reveal_prefix('はい、Ardaは**Go**の経験', 11), 'はい、Ardaは**G**');
+  assert.equal(reveal_prefix('run `make` now', 5), 'run ');
+});
+
 // A browser-ish `window` with localStorage and no Web Audio, for this test only.
 function fakeWindow(t) {
   const m = new Map();
