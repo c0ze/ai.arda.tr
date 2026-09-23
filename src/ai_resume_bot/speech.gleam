@@ -641,6 +641,7 @@ pub opaque type Voicer {
     in_fence: Bool,
     voiced: Int,
     max_chars: Int,
+    max_chars_ja: Int,
     next_seq: Int,
     stopped: Bool,
   )
@@ -649,12 +650,18 @@ pub opaque type Voicer {
 /// `lang` is "en", "ja" or "tr" (anything else is English). `max_chars` caps
 /// the spoken characters per reply.
 pub fn voicer(lang: String, max_chars: Int) -> Voicer {
+  voicer_capped(lang, max_chars, max_chars)
+}
+
+/// Like `voicer`, with a separate cap once the reply turns out to be Japanese.
+pub fn voicer_capped(lang: String, max_chars: Int, max_chars_ja: Int) -> Voicer {
   Voicer(
     splitter: new_splitter(),
     lang: normalise_lang(lang),
     in_fence: False,
     voiced: 0,
     max_chars:,
+    max_chars_ja:,
     next_seq: 0,
     stopped: False,
   )
@@ -723,14 +730,18 @@ fn plan(
               let toks = tokens(seg.chars)
               let spoken =
                 list.fold(toks, 0, fn(n, t) { n + string.length(t.text) })
+              let lang = detect_lang(v.lang, seg.text)
+              let cap = case lang {
+                "ja" -> v.max_chars_ja
+                _ -> v.max_chars
+              }
               case toks {
                 [] -> plan(v, rest, acc)
-                _ if v.voiced + spoken > v.max_chars -> #(
+                _ if v.voiced + spoken > cap -> #(
                   Voicer(..v, stopped: True),
                   list.reverse(acc),
                 )
                 _ -> {
-                  let lang = detect_lang(v.lang, seg.text)
                   let job =
                     Job(
                       seq: v.next_seq,

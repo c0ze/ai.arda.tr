@@ -49,7 +49,10 @@ pub type Config {
     voice_ja: String,
     pitch: Float,
     speaking_rate: Float,
+    /// Japanese is dense: it gets its own rate and cap, or long replies take minutes to read out.
+    speaking_rate_ja: Float,
     max_chars: Int,
+    max_chars_ja: Int,
     dev_token: String,
     quota_project: String,
   )
@@ -116,9 +119,14 @@ pub fn config_from_env(get: fn(String) -> Result(String, Nil)) -> Config {
     voice_ja: str("TTS_VOICE_JA", default_voice_ja),
     pitch: num("TTS_PITCH", -4.0),
     speaking_rate: num("TTS_SPEAKING_RATE", 0.92),
+    speaking_rate_ja: num("TTS_SPEAKING_RATE_JA", 1.06),
     max_chars: case int.parse(str("VOICE_MAX_CHARS", "")) {
       Ok(n) if n > 0 -> n
       _ -> 1200
+    },
+    max_chars_ja: case int.parse(str("VOICE_MAX_CHARS_JA", "")) {
+      Ok(n) if n > 0 -> n
+      _ -> 400
     },
     dev_token: str("TTS_ACCESS_TOKEN", ""),
     quota_project: str("TTS_QUOTA_PROJECT", ""),
@@ -188,7 +196,13 @@ pub fn request_body(cfg: Config, job: Job, marks: Bool) -> json.Json {
         #("audioEncoding", json.string("MP3")),
         #("sampleRateHertz", json.int(24_000)),
         #("pitch", json.float(cfg.pitch)),
-        #("speakingRate", json.float(cfg.speaking_rate)),
+        #(
+          "speakingRate",
+          json.float(case job.lang {
+            "ja" -> cfg.speaking_rate_ja
+            _ -> cfg.speaking_rate
+          }),
+        ),
       ]),
     ),
   ]

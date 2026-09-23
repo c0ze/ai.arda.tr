@@ -320,9 +320,10 @@ fn start_voice(state: SseState, conn: SSEConnection) -> SseState {
         True ->
           SseState(
             ..state,
-            voice: Some(voice.new(
+            voice: Some(voice.new_capped(
               state.voice_opts.lang,
               cfg.max_chars,
+              cfg.max_chars_ja,
               max_clips_in_flight,
             )),
           )

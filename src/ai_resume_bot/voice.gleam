@@ -32,8 +32,18 @@ pub type Step {
 }
 
 pub fn new(lang: String, max_chars: Int, max_in_flight: Int) -> Session {
+  new_capped(lang, max_chars, max_chars, max_in_flight)
+}
+
+/// Like `new`, with a separate (lower) cap for Japanese sentences.
+pub fn new_capped(
+  lang: String,
+  max_chars: Int,
+  max_chars_ja: Int,
+  max_in_flight: Int,
+) -> Session {
   Session(
-    voicer: speech.voicer(lang, max_chars),
+    voicer: speech.voicer_capped(lang, max_chars, max_chars_ja),
     waiting: [],
     in_flight: 0,
     max_in_flight:,

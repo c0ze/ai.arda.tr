@@ -175,6 +175,7 @@ pub fn tts_config_defaults_and_overrides_test() {
   #(cfg.voice_en, cfg.voice_tr, cfg.voice_ja)
   |> should.equal(#("en-US-Standard-D", "tr-TR-Standard-E", "ja-JP-Standard-C"))
   cfg.max_chars |> should.equal(1200)
+  #(cfg.max_chars_ja, cfg.speaking_rate_ja) |> should.equal(#(400, 1.06))
   let cfg =
     tts.config_from_env(fn(n) {
       case n {
@@ -232,4 +233,17 @@ pub fn speech_events_round_trip_through_the_shared_decoder_test() {
     |> json.parse(shared.stream_event_decoder())
   })
   |> should.equal(list.map(events, Ok))
+}
+
+pub fn japanese_replies_get_a_lower_cap_test() {
+  // 30 sentences of about 16 characters: English voices them all under 1200,
+  // Japanese stops at the 400-character cap
+  let ja = string.repeat("アルダは東京に住んでいます。", 30)
+  let en = string.repeat("Arda lives in Tokyo. ", 30)
+  let spoken = fn(lang, text) {
+    voice.on_text_done(voice.new_capped(lang, 1200, 400, 50), text).start
+    |> list.length
+  }
+  { spoken("ja", ja) < 30 } |> should.be_true
+  spoken("en", en) |> should.equal(30)
 }
