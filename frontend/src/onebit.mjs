@@ -542,12 +542,16 @@ function loadImage(src) {
 /**
  * An image, Atkinson-dithered to 1 bit, alive: it develops out of noise when it first appears, and a slow
  * fog drifts through its threshold afterwards. hot(true) redraws it in the signal colour; develop() replays.
- * opts: px (css px per pixel), invert ("auto" | true | false), contrast, motion ("drift" | "still"), fallbackSeed.
+ * opts: px (css px per pixel), invert ("auto" | true | false), contrast, motion ("drift" | "still"), fallbackSeed,
+ * reveal: { hold, fade, onDone }: after developing and holding `hold` s, the dither burns off pixel by pixel
+ * in random order over `fade` s (a band of static runs just ahead of it) until the canvas is transparent, so
+ * whatever sits underneath (the real image) shows through; then it stops and calls onDone. Under reduced
+ * motion, or with no image (a sigil), onDone is called straight away for an image, never for a sigil.
  */
 export function dithered(canvas, src, opts = {}) {
   const o = { px: 2, invert: "auto", contrast: 1.25, lift: 0, motion: "drift", fps: 14, fallbackSeed: null, ...opts };
   let W = 0, H = 0, base = null, E, ctx, img, hot = false, dev = 0, devT0 = 0, curT = 0, fogT;
-  let anim = null, unres = () => {}, dead = false, source = null, builtLight = null;
+  let anim = null, unres = () => {}, dead = false, source = null, builtLight = null, order = null, revealed = false;
 
   function build(image) {
     source = image; builtLight = palette(canvas).light;
@@ -555,6 +559,7 @@ export function dithered(canvas, src, opts = {}) {
     canvas.width = W; canvas.height = H; ctx = canvas.getContext("2d", { willReadFrequently: true });
     base = new Float32Array(W * H); E = new Float32Array(W * H); img = ctx.createImageData(W, H);
     fogT = tile2(hash(String(src)) + 3, 12, 8);
+    if (o.reveal) { const R = rng(hash(String(src)) + 11); order = new Float32Array(W * H); for (let i = 0; i < order.length; i++) order[i] = R(); }
     if (!image) { // no image: a seeded mirrored sigil
       const R = rng(o.fallbackSeed ?? hash(String(src))), G = 9, cell = Math.max(1, Math.floor(H * 0.6 / G));
       const ox = Math.floor((W - G * cell) / 2), oy = Math.floor((H - G * cell) / 2);
@@ -591,6 +596,9 @@ export function dithered(canvas, src, opts = {}) {
     if (dev > 0) dev = Math.max(0, 1 - (t - devT0) / 0.9);
     const drift = o.motion === "drift" && !(anim && anim.reduced);
     const R = rng((t * 1000) | 0);
+    // the burn-off: 0 = all dither … 1 = all gone
+    const rv = o.reveal && source ? o.reveal : null, t0 = rv ? 0.9 + (rv.hold ?? 0.6) : 0;
+    const dis = rv ? Math.min(1, Math.max(0, (t - t0) / (rv.fade ?? 1.1))) : 0, band = 0.09;
     for (let i = 0; i < base.length; i++) {
       let v = base[i];
       if (dev > 0) v = v * (1 - dev) + R() * dev;
@@ -603,16 +611,32 @@ export function dithered(canvas, src, opts = {}) {
       if (x + 2 < W) E[i + 2] += err;
       if (y + 1 < H) { if (x > 0) E[i + W - 1] += err; E[i + W] += err; if (x + 1 < W) E[i + W + 1] += err; }
       if (y + 2 < H) E[i + 2 * W] += err;
-      const C = nv ? F : ground, j = i * 4;
-      d[j] = C[0]; d[j + 1] = C[1]; d[j + 2] = C[2]; d[j + 3] = 255;
+      let C = nv ? F : ground, a = 255;
+      if (dis > 0) {
+        const k = order[i] - dis * (1 + band);
+        if (k < -band) a = 0; // burnt off: the real image shows through
+        else if (k < 0 && R() < 0.65) C = R() < 0.5 ? signal : ink; // the sizzle, just ahead of the edge
+      }
+      const j = i * 4;
+      d[j] = C[0]; d[j + 1] = C[1]; d[j + 2] = C[2]; d[j + 3] = a;
     }
     ctx.putImageData(img, 0, 0);
+    if (dis >= 1 && !revealed) finish();
+  }
+
+  function finish() {
+    if (revealed) return;
+    revealed = true;
+    ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    anim?.destroy(); unres();
+    o.reveal?.onDone?.();
   }
 
   const ready = loadImage(src).then(image => {
     if (dead) return; // destroyed before the image arrived: never start an animation nobody can stop
     build(image);
-    anim = animate(canvas, t => draw(t), { fps: o.fps, still: o.motion === "still" });
+    if (o.reveal && image && reducedMotion()) { finish(); return; } // no burn-off to watch: show the real image
+    anim = animate(canvas, t => draw(t), { fps: o.reveal && image ? Math.max(o.fps, 24) : o.fps, still: o.motion === "still" && !(o.reveal && image) });
     if (!anim.reduced) { dev = 1; devT0 = 0; }
     unres = onResize(canvas, () => { build(image); anim.redraw(); });
   });
