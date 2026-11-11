@@ -26,8 +26,15 @@ COPY shared/src shared/src
 COPY public public
 
 # Emit the minified bundle + generated index.html into /public so the
-# backend can serve it at runtime.
-RUN cd frontend && gleam run -m lustre/dev build --minify --outdir=../public
+# backend can serve it at runtime. lustre_dev_tools makes a single attempt at
+# downloading Bun (a failed hash check broke the scheduled deploy on
+# 2026-11-08), so retry up to three times, clearing its half-written
+# frontend/.lustre between attempts.
+RUN cd frontend && for attempt in 1 2 3; do \
+      gleam run -m lustre/dev build --minify --outdir=../public && exit 0; \
+      echo "Lustre build failed (attempt $attempt of 3)" >&2; \
+      rm -rf .lustre; sleep 10; \
+    done; exit 1
 
 
 ##
@@ -49,8 +56,13 @@ COPY shared/src ./shared/src
 COPY test ./test
 
 # Fetch the resume JSON at build time so the runtime image does not need
-# outbound access to GitHub at boot.
-RUN gleam run -- fetch
+# outbound access to GitHub at boot. Retried: one network blip should not
+# fail a scheduled deploy.
+RUN for attempt in 1 2 3; do \
+      gleam run -- fetch && exit 0; \
+      echo "Resume fetch failed (attempt $attempt of 3)" >&2; \
+      sleep 10; \
+    done; exit 1
 
 # Build a self-contained Erlang release tree under /build/build/erlang-shipment
 RUN gleam export erlang-shipment

@@ -40,11 +40,18 @@ jobs:
           gleam-version: "1.15.2"
           rebar3-version: "3"
 
+      # lustre_dev_tools downloads Bun in a single attempt; retry the build.
       - name: Build Lustre frontend
         working-directory: frontend
         run: |
           gleam deps download
-          gleam run -m lustre/dev build --minify --outdir=../public
+          for attempt in 1 2 3; do
+            gleam run -m lustre/dev build --minify --outdir=../public && exit 0
+            echo "::warning::Lustre build failed (attempt $attempt of 3)"
+            rm -rf .lustre
+            sleep 10
+          done
+          exit 1
 
       - name: Set up Node for browser-boundary tests
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5

@@ -77,6 +77,14 @@ jobs:
         working-directory: frontend
         run: gleam build && node --test test/*.test.mjs
 
+      # lustre_dev_tools downloads Bun in a single attempt; retry the build.
       - name: Build Lustre bundle
         working-directory: frontend
-        run: gleam run -m lustre/dev build --minify --outdir=../public
+        run: |
+          for attempt in 1 2 3; do
+            gleam run -m lustre/dev build --minify --outdir=../public && exit 0
+            echo "::warning::Lustre build failed (attempt $attempt of 3)"
+            rm -rf .lustre
+            sleep 10
+          done
+          exit 1
