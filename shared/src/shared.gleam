@@ -34,6 +34,14 @@ pub type ChatResponse {
 /// trust a client to bound its own payload (and Gemini token cost). ~10 turns.
 pub const default_max_history = 20
 
+/// Longest message the server accepts, in characters (the frontend's input
+/// has the same `maxlength`). Longer messages are rejected with a 400.
+pub const max_message_chars = 4000
+
+/// Longest history item the server passes on to the model, in characters;
+/// longer items are cut to this length.
+pub const max_history_item_chars = 8000
+
 /// Keep only the most recent `max` messages of a conversation history, so a
 /// long chat doesn't grow the request payload (and token cost) without bound.
 /// A non-positive `max` keeps everything.

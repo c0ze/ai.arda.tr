@@ -22,6 +22,7 @@ import ai_resume_bot/blog
 import ai_resume_bot/email.{type SmtpConfig}
 import ai_resume_bot/gemini
 import ai_resume_bot/gemini_stream.{type StreamMsg, Chunk, Done, StreamError}
+import ai_resume_bot/guard
 import ai_resume_bot/rate_limit
 import ai_resume_bot/smtp
 import ai_resume_bot/speech.{type Job}
@@ -97,16 +98,19 @@ pub fn handle_stream(
       )
     True ->
       // Read the request body
-      case mist.read_body(req, 1_000_000) {
-        Error(_) ->
+      case mist.read_body(req, guard.max_body_bytes) {
+        Error(mist.ExcessBody) ->
+          with_cors(error_response(413, "Request body too large"))
+        Error(mist.MalformedBody) ->
           with_cors(error_response(400, "Failed to read request body"))
         Ok(req_with_body) ->
           case bit_array.to_string(req_with_body.body) {
             Error(_) ->
               with_cors(error_response(400, "Invalid UTF-8 in request body"))
             Ok(body_str) ->
-              case json.parse(body_str, shared.chat_request_decoder()) {
-                Error(_) -> with_cors(error_response(400, "Invalid JSON"))
+              case guard.parse_chat_request(body_str) {
+                Error(guard.Rejection(status, message)) ->
+                  with_cors(error_response(status, message))
                 Ok(chat_req) -> {
                   // Voice fields are optional; a malformed one means no voice.
                   let voice_opts = case
@@ -156,9 +160,9 @@ fn start_sse(
   config: StreamConfig,
 ) -> response.Response(ResponseData) {
   let gemini_svc = config.gemini
-  // Re-cap server-side: the client caps too, but a direct API caller can't be
-  // trusted to bound its own history (and the Gemini token cost it drives).
-  let history = shared.cap_history(chat_req.history, shared.default_max_history)
+  // `guard.check_chat_request` has already capped the history server-side:
+  // a direct API caller can't be trusted to bound its own payload.
+  let history = chat_req.history
   // Recent blog posts (if cached) so "what's Arda working on lately?" works.
   let recent = blog.current()
 

@@ -780,6 +780,11 @@ fn input_footer(model: Model, s: Strings) -> Element(Msg) {
         attribute.placeholder(s.input_placeholder),
         attribute.attribute("aria-label", s.input_placeholder),
         attribute.attribute("autocomplete", "off"),
+        // The server rejects longer messages with a 400.
+        attribute.attribute(
+          "maxlength",
+          int.to_string(shared.max_message_chars),
+        ),
         attribute.attribute("enterkeyhint", "send"),
         attribute.value(model.input),
         attribute.autofocus(True),

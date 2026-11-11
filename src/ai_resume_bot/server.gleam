@@ -4,9 +4,11 @@
 import ai_resume_bot/blog
 import ai_resume_bot/email.{type SmtpConfig}
 import ai_resume_bot/gemini
+import ai_resume_bot/guard
 import ai_resume_bot/models.{type ChatRequest}
 import ai_resume_bot/rate_limit
 import ai_resume_bot/smtp
+import gleam/bit_array
 import gleam/bytes_tree
 import gleam/http
 import gleam/http/request
@@ -146,17 +148,31 @@ fn handle_chat(req: Request, config: Config) -> Response {
 }
 
 fn do_chat(req: Request, config: Config) -> Response {
-  use body <- wisp.require_string_body(req)
-  case json.parse(body, models.chat_request_decoder()) {
-    Error(_) -> json_response(400, models.error_response("Invalid JSON"))
-    Ok(chat_req) -> dispatch(chat_req, config)
+  let req = wisp.set_max_body_size(req, guard.max_body_bytes)
+  case wisp.read_body_bits(req) {
+    Error(_) ->
+      json_response(413, models.error_response("Request body too large"))
+    Ok(bits) ->
+      case bit_array.to_string(bits) {
+        Error(_) ->
+          json_response(
+            400,
+            models.error_response("Invalid UTF-8 in request body"),
+          )
+        Ok(body) ->
+          case guard.parse_chat_request(body) {
+            Error(guard.Rejection(status, message)) ->
+              json_response(status, models.error_response(message))
+            Ok(chat_req) -> dispatch(chat_req, config)
+          }
+      }
   }
 }
 
 fn dispatch(req: ChatRequest, config: Config) -> Response {
-  // Re-cap server-side: the client caps too, but a direct API caller can't be
-  // trusted to bound its own history (and the Gemini token cost it drives).
-  let history = shared.cap_history(req.history, shared.default_max_history)
+  // `guard.check_chat_request` has already capped the history server-side:
+  // a direct API caller can't be trusted to bound its own payload.
+  let history = req.history
   // Recent blog posts (if cached) so "what's Arda working on lately?" works.
   let recent = blog.current()
   case gemini.generate(config.gemini, recent, req.message, history) {

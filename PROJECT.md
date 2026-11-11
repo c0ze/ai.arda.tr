@@ -139,7 +139,8 @@ docker run -p 8080:8080 \
     the busy composer. Its transport tests run in CI and before UI publication.
   - Handled at the raw Mist level (Wisp cannot do streaming responses).
 - `GET /*` → static files from `PUBLIC_DIR`.
-- Error shapes: 400 `Invalid JSON`, 500 `Internal AI Error`, 502 contact-email failure.
+- Limits (`guard.gleam`, both endpoints): bodies over 256 KB get 413 `Request body too large`; an empty or whitespace-only `message` gets 400 `Message is empty`, one over 4000 characters (`shared.max_message_chars`, also the input's `maxlength`) 400 `Message is too long (at most 4000 characters)`. History is capped to the last 20 items and each item is cut to 8000 characters (`shared.max_history_item_chars`), not rejected: the sibling widgets resend a rejected message as history, which would wedge their conversation. The body limit is generous because those widgets send their whole conversation uncapped.
+- Error shapes (`{"error": "..."}`): 400 `Invalid JSON` / the limits above, 413, 429 (with `retry-after`), 500 `Internal AI Error`, 502 contact-email failure.
 
 ### Gemini Client
 - Direct REST calls to `generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`.
