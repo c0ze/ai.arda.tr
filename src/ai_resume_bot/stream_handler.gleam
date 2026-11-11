@@ -160,7 +160,11 @@ type SseMsg {
 
 type SseState {
   SseState(
+    // The whole reply from Gemini so far, [[SEND_EMAIL]] block included.
     accumulated: String,
+    // Bytes of `email.streamable(accumulated)` already sent as chunks (and fed
+    // to the voice): the block, and a possible partial tag, are held back.
+    sent_bytes: Int,
     sent_thinking: Bool,
     // Bytes from an incomplete trailing SSE line, carried between Chunk
     // messages so a `data:` line split across chunks isn't dropped.
@@ -228,6 +232,7 @@ fn start_sse(
 
       SseState(
         accumulated: "",
+        sent_bytes: 0,
         sent_thinking: False,
         pending: <<>>,
         config: config,
@@ -285,22 +290,29 @@ fn on_gemini(
       let new_text = list.fold(deltas, "", fn(acc, d) { acc <> d })
       // Always carry the updated buffer forward, even with no new text yet.
       let state = SseState(..state, pending: pending)
-      case new_text {
+      // Only text before a [[SEND_EMAIL]] tag is streamed (or voiced); the
+      // block itself is machine-readable and goes no further than `done`.
+      let accumulated = state.accumulated <> new_text
+      let visible = email.streamable(accumulated, False)
+      let to_send = email.unsent(visible, state.sent_bytes)
+      let state =
+        SseState(
+          ..state,
+          accumulated: accumulated,
+          sent_bytes: string.byte_size(visible),
+        )
+      case to_send {
         "" -> actor.continue(state)
-        _ -> {
-          let new_accumulated = state.accumulated <> new_text
-          case send_sse_event(conn, shared.StreamChunk(text: new_text)) {
-            Ok(_) -> {
-              let state = SseState(..state, accumulated: new_accumulated)
+        _ ->
+          case send_sse_event(conn, shared.StreamChunk(text: to_send)) {
+            Ok(_) ->
               case state.voice {
                 None -> actor.continue(state)
                 Some(session) ->
-                  apply_voice(state, voice.on_text(session, new_text), conn)
+                  apply_voice(state, voice.on_text(session, to_send), conn)
               }
-            }
             Error(_) -> actor.stop()
           }
-        }
       }
     }
 
@@ -311,6 +323,10 @@ fn on_gemini(
       let tail_text = list.fold(tail, "", fn(acc, d) { acc <> d })
       let full_reply = state.accumulated <> tail_text
       use full_reply <- end_if_empty(full_reply, conn)
+      // Text held back in case it began a tag (and the stream's tail): the
+      // voice still gets it; the client gets it with `done`.
+      let rest =
+        email.unsent(email.streamable(full_reply, True), state.sent_bytes)
       let final_reply = handle_email_if_needed(full_reply, state.config)
       case state.voice {
         None -> {
@@ -320,7 +336,7 @@ fn on_gemini(
         Some(session) ->
           apply_voice(
             SseState(..state, final: Some(final_reply)),
-            voice.on_text_done(session, tail_text),
+            voice.on_text_done(session, rest),
             conn,
           )
       }
@@ -435,7 +451,8 @@ fn handle_email_if_needed(reply: String, config: StreamConfig) -> String {
             logging.Error,
             "Failed to parse email: " <> string.inspect(e),
           )
-          reply
+          // Never show the broken block; say that nothing was sent.
+          email.reply_with_outcome(email.strip_block(reply), False)
         }
         Ok(extracted) ->
           case config.smtp {

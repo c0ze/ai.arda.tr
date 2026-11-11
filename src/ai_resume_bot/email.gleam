@@ -2,8 +2,10 @@
 //// ported from internal/api/api.go.
 
 import ai_resume_bot/models.{type EmailPayload}
+import gleam/bit_array
 import gleam/json
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 
 pub const start_tag = "[[SEND_EMAIL]]"
@@ -64,6 +66,66 @@ pub fn extract(reply: String) -> Result(Extracted, ExtractError) {
           }
         }
       }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Streaming: the machine-readable block must never reach the visitor.
+// ---------------------------------------------------------------------------
+
+/// The part of a reply streamed so far that may be shown: everything before a
+/// `[[SEND_EMAIL]]` tag. Until the stream is `final`, a trailing `[`, `[[`,
+/// `[[S`, ... is held back too, since it may be the start of a tag split across
+/// chunks. Each call's result extends the previous one's, so the stream handler
+/// sends only what is new (`unsent`).
+pub fn streamable(reply: String, final: Bool) -> String {
+  case string.split_once(reply, start_tag), final {
+    Ok(#(before, _)), _ -> before
+    Error(_), True -> reply
+    Error(_), False -> drop_partial_tag(reply, string.length(start_tag) - 1)
+  }
+}
+
+fn drop_partial_tag(text: String, n: Int) -> String {
+  case n {
+    0 -> text
+    _ ->
+      case string.ends_with(text, string.slice(start_tag, 0, n)) {
+        True -> string.drop_end(text, n)
+        False -> drop_partial_tag(text, n - 1)
+      }
+  }
+}
+
+/// The part of `visible` after its first `sent_bytes` bytes. Cuts fall where
+/// chunks were joined or before a `[`, so they never split a character.
+pub fn unsent(visible: String, sent_bytes: Int) -> String {
+  let bits = bit_array.from_string(visible)
+  let size = bit_array.byte_size(bits)
+  case sent_bytes >= size {
+    True -> ""
+    False ->
+      bit_array.slice(bits, sent_bytes, size - sent_bytes)
+      |> result.try(bit_array.to_string)
+      |> result.unwrap("")
+  }
+}
+
+/// A reply whose block could not be parsed, without the block: from
+/// `[[SEND_EMAIL]]` to `[[/SEND_EMAIL]]` (or to the end, if unterminated),
+/// and any stray closing tag.
+pub fn strip_block(reply: String) -> String {
+  let without = case string.split_once(reply, start_tag) {
+    Error(_) -> reply
+    Ok(#(before, after_start)) ->
+      case string.split_once(after_start, end_tag) {
+        Ok(#(_, after_end)) -> before <> after_end
+        Error(_) -> before
+      }
+  }
+  case string.contains(without, start_tag) {
+    True -> strip_block(without)
+    False -> string.replace(without, end_tag, "") |> string.trim
   }
 }
 

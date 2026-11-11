@@ -207,6 +207,80 @@ pub fn extract_invalid_json_test() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Streaming must never show the raw [[SEND_EMAIL]] block, even when the tag is
+// split across chunks; on a parse failure the final text drops it too.
+// ---------------------------------------------------------------------------
+
+/// Run chunks through the stream filter the way the SSE handler does: what is
+/// sent as `chunk` events, then what is released at the end of the stream.
+fn stream_out(chunks: List(String)) -> #(String, String) {
+  let #(acc, sent, out) =
+    list.fold(chunks, #("", 0, ""), fn(st, chunk) {
+      let #(acc, sent, out) = st
+      let acc = acc <> chunk
+      let visible = email.streamable(acc, False)
+      #(acc, string.byte_size(visible), out <> email.unsent(visible, sent))
+    })
+  #(out, email.unsent(email.streamable(acc, True), sent))
+}
+
+const handoff_reply = "Great, I'll pass it on.\n[[SEND_EMAIL]]\n{\"name\":\"Taro\"}\n[[/SEND_EMAIL]]"
+
+pub fn the_email_block_is_never_streamed_test() {
+  stream_out([
+    "Great, I'll pass it on.\n",
+    "[[SEND_EMAIL]]\n{\"name\":",
+    "\"Taro\"}\n[[/SEND_EMAIL]]",
+  ])
+  |> should.equal(#("Great, I'll pass it on.\n", ""))
+}
+
+pub fn a_tag_split_across_chunks_is_caught_wherever_it_splits_test() {
+  // Split the reply in two at every byte offset inside or around the tag.
+  let #(before, _) = case string.split_once(handoff_reply, "[[SEND") {
+    Ok(parts) -> parts
+    Error(_) -> panic as "fixture"
+  }
+  let start = string.length(before) - 2
+  list.index_map(list.repeat(Nil, 18), fn(_, i) { start + i })
+  |> list.each(fn(cut) {
+    let first = string.slice(handoff_reply, 0, cut)
+    let second = string.drop_start(handoff_reply, cut)
+    let #(streamed, released) = stream_out([first, second])
+    let shown = streamed <> released
+    string.contains(shown, "[")
+    |> should.be_false
+    shown
+    |> should.equal("Great, I'll pass it on.\n")
+  })
+}
+
+pub fn ordinary_brackets_are_only_held_until_they_cannot_be_the_tag_test() {
+  let #(streamed, released) = stream_out(["see [", "my blog](https://x.y)"])
+  streamed |> should.equal("see [my blog](https://x.y)")
+  released |> should.equal("")
+  // A reply that really ends in "[[" gets it back at the end of the stream.
+  stream_out(["odd ending [["])
+  |> should.equal(#("odd ending ", "[["))
+}
+
+pub fn multibyte_text_around_the_tag_survives_test() {
+  stream_out(["はい、伝えます。", "[", "[SEND_EMAIL]]{}[[/SEND_EMAIL]]"])
+  |> should.equal(#("はい、伝えます。", ""))
+}
+
+pub fn strip_block_removes_a_broken_block_test() {
+  email.strip_block("Thanks!\n[[SEND_EMAIL]]\n{not json\n[[/SEND_EMAIL]]\nBye")
+  |> should.equal("Thanks!\n\nBye")
+  // Unterminated: everything from the tag on goes.
+  email.strip_block("Thanks!\n[[SEND_EMAIL]]\n{\"name\": ")
+  |> should.equal("Thanks!")
+  // A stray closing tag goes too.
+  email.strip_block("Thanks! [[/SEND_EMAIL]]")
+  |> should.equal("Thanks!")
+}
+
 pub fn contains_tag_test() {
   email.contains_tag("hello [[SEND_EMAIL]] world")
   |> should.be_true
