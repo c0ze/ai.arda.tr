@@ -49,18 +49,30 @@ pub fn empty_message_is_a_400_with_a_json_error_test() {
 pub fn over_long_message_is_a_400_with_a_json_error_test() {
   let body =
     json.to_string(
-      json.object([#("message", json.string(string.repeat("a", 4001)))]),
+      json.object([#("message", json.string(string.repeat("a", 20_001)))]),
     )
   let resp = server.handle(chat(body), config())
   resp.status |> should.equal(400)
   simulate.read_body(resp)
-  |> should.equal(error_body("Message is too long (at most 4000 characters)"))
+  |> should.equal(error_body("Message is too long (at most 20000 characters)"))
+}
+
+pub fn a_long_conversation_gets_past_the_body_limit_test() {
+  // ~300 KB of history: read and parsed (the empty message then stops it
+  // before Gemini), not refused with a 413.
+  let body =
+    "{\"message\":\"\",\"history\":[{\"role\":\"user\",\"content\":\""
+    <> string.repeat("語", 100_000)
+    <> "\"}]}"
+  let resp = server.handle(chat(body), config())
+  resp.status |> should.equal(400)
+  simulate.read_body(resp) |> should.equal(error_body("Message is empty"))
 }
 
 pub fn over_large_body_is_a_413_test() {
   let body =
     "{\"message\":\"hi\",\"history\":[{\"role\":\"user\",\"content\":\""
-    <> string.repeat("a", 300_000)
+    <> string.repeat("a", 1_000_001)
     <> "\"}]}"
   let resp = server.handle(chat(body), config())
   resp.status |> should.equal(413)

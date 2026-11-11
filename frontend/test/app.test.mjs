@@ -156,3 +156,9 @@ test('the scrolling transcript is focusable and labelled', () => {
   assert.equal(attr(container, 'tabindex'), '0');
   assert.equal(attr(container, 'aria-label'), 'Conversation');
 });
+
+test('the input allows as much as the server accepts', () => {
+  // maxlength counts UTF-16 units, the server counts graphemes (each at least
+  // one unit), so nothing the input allows is rejected.
+  assert.equal(attr(tagWith(to_string(view(start())), 'id="user-input"'), 'maxlength'), '20000');
+});

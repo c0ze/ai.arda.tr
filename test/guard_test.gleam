@@ -17,6 +17,12 @@ pub fn whitespace_only_message_is_rejected_test() {
   |> should.equal(Error(Rejection(400, "Message is empty")))
 }
 
+pub fn a_pasted_job_description_fits_test() {
+  // The sibling widgets have no maxlength, and a pasted job description is
+  // often longer than a few thousand characters.
+  shared.max_message_chars |> should.equal(20_000)
+}
+
 pub fn message_at_the_limit_is_accepted_test() {
   let msg = string.repeat("a", shared.max_message_chars)
   guard.check_chat_request(ChatRequest(message: msg, history: []))
@@ -27,12 +33,12 @@ pub fn message_over_the_limit_is_rejected_test() {
   let msg = string.repeat("a", shared.max_message_chars + 1)
   guard.check_chat_request(ChatRequest(message: msg, history: []))
   |> should.equal(
-    Error(Rejection(400, "Message is too long (at most 4000 characters)")),
+    Error(Rejection(400, "Message is too long (at most 20000 characters)")),
   )
 }
 
 pub fn the_message_limit_counts_characters_not_bytes_test() {
-  // 4000 Japanese characters are 12000 bytes of UTF-8 and still fine.
+  // 20000 Japanese characters are 60000 bytes of UTF-8 and still fine.
   let msg = string.repeat("語", shared.max_message_chars)
   guard.check_chat_request(ChatRequest(message: msg, history: []))
   |> should.be_ok
@@ -64,6 +70,13 @@ pub fn history_is_capped_to_the_most_recent_messages_test() {
   |> should.equal(shared.default_max_history)
   list.first(req.history)
   |> should.equal(Ok(ChatMessage("user", "6")))
+}
+
+pub fn the_body_limit_is_the_old_streaming_allowance_test() {
+  // A long conversation resends its whole history from the sibling widgets
+  // (18 turns of 2500 Japanese characters is ~271 KB); it must get as far as
+  // the history trimming instead of a 413 it could never recover from.
+  guard.max_body_bytes |> should.equal(1_000_000)
 }
 
 pub fn invalid_json_is_rejected_test() {

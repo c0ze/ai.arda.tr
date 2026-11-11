@@ -12,12 +12,15 @@ import gleam/result
 import gleam/string
 import shared.{type ChatRequest, ChatMessage, ChatRequest}
 
-/// Largest request body either endpoint reads, in bytes. The siblings'
-/// widgets (arda.tr, resume.arda.tr) send their whole conversation, uncapped,
-/// and the server only trims it to the last `default_max_history` messages
-/// after parsing, so this is sized for a long Japanese conversation (UTF-8,
-/// three bytes a character), not for a single 20-message request.
-pub const max_body_bytes = 262_144
+/// Largest request body either endpoint reads, in bytes: the stream path's
+/// long-standing allowance. The sibling widgets (arda.tr, resume.arda.tr)
+/// send their whole conversation, uncapped, and resend it with every
+/// question; the server trims it to the last `default_max_history` messages
+/// (each cut to `shared.max_history_item_chars`) only after parsing. A tighter
+/// limit would turn a long conversation (18 turns of 2500 Japanese characters
+/// is ~271 KB) into a 413 it could never recover from. What reaches the model
+/// is bounded by the trimming, not by this.
+pub const max_body_bytes = 1_000_000
 
 pub type Rejection {
   Rejection(status: Int, message: String)

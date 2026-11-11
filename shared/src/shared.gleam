@@ -35,8 +35,9 @@ pub type ChatResponse {
 pub const default_max_history = 20
 
 /// Longest message the server accepts, in characters (the frontend's input
-/// has the same `maxlength`). Longer messages are rejected with a 400.
-pub const max_message_chars = 4000
+/// has the same `maxlength`). Longer messages are rejected with a 400. Sized
+/// for a pasted job description: the sibling widgets have no maxlength.
+pub const max_message_chars = 20_000
 
 /// Longest history item the server passes on to the model, in characters;
 /// longer items are cut to this length.
