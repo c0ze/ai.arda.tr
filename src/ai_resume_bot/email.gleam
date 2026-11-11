@@ -57,9 +57,11 @@ pub fn extract(reply: String) -> Result(Extracted, ExtractError) {
             _ ->
               case json.parse(json_str, models.email_payload_decoder()) {
                 Error(e) -> Error(InvalidJson(string.inspect(e)))
+                // Only this first block is sent; any further block or stray
+                // tag is stripped from what the visitor sees, too.
                 Ok(payload) ->
                   Ok(Extracted(
-                    clean_reply: string.trim(before <> after_end),
+                    clean_reply: strip_block(before <> after_end),
                     payload: payload,
                   ))
               }
@@ -115,6 +117,7 @@ pub fn unsent(visible: String, sent_bytes: Int) -> String {
 /// `[[SEND_EMAIL]]` to `[[/SEND_EMAIL]]` (or to the end, if unterminated),
 /// and any stray closing tag.
 pub fn strip_block(reply: String) -> String {
+  // (Also used on the text around a block that *was* parsed.)
   let without = case string.split_once(reply, start_tag) {
     Error(_) -> reply
     Ok(#(before, after_start)) ->

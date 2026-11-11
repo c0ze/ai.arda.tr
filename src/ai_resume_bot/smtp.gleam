@@ -8,10 +8,21 @@
 
 import ai_resume_bot/email.{type SmtpConfig}
 import ai_resume_bot/models.{type EmailPayload}
+import gleam/option.{type Option}
 
 pub type SmtpError {
   NotConfigured
   SendFailed(reason: String)
+}
+
+/// Sends a contact email; `sender` binds `send` to the SMTP config. The chat
+/// handlers take one so their user-facing text can be tested without mail.
+pub type Sender =
+  fn(EmailPayload) -> Result(Nil, SmtpError)
+
+/// `send` bound to the SMTP config, if there is one.
+pub fn sender(config: Option(SmtpConfig)) -> Option(Sender) {
+  option.map(config, fn(cfg) { fn(payload) { send(cfg, payload) } })
 }
 
 /// Send the contact email. The message body is formatted by `email.format_message`.

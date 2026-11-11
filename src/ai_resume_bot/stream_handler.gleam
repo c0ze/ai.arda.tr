@@ -383,7 +383,7 @@ fn on_gemini(
       // voice still gets it; the client gets it with `done`.
       let rest =
         email.unsent(email.streamable(full_reply, True), state.sent_bytes)
-      let final_reply = handle_email_if_needed(full_reply, state.config)
+      let final_reply = final_reply(full_reply, smtp.sender(state.config.smtp))
       case state.voice {
         None -> {
           let _ = send_sse_event(conn, shared.StreamDone(text: final_reply))
@@ -497,7 +497,10 @@ fn send_sse_event(
   |> mist.send_event(conn, _)
 }
 
-fn handle_email_if_needed(reply: String, config: StreamConfig) -> String {
+/// The `done` text for a finished reply: as is, or, if it carries a
+/// `[[SEND_EMAIL]]` block, the reply without any block plus the outcome of
+/// sending the first block with `send`.
+pub fn final_reply(reply: String, send: Option(smtp.Sender)) -> String {
   case email.contains_tag(reply) {
     False -> reply
     True ->
@@ -511,7 +514,7 @@ fn handle_email_if_needed(reply: String, config: StreamConfig) -> String {
           email.reply_with_outcome(email.strip_block(reply), False)
         }
         Ok(extracted) ->
-          case config.smtp {
+          case send {
             None -> {
               logging.log(
                 logging.Warning,
@@ -519,8 +522,8 @@ fn handle_email_if_needed(reply: String, config: StreamConfig) -> String {
               )
               email.reply_with_outcome(extracted.clean_reply, False)
             }
-            Some(cfg) ->
-              case smtp.send(cfg, extracted.payload) {
+            Some(send) ->
+              case send(extracted.payload) {
                 Error(e) -> {
                   logging.log(
                     logging.Error,

@@ -227,11 +227,16 @@ fn dispatch(req: ChatRequest, config: Config) -> Response {
       logging.log(logging.Error, "Gemini error: " <> string.inspect(err))
       json_response(500, models.error_response("Internal AI Error"))
     }
-    Ok(reply) -> maybe_handle_email(reply, config)
+    Ok(reply) -> email_reply_response(reply, smtp.sender(config.smtp))
   }
 }
 
-fn maybe_handle_email(reply: String, config: Config) -> Response {
+/// The `/api/chat` response for a model reply: as is, or, if it carries a
+/// `[[SEND_EMAIL]]` block, after sending the first block with `send`.
+pub fn email_reply_response(
+  reply: String,
+  send: Option(smtp.Sender),
+) -> Response {
   case email.contains_tag(reply) {
     False ->
       json_response(
@@ -250,14 +255,17 @@ fn maybe_handle_email(reply: String, config: Config) -> Response {
             models.error_response(email.contact_failure_message),
           )
         }
-        Ok(extracted) -> send_and_respond(extracted, config)
+        Ok(extracted) -> send_and_respond(extracted, send)
       }
     }
   }
 }
 
-fn send_and_respond(extracted: email.Extracted, config: Config) -> Response {
-  case config.smtp {
+fn send_and_respond(
+  extracted: email.Extracted,
+  send: Option(smtp.Sender),
+) -> Response {
+  case send {
     None -> {
       logging.log(
         logging.Warning,
@@ -265,8 +273,8 @@ fn send_and_respond(extracted: email.Extracted, config: Config) -> Response {
       )
       json_response(502, models.error_response(email.contact_failure_message))
     }
-    Some(cfg) ->
-      case smtp.send(cfg, extracted.payload) {
+    Some(send) ->
+      case send(extracted.payload) {
         Error(e) -> {
           logging.log(
             logging.Error,

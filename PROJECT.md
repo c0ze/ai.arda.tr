@@ -164,7 +164,7 @@ docker run -p 8080:8080 \
 ### Contact Email Handoff
 - Gemini emits a `[[SEND_EMAIL]]{...JSON...}[[/SEND_EMAIL]]` block in its reply.
 - `email.extract` parses the payload, strips the tags, sanitizes header-injection vectors.
-- While streaming, nothing from `[[SEND_EMAIL]]` on is sent as a `chunk` (or voiced): `email.streamable` holds back a trailing `[`, `[[`, `[[S`… in case a tag is split across chunks, and releases it once it cannot be one. The client gets the cleaned reply in `done`. If the block cannot be parsed, `email.strip_block` removes it and the failure message is appended.
+- While streaming, nothing from `[[SEND_EMAIL]]` on is sent as a `chunk` (or voiced): `email.streamable` holds back a trailing `[`, `[[`, `[[S`… in case a tag is split across chunks, and releases it once it cannot be one. The client gets the cleaned reply in `done`. If the block cannot be parsed, `email.strip_block` removes it and the failure message is appended. Only the first block is ever sent; on a successful extraction every further block and stray tag is stripped from the user-facing text too (`email.extract`), on both endpoints.
 - `smtp.send` dispatches via the `gen_smtp_client` Erlang shim.
 - Without SMTP configuration (`GMAIL_*`), the `[[SEND_EMAIL]]` instructions are not put in the prompt at all (`prompt.job_requirements_rider`): the bot says it cannot pass messages on and points people to the contact details on the résumé (https://resume.arda.tr) or LinkedIn. If a block still arrives, the user gets `contact_failure_message` and an error log.
 
