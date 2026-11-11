@@ -1,8 +1,10 @@
 //// Request checks shared by `POST /api/chat` and `POST /api/chat/stream`.
 ////
 //// Both endpoints are public and every accepted request is a paid Gemini
-//// call, so the body is bounded before it is parsed, and the parsed request is
-//// bounded before it reaches the model. The handlers turn a `Rejection` into a
+//// call, so the parsed request is bounded before it reaches the model. The
+//// body sizes they read are the ones they always had (see
+//// `max_stream_body_bytes`); what reaches the model is bounded by
+//// `check_chat_request`, not by those. The handlers turn a `Rejection` into a
 //// JSON `{"error": message}` response with its status.
 
 import gleam/int
@@ -12,15 +14,16 @@ import gleam/result
 import gleam/string
 import shared.{type ChatRequest, ChatMessage, ChatRequest}
 
-/// Largest request body either endpoint reads, in bytes: the stream path's
-/// long-standing allowance. The sibling widgets (arda.tr, resume.arda.tr)
-/// send their whole conversation, uncapped, and resend it with every
-/// question; the server trims it to the last `default_max_history` messages
-/// (each cut to `shared.max_history_item_chars`) only after parsing. A tighter
-/// limit would turn a long conversation (18 turns of 2500 Japanese characters
-/// is ~271 KB) into a 413 it could never recover from. What reaches the model
-/// is bounded by the trimming, not by this.
-pub const max_body_bytes = 1_000_000
+/// Largest body `/api/chat/stream` reads, in bytes: its long-standing
+/// allowance. `/api/chat` keeps Wisp's default limit (8,000,000 bytes), as it
+/// always had: the sibling widgets (arda.tr, resume.arda.tr) send their whole
+/// conversation, uncapped, with every question, and fall back to `/api/chat`
+/// when the stream fails, so a conversation too long for the stream is still
+/// answered there instead of being refused for good. The server trims the
+/// history to the last `default_max_history` messages (each cut to
+/// `shared.max_history_item_chars`) after parsing; that, not the body limit,
+/// bounds what reaches the model.
+pub const max_stream_body_bytes = 1_000_000
 
 pub type Rejection {
   Rejection(status: Int, message: String)

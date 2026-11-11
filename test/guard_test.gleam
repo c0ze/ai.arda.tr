@@ -72,11 +72,11 @@ pub fn history_is_capped_to_the_most_recent_messages_test() {
   |> should.equal(Ok(ChatMessage("user", "6")))
 }
 
-pub fn the_body_limit_is_the_old_streaming_allowance_test() {
+pub fn the_stream_body_limit_is_its_old_allowance_test() {
   // A long conversation resends its whole history from the sibling widgets
   // (18 turns of 2500 Japanese characters is ~271 KB); it must get as far as
   // the history trimming instead of a 413 it could never recover from.
-  guard.max_body_bytes |> should.equal(1_000_000)
+  guard.max_stream_body_bytes |> should.equal(1_000_000)
 }
 
 pub fn invalid_json_is_rejected_test() {

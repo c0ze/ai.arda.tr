@@ -110,7 +110,7 @@ pub fn handle_stream(
       )
     True ->
       // Read the request body
-      case read_body(req, guard.max_body_bytes) {
+      case read_body(req, guard.max_stream_body_bytes) {
         Error(mist.ExcessBody) ->
           with_cors(error_response(413, "Request body too large"))
           // The rest of the body is still on the socket: don't reuse it.
@@ -158,6 +158,11 @@ fn reject_headers(
 /// checks Content-Length and accumulates a chunked body without a limit, so
 /// the body is streamed and counted instead; a declared length over the limit
 /// is refused before anything is read.
+///
+/// Known limitation of the pinned Mist (6.0.2): it assembles each HTTP chunk
+/// of a chunked body whole before handing it over, so one chunk far larger
+/// than `limit` is buffered in memory once before this count rejects it. The
+/// limit is enforced between chunks, not inside one.
 fn read_body(
   req: request.Request(mist.Connection),
   limit: Int,

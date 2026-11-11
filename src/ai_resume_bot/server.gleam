@@ -195,7 +195,9 @@ fn require_post(req: Request, next: fn() -> Response) -> Response {
 }
 
 fn do_chat(req: Request, config: Config) -> Response {
-  let req = wisp.set_max_body_size(req, guard.max_body_bytes)
+  // Wisp's default body limit, as this endpoint always had: it is the
+  // fallback for conversations too long for the stream path (see
+  // `guard.max_stream_body_bytes`).
   case wisp.read_body_bits(req) {
     Error(_) ->
       json_response(413, models.error_response("Request body too large"))
