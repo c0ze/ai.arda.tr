@@ -191,7 +191,7 @@ Local end-to-end: `TTS_BACKEND=mock gleam run` (real Gemini, fake audio), or aga
 
 ### CORS
 - Origins validated against `ALLOWED_ORIGINS`, delimited by `;`.
-- Only the echoed `Access-Control-Allow-Origin` is set; preflight `OPTIONS` returns 200 with full CORS headers.
+- Only the echoed `Access-Control-Allow-Origin` is set; preflight `OPTIONS` returns 200 with full CORS headers. The only allowed request header is `Content-Type`, and every CORS response carries `Vary: Origin`.
 - [cloud_deploy.sh](cloud_deploy.sh) refuses to deploy if `ALLOWED_ORIGINS` is missing.
 
 ## Deployment

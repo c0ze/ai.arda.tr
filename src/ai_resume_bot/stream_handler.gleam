@@ -76,6 +76,7 @@ pub fn handle_stream(
         "POST, GET, OPTIONS",
       )
       |> response.set_header("access-control-allow-headers", "Content-Type")
+      |> response.set_header("vary", "origin")
     case list.contains(config.allowed_origins, origin) {
       True -> response.set_header(resp, "access-control-allow-origin", origin)
       False -> resp
@@ -201,6 +202,7 @@ fn start_sse(
     response.new(200)
     |> response.set_header("access-control-allow-methods", "POST, GET, OPTIONS")
     |> response.set_header("access-control-allow-headers", "Content-Type")
+    |> response.set_header("vary", "origin")
   let resp = case list.contains(config.allowed_origins, origin) {
     True -> response.set_header(resp, "access-control-allow-origin", origin)
     False -> resp

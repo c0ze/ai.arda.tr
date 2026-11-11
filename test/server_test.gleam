@@ -7,6 +7,7 @@ import ai_resume_bot/rate_limit
 import ai_resume_bot/server.{Config}
 import gleam/http
 import gleam/json
+import gleam/list
 import gleam/option.{None}
 import gleam/string
 import gleeunit/should
@@ -93,4 +94,26 @@ pub fn no_origin_json_post_gets_past_the_header_checks_test() {
     |> simulate.header("content-type", "application/json; charset=utf-8")
   let resp = server.handle(req, config())
   resp.status |> should.equal(400)
+}
+
+// CORS responses depend on the Origin, so caches must key on it; and nothing
+// sends Authorization, so it is not advertised.
+pub fn cors_responses_vary_on_origin_test() {
+  let resp = server.handle(chat("{\"message\":\"\"}"), config())
+  list.key_find(resp.headers, "vary") |> should.equal(Ok("origin"))
+  list.key_find(resp.headers, "access-control-allow-origin")
+  |> should.equal(Ok(allowed_origin))
+  list.key_find(resp.headers, "access-control-allow-headers")
+  |> should.equal(Ok("Content-Type"))
+}
+
+pub fn preflight_varies_on_origin_and_allows_only_content_type_test() {
+  let req =
+    simulate.request(http.Options, "/api/chat")
+    |> simulate.header("origin", allowed_origin)
+  let resp = server.handle(req, config())
+  resp.status |> should.equal(200)
+  list.key_find(resp.headers, "vary") |> should.equal(Ok("origin"))
+  list.key_find(resp.headers, "access-control-allow-headers")
+  |> should.equal(Ok("Content-Type"))
 }

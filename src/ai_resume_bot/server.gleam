@@ -101,7 +101,9 @@ fn cors_middleware(
   base
   |> maybe_set_header("access-control-allow-origin", allow_origin)
   |> set_header("access-control-allow-methods", "POST, GET, OPTIONS")
-  |> set_header("access-control-allow-headers", "Content-Type, Authorization")
+  |> set_header("access-control-allow-headers", "Content-Type")
+  // The allow-origin header depends on the request's Origin.
+  |> set_header("vary", "origin")
 }
 
 fn set_header(resp: Response, key: String, value: String) -> Response {
@@ -282,10 +284,8 @@ pub fn cors_preflight(
     response.new(200)
     |> response.set_body(mist.Bytes(bytes_tree.new()))
     |> response.set_header("access-control-allow-methods", "POST, GET, OPTIONS")
-    |> response.set_header(
-      "access-control-allow-headers",
-      "Content-Type, Authorization",
-    )
+    |> response.set_header("access-control-allow-headers", "Content-Type")
+    |> response.set_header("vary", "origin")
   case list.contains(allowed_origins, origin) {
     True -> response.set_header(base, "access-control-allow-origin", origin)
     False -> base
