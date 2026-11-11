@@ -70,7 +70,40 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/deploy-backend.yml/enable"
 
+  # Same checks as ci.yml's backend job: a commit that fails them never
+  # reaches Cloud Run (ci.yml runs in parallel and cannot gate this).
+  test:
+    name: Backend (format, build, test)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Erlang/OTP + Gleam
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1
+        with:
+          otp-version: "28.0"
+          gleam-version: "1.15.2"
+          rebar3-version: "3"
+
+      - name: Check formatting
+        run: gleam format --check src test shared/src
+
+      - name: Download dependencies
+        run: gleam deps download
+
+      - name: Build
+        run: gleam build
+
+      - name: Test
+        run: gleam test
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read

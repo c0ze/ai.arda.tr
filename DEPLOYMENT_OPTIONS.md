@@ -42,7 +42,7 @@ It forwards optional `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `CONTACT_ADDRESS`. 
 
 ## Option 2: GitHub Actions (Workload Identity Federation)
 
-[.github/workflows/deploy-backend.yml](.github/workflows/deploy-backend.yml) **auto-deploys on push to `main`** (backend paths only) and authenticates with **Workload Identity Federation**, so no long-lived service-account JSON keys are ever stored in GitHub.
+[.github/workflows/deploy-backend.yml](.github/workflows/deploy-backend.yml) **auto-deploys on push to `main`** (backend paths only), deploys only after its `test` job (the same format/build/test checks as `ci.yml`) passes, and authenticates with **Workload Identity Federation**, so no long-lived service-account JSON keys are ever stored in GitHub.
 
 ### One-time Google Cloud setup
 
