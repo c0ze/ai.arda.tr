@@ -241,3 +241,11 @@ test('abort_stream stops the request in flight without reporting an error', asyn
   assert.equal(calls[0].signal.aborted, true);
   assert.deepEqual(events, []);
 });
+
+test('a network failure is reported as "Network error", which the app localises', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new TypeError('Failed to fetch'); });
+  const event = await new Promise((resolve) => {
+    stream_chat('https://example.test/chat', '{}', (raw) => resolve(JSON.parse(raw)));
+  });
+  assert.deepEqual(event, { type: 'error', message: 'Network error' });
+});

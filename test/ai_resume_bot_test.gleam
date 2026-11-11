@@ -8,6 +8,7 @@ import ai_resume_bot/models.{
 }
 import ai_resume_bot/prompt
 import ai_resume_bot/rate_limit
+import ai_resume_bot/stream_handler
 import gleam/bit_array
 import gleam/http/request
 import gleam/list
@@ -269,6 +270,22 @@ pub fn gemini_stream_url_omits_key_test() {
 pub fn reply_from_parts_concatenates_test() {
   gemini.reply_from_parts(["Hello, ", "world", "!"])
   |> should.equal(Ok("Hello, world!"))
+}
+
+pub fn reply_from_parts_with_no_text_is_error_test() {
+  // An empty reply would otherwise reach the client as a blank answer (and be
+  // sent back to the model as an empty turn).
+  gemini.reply_from_parts(["", " \n"])
+  |> should.equal(Error(gemini.EmptyResponse))
+}
+
+pub fn an_empty_streamed_reply_ends_in_an_error_event_test() {
+  stream_handler.reply_or_error("")
+  |> should.equal(Error(shared.StreamError(message: "Empty reply")))
+  stream_handler.reply_or_error("  \n ")
+  |> should.equal(Error(shared.StreamError(message: "Empty reply")))
+  stream_handler.reply_or_error("Hi.")
+  |> should.equal(Ok("Hi."))
 }
 
 pub fn reply_from_parts_empty_is_error_test() {

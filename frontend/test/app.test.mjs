@@ -79,3 +79,46 @@ test('the transcript is a log that does not announce itself; a polite region car
   assert.match(announcer[0], /aria-live="polite"/);
   assert.equal(announcer[1], 'Hello there.');
 });
+
+// ---------------------------------------------------------------------------
+// Errors and empty replies are not the model's words: they stay out of the
+// history sent with the next question, and errors read in the UI language.
+// ---------------------------------------------------------------------------
+
+import { wire_history } from '../build/dev/javascript/frontend/frontend.mjs';
+
+const wire = (model) => wire_history(model.history).toArray().map((m) => [m.role, m.content]);
+
+function ask(model, text) {
+  model = step(model, new UserTypedInput(text));
+  return step(model, new UserClickedSend());
+}
+
+test('an error is flagged, localised, and not sent back to the model as its own turn', () => {
+  let model = ask(start(), 'Hi');
+  model = step(model, new StreamEventReceived(model.generation, '{"type":"error","message":"HTTP 429"}'));
+  const last = model.history.toArray().at(-1);
+  assert.equal(last.is_error, true);
+  assert.match(last.text, /minute/);
+  assert.deepEqual(wire(model), [['user', 'Hi']]);
+});
+
+test('an empty reply is not sent back to the model as an empty turn', () => {
+  let model = ask(start(), 'Hi');
+  model = step(model, new StreamEventReceived(model.generation, '{"type":"thinking"}'));
+  model = step(model, new StreamEventReceived(model.generation, '{"type":"done","text":""}'));
+  model = ask(model, 'Again');
+  model = step(model, new StreamEventReceived(model.generation, '{"type":"thinking"}'));
+  model = step(model, new StreamEventReceived(model.generation, '{"type":"done","text":"Sure."}'));
+  assert.deepEqual(wire(model), [['user', 'Hi'], ['user', 'Again'], ['model', 'Sure.']]);
+});
+
+test('offline and timeout errors read in the UI language', () => {
+  let model = step(start(), new UserPickedLanguage(new Jp()));
+  model = ask(model, 'こんにちは');
+  model = step(model, new StreamEventReceived(model.generation, '{"type":"error","message":"Network error"}'));
+  assert.match(model.history.toArray().at(-1).text, /ネットワーク/);
+  model = ask(model, 'もう一度');
+  model = step(model, new StreamEventReceived(model.generation, '{"type":"error","message":"Response timed out. Please try again."}'));
+  assert.match(model.history.toArray().at(-1).text, /時間内/);
+});

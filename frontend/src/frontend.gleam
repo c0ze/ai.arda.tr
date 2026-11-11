@@ -73,8 +73,10 @@ pub type Sender {
   Bot
 }
 
+/// `is_error`: a client-side error line, not the model's words; it is never
+/// sent back to the model as history.
 pub type ChatMessage {
-  ChatMessage(id: Int, sender: Sender, text: String)
+  ChatMessage(id: Int, sender: Sender, text: String, is_error: Bool)
 }
 
 /// How much of a reply the voice lets us show.
@@ -293,7 +295,7 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
         | shared.StreamSpeechEnd(_) -> #(model, effect.none())
 
         shared.StreamError(message) -> {
-          let error_text = "System Malfunction: " <> message
+          let error_text = error_text(i18n.strings(model.language), message)
           let model = Model(..model, speech: Silent, announcement: error_text)
           case model.stream_state {
             Streaming(bot_msg_id) -> {
@@ -302,18 +304,15 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
                   msg.id == bot_msg_id && msg.text != ""
                 })
               let model = case has_partial_text {
-                True -> {
-                  let #(model, _) = push(model, Bot, error_text)
-                  model
-                }
-                False -> replace_message_text(model, bot_msg_id, error_text)
+                True -> push_error(model, error_text)
+                False -> replace_with_error(model, bot_msg_id, error_text)
               }
               #(Model(..model, stream_state: Idle), settle())
             }
-            _ -> {
-              let #(model, _) = push(model, Bot, error_text)
-              #(Model(..model, stream_state: Idle), settle())
-            }
+            _ -> #(
+              Model(..push_error(model, error_text), stream_state: Idle),
+              settle(),
+            )
           }
         }
       }
@@ -376,11 +375,41 @@ fn send_current(model: Model) -> #(Model, Effect(Msg)) {
 
 fn push(model: Model, sender: Sender, text: String) -> #(Model, Int) {
   let id = model.next_id
-  let msg = ChatMessage(id: id, sender: sender, text: text)
+  let msg = ChatMessage(id: id, sender: sender, text: text, is_error: False)
   #(
     Model(..model, history: list.append(model.history, [msg]), next_id: id + 1),
     id,
   )
+}
+
+fn push_error(model: Model, text: String) -> Model {
+  let id = model.next_id
+  let msg = ChatMessage(id: id, sender: Bot, text: text, is_error: True)
+  Model(..model, history: list.append(model.history, [msg]), next_id: id + 1)
+}
+
+fn replace_with_error(model: Model, msg_id: Int, text: String) -> Model {
+  let history =
+    list.map(model.history, fn(m) {
+      case m.id == msg_id {
+        True -> ChatMessage(..m, text: text, is_error: True)
+        False -> m
+      }
+    })
+  Model(..model, history: history)
+}
+
+/// What an error says in the UI language. The transport reports `HTTP 429`
+/// (rate limited), `Network error` (offline, or the server unreachable) and
+/// `Response timed out. Please try again.` (see ffi.mjs); anything else is
+/// shown after a localised prefix.
+fn error_text(s: Strings, message: String) -> String {
+  case message {
+    "HTTP 429" -> s.error_rate_limited
+    "Network error" -> s.error_offline
+    "Response timed out. Please try again." -> s.error_timeout
+    _ -> s.error_prefix <> message
+  }
 }
 
 fn append_to_message(model: Model, msg_id: Int, text: String) -> Model {
@@ -434,16 +463,7 @@ fn call_api_stream(
   lang: String,
   generation: Int,
 ) -> Effect(Msg) {
-  let wire_history =
-    history
-    // Drop the leading assistant welcome message: it is UI-only chrome, and
-    // Gemini's `contents` should begin with a user turn rather than a model
-    // turn (and we needn't spend tokens echoing our own canned greeting).
-    |> list.drop_while(fn(m) { m.sender == Bot })
-    |> list.map(fn(m) {
-      shared.ChatMessage(role: role_of(m.sender), content: m.text)
-    })
-    |> shared.cap_history(max_history_messages)
+  let wire_history = wire_history(history)
   // Muted: no voice fields at all, exactly the text-only request.
   let body =
     shared.stream_request_to_json(
@@ -471,6 +491,22 @@ fn call_api_stream(
       dispatch(StreamEventReceived(generation, json_str))
     })
   })
+}
+
+/// The history sent with a question: the model's and the user's words only.
+pub fn wire_history(history: List(ChatMessage)) -> List(shared.ChatMessage) {
+  history
+  // Drop the leading assistant welcome message: it is UI-only chrome, and
+  // Gemini's `contents` should begin with a user turn rather than a model
+  // turn (and we needn't spend tokens echoing our own canned greeting).
+  |> list.drop_while(fn(m) { m.sender == Bot })
+  // Error lines and empty replies are not the model's words; sent back, they
+  // would read as its own turns ("System Malfunction: HTTP 429").
+  |> list.filter(fn(m) { !m.is_error && string.trim(m.text) != "" })
+  |> list.map(fn(m) {
+    shared.ChatMessage(role: role_of(m.sender), content: m.text)
+  })
+  |> shared.cap_history(max_history_messages)
 }
 
 fn role_of(sender: Sender) -> String {
@@ -737,7 +773,7 @@ fn view_message(
     _, Speaking(msg_id: id, ..) if id == msg.id -> True
     _, _ -> False
   }
-  let is_error = string.starts_with(msg.text, "System Malfunction: ")
+  let is_error = msg.is_error
   let text = case shown {
     // Waiting for the first chunk: an empty column for the crackle cursor.
     "" -> html.div([attribute.class("txt")], [])

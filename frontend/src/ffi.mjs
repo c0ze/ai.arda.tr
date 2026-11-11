@@ -218,7 +218,9 @@ export function stream_chat(url, body_json, on_event) {
         }
       }
     })
-    .catch((err) => { fail(String(err)); });
+    // fetch rejects with a TypeError when the network or the server is
+    // unreachable; the app shows that as its localised "offline" line.
+    .catch((err) => { fail(err instanceof TypeError ? "Network error" : String(err)); });
 }
 
 // ---------------------------------------------------------------------------

@@ -132,7 +132,7 @@ docker run -p 8080:8080 \
 ### API
 - `POST /api/chat` → `{"message": "...", "history": [...]}` → `{"reply": "..."}` (non-streaming).
 - `POST /api/chat/stream` → same request body (+ optional `"voice": true, "lang": "en"|"ja"|"tr"`) → SSE stream of `{type, ...}` events (streaming).
-  - SSE events: `thinking` → `chunk` (text delta) → `done` (full reply) or `error`.
+  - SSE events: `thinking` → `chunk` (text delta) → `done` (full reply) or `error`. A reply with no text ends in `error` (`Empty reply`), never a blank `done`; on `/api/chat` it is a 500.
   - With `voice: true`, `voice` / `speech` / `speech_end` events interleave, all before `done` (see [Voice replies](#voice-replies)). Without it the stream is byte-for-byte the text-only one.
   - The frontend accepts LF/CRLF framing, settles once on a valid terminal event,
     and reports truncated or stalled responses as errors (45s idle deadline), releasing
@@ -164,6 +164,7 @@ docker run -p 8080:8080 \
 - Follows the family design system (`../DESIGN-SYSTEM.md`, section ai.arda.tr). Styles are hand-written in `public/style.css`; bump `style.css?v=` in `frontend/gleam.toml` when it changes.
 - Renditions: `night` (default), `night-hc`, `xerox`, `xerox-hc`, stored in localStorage `theme` and applied as `body[data-theme]`. Legacy ids migrate on read (`light`→xerox, `paper`→xerox-hc, `dark`→night, `carbon`→night-hc) in both the pre-hydration script (`frontend/gleam.toml`) and `theme_from_string` (`frontend.gleam`); keep the two in sync.
 - The construct orb and the crackle cursor are canvases created by `ffi.mjs`, outside Lustre's vdom: the orb mounts into `#construct-orb` (a vnode with no children, so re-renders never touch it); the cursor is re-appended to the end of `.msg.is-streaming .txt` in a `before_paint` effect after each chunk. The orb sizzles on every chunk, simmers between `thinking` and the first chunk, and does neither under `prefers-reduced-motion`.
+- Error lines are `ChatMessage(is_error: True)` and, like empty replies, never go back to the model (`wire_history`). The transport's `HTTP 429`, `Network error` and timeout map to localised lines in `i18n.gleam`; other errors show after a localised `System Malfunction:` prefix.
 - One request at a time: `stream_chat` aborts the request in flight before starting another, and a reset (language switch) calls `abort_stream`. Each send/reset bumps `Model.generation`; stream events carry the generation they were started with and older ones are dropped, so a reply can never land in a newer conversation. `test/app.test.mjs` drives `init`/`update` in Node to check this.
 - `onebit.mjs` must stay byte-identical to `design-previews/onebit/onebit.js`, and `voice.mjs` to `design-previews/onebit/voice.js`; change the shared copy first.
 - Voice: while a reply is spoken, the model's `speech` is `Speaking(msg_id, shown)` and the message renders `reveal_prefix(text, shown)` (UTF-16 prefix, with a half-typed link or `**` tidied). The cursor trails the revealed text, and the status reads `speaking…`. `done` no longer ends the cursor while the voice runs; `SpeechEnded` does. The `♪` toggle (`.voice-toggle`, next to the language switch) shows `♪ on/off` (localised). On phones it shows only `♪`, struck through when muted.

@@ -310,6 +310,7 @@ fn on_gemini(
       let tail = gemini_stream.flush_sse_buffer(state.pending)
       let tail_text = list.fold(tail, "", fn(acc, d) { acc <> d })
       let full_reply = state.accumulated <> tail_text
+      use full_reply <- end_if_empty(full_reply, conn)
       let final_reply = handle_email_if_needed(full_reply, state.config)
       case state.voice {
         None -> {
@@ -329,6 +330,31 @@ fn on_gemini(
       logging.log(logging.Error, "Gemini stream error: " <> reason)
       let _ =
         send_sse_event(conn, shared.StreamError(message: "Internal AI Error"))
+      actor.stop()
+    }
+  }
+}
+
+/// A reply with no text (Gemini finished without any, e.g. blocked or cut
+/// off) is an error, not a blank `done` the client would show and send back
+/// to the model as an empty turn.
+pub fn reply_or_error(full_reply: String) -> Result(String, shared.StreamEvent) {
+  case string.trim(full_reply) {
+    "" -> Error(shared.StreamError(message: "Empty reply"))
+    _ -> Ok(full_reply)
+  }
+}
+
+fn end_if_empty(
+  full_reply: String,
+  conn: SSEConnection,
+  next: fn(String) -> actor.Next(SseState, SseMsg),
+) -> actor.Next(SseState, SseMsg) {
+  case reply_or_error(full_reply) {
+    Ok(reply) -> next(reply)
+    Error(event) -> {
+      logging.log(logging.Warning, "Gemini returned an empty reply")
+      let _ = send_sse_event(conn, event)
       actor.stop()
     }
   }

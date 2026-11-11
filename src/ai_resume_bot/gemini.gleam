@@ -151,11 +151,13 @@ fn decode_reply(body: String) -> Result(String, GeminiError) {
 
 /// Join a candidate's text parts into a single reply. Gemini can split one
 /// candidate's text across several parts; taking only the first would truncate
-/// the reply, so concatenate them all. An empty part list means no content.
+/// the reply, so concatenate them all. No parts, or parts with no text, mean
+/// no content.
 pub fn reply_from_parts(parts: List(String)) -> Result(String, GeminiError) {
-  case parts {
-    [] -> Error(EmptyResponse)
-    _ -> Ok(string.concat(parts))
+  let reply = string.concat(parts)
+  case string.trim(reply) {
+    "" -> Error(EmptyResponse)
+    _ -> Ok(reply)
   }
 }
 
