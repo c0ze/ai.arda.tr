@@ -127,7 +127,7 @@ docker run -p 8080:8080 \
 1. At build time (Docker) or on first startup, resume JSON is fetched from GitHub (`c0ze/resume`).
 2. Data is cached to `./data/`.
 3. On boot, `resume.load_from_disk` reads and decodes all five files.
-4. `prompt.build` compiles the system prompt. It opens with a scope guardrail (`scope_guardrail` in [prompt.gleam](src/ai_resume_bot/prompt.gleam)) that confines the bot to Arda-related topics, then the résumé sections. A curated [personal.md](personal.md) (interests, music, hobbies — beyond the résumé) is appended if present, then `job_requirements.md` if present, along with the `[[SEND_EMAIL]]` instructions. Both files are baked into the Docker image and read at startup (see `maybe_append_personal` / `maybe_append_job_requirements` in [ai_resume_bot.gleam](src/ai_resume_bot.gleam)).
+4. `prompt.build` compiles the system prompt. It opens with a scope guardrail (`scope_guardrail` in [prompt.gleam](src/ai_resume_bot/prompt.gleam)) that confines the bot to Arda-related topics, then the résumé sections. A curated [personal.md](personal.md) (interests, music, hobbies — beyond the résumé) is appended if present, then `job_requirements.md` if present, along with the `[[SEND_EMAIL]]` instructions (only when SMTP is configured; see [Contact Email Handoff](#contact-email-handoff)). Both files are baked into the Docker image and read at startup (see `maybe_append_personal` / `maybe_append_job_requirements` in [ai_resume_bot.gleam](src/ai_resume_bot.gleam)).
 
 ### API
 - `POST /api/chat` → `{"message": "...", "history": [...]}` → `{"reply": "..."}` (non-streaming).
@@ -155,7 +155,7 @@ docker run -p 8080:8080 \
 - Gemini emits a `[[SEND_EMAIL]]{...JSON...}[[/SEND_EMAIL]]` block in its reply.
 - `email.extract` parses the payload, strips the tags, sanitizes header-injection vectors.
 - `smtp.send` dispatches via the `gen_smtp_client` Erlang shim.
-- Without SMTP configuration (`GMAIL_*`), the user gets `contact_failure_message` and an error log.
+- Without SMTP configuration (`GMAIL_*`), the `[[SEND_EMAIL]]` instructions are not put in the prompt at all (`prompt.job_requirements_rider`): the bot says it cannot pass messages on and points people to the contact details on the résumé (https://resume.arda.tr) or LinkedIn. If a block still arrives, the user gets `contact_failure_message` and an error log.
 
 ### Frontend design (One Bit Forest)
 - Follows the family design system (`../DESIGN-SYSTEM.md`, section ai.arda.tr). Styles are hand-written in `public/style.css`; bump `style.css?v=` in `frontend/gleam.toml` when it changes.

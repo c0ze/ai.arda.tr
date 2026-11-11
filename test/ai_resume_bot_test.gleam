@@ -134,6 +134,38 @@ pub fn prompt_has_scope_guardrail_test() {
 }
 
 // ---------------------------------------------------------------------------
+// prompt.job_requirements_rider — the contact handoff is only offered when
+// the server can actually send the email (SMTP configured); otherwise every
+// handoff would end in "I couldn't reach Arda".
+// ---------------------------------------------------------------------------
+
+pub fn rider_with_smtp_offers_the_email_handoff_test() {
+  let out = prompt.job_requirements_rider("# Prefs", True)
+  string.starts_with(out, "# Prefs")
+  |> should.be_true
+  string.contains(out, "[[SEND_EMAIL]]")
+  |> should.be_true
+  string.contains(out, "I can contact Arda directly on your behalf")
+  |> should.be_true
+}
+
+pub fn rider_without_smtp_never_promises_to_relay_test() {
+  let out = prompt.job_requirements_rider("# Prefs", False)
+  string.starts_with(out, "# Prefs")
+  |> should.be_true
+  // No handoff tag to emit and no promise to pass anything on ...
+  string.contains(out, "SEND_EMAIL")
+  |> should.be_false
+  string.contains(out, "on your behalf")
+  |> should.be_false
+  // ... but a real way to reach him.
+  string.contains(out, "https://resume.arda.tr")
+  |> should.be_true
+  string.contains(out, "LinkedIn")
+  |> should.be_true
+}
+
+// ---------------------------------------------------------------------------
 // email.extract
 // ---------------------------------------------------------------------------
 

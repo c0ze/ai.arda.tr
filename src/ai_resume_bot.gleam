@@ -36,24 +36,6 @@ const job_requirements_path = "job_requirements.md"
 
 const personal_path = "personal.md"
 
-const job_requirements_suffix = "
-
-If a user presents a job opportunity, evaluate it against my requirements.
-1. If it's a good match, tell the user I'm interested and ask them to provide their Name, Email, and Organization so I can contact Arda.
-2. If they provide this contact info, output a JSON block at the end of your response like this:
-[[SEND_EMAIL]]
-{
-  \"name\": \"User Name\",
-  \"email\": \"user@example.com\",
-  \"org\": \"Organization Name\",
-  \"analysis\": \"Brief analysis of why this is a good match\",
-  \"job_details\": \"Summary of the job offer\"
-}
-[[/SEND_EMAIL]]
-
-If the user specifically asks \"Can you contact him?\" or \"How can I reach him?\", tell them: \"I can contact Arda directly on your behalf if you have a job opportunity that matches his interests. Please paste the job description here, and I will evaluate it.\"
-"
-
 pub fn main() {
   wisp.configure_logger()
   logging.configure()
@@ -111,10 +93,18 @@ fn run_server() -> Nil {
     }
   }
 
+  let smtp_config =
+    email.config_from_env(
+      envoy_opt("GMAIL_USER"),
+      envoy_opt("GMAIL_APP_PASSWORD"),
+      envoy_opt("CONTACT_ADDRESS"),
+    )
+
+  // The contact handoff is only offered when the email can actually be sent.
   let system_prompt =
     prompt.build(resume_data)
     |> maybe_append_personal
-    |> maybe_append_job_requirements
+    |> maybe_append_job_requirements(option.is_some(smtp_config))
 
   let model_name = case envoy.get("GEMINI_MODEL") {
     Ok(v) if v != "" -> v
@@ -122,13 +112,6 @@ fn run_server() -> Nil {
   }
 
   let gemini_service = gemini.new(api_key, model_name, system_prompt)
-
-  let smtp_config =
-    email.config_from_env(
-      envoy_opt("GMAIL_USER"),
-      envoy_opt("GMAIL_APP_PASSWORD"),
-      envoy_opt("CONTACT_ADDRESS"),
-    )
 
   let public_dir = case envoy.get("PUBLIC_DIR") {
     Ok(v) if v != "" -> v
@@ -333,9 +316,10 @@ fn maybe_append_personal(base: String) -> String {
   }
 }
 
-fn maybe_append_job_requirements(base: String) -> String {
+fn maybe_append_job_requirements(base: String, can_relay: Bool) -> String {
   case simplifile.read(job_requirements_path) {
-    Ok(contents) -> base <> "\n\n" <> contents <> job_requirements_suffix
+    Ok(contents) ->
+      base <> "\n\n" <> prompt.job_requirements_rider(contents, can_relay)
     Error(_) -> base
   }
 }
