@@ -13,7 +13,7 @@
     --fg:        #dfe9ec;
     --fg-hi:     #ffffff;
     --fg-2:      #7d9299;
-    --fg-3:      #5b737c;   /* decorative: chip numbers, placeholder, hint */
+    --fg-3:      #5b737c;   /* decorative only (chip numbers): 4.0:1 on --bg, too low for text */
     --rule:      #16232a;
     --rule-2:    #263840;   /* control outlines */
     --well-rule: transparent;
@@ -248,7 +248,7 @@ canvas.px {
 .ai-id .state {
     margin-top: 2px;
     font: 12px/1.5 var(--mono);
-    color: var(--fg-3);
+    color: var(--fg-2);
 }
 
 .ai-id .state::before { content: "○ "; }
@@ -526,7 +526,7 @@ canvas.px.cursor {
     caret-shape: block;
 }
 
-#user-input::placeholder { color: var(--fg-3); opacity: 1; }
+#user-input::placeholder { color: var(--fg-2); opacity: 1; }
 
 #send-btn {
     flex-shrink: 0;
@@ -546,7 +546,7 @@ canvas.px.cursor {
 .input-hint {
     margin-top: 8px;
     font: 11px/1.5 var(--mono);
-    color: var(--fg-3);
+    color: var(--fg-2);
 }
 
 @keyframes blink { 50% { opacity: 0; } }
