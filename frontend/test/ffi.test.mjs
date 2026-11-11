@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { stream_chat, reveal_prefix, abort_stream } from '../build/dev/javascript/frontend/ffi.mjs';
+import { stream_chat, reveal_prefix, abort_stream, render_markdown } from '../build/dev/javascript/frontend/ffi.mjs';
 import { createSpeaker, requestFields, setVoiceEnabled, voiceEnabled } from '../build/dev/javascript/frontend/voice.mjs';
 
 async function collect(t, chunks, { delayed = false } = {}) {
@@ -248,4 +248,47 @@ test('a network failure is reported as "Network error", which the app localises'
     stream_chat('https://example.test/chat', '{}', (raw) => resolve(JSON.parse(raw)));
   });
   assert.deepEqual(event, { type: 'error', message: 'Network error' });
+});
+
+// ---------------------------------------------------------------------------
+// Markdown: links open in a new tab through a DOMPurify hook (not a regex on
+// the sanitised string), and tags the bot never needs are forbidden.
+// ---------------------------------------------------------------------------
+
+test('render_markdown sanitises with a link hook and forbids form, style and img tags', (t) => {
+  const hooks = {};
+  let config;
+  globalThis.window = {
+    marked: { parse: (text) => text },
+    DOMPurify: {
+      addHook: (name, fn) => { hooks[name] = fn; },
+      sanitize: (html, cfg) => { config = cfg; return html; },
+    },
+  };
+  t.after(() => { delete globalThis.window; });
+
+  // The sanitised string comes back untouched: no regex rewriting of "<a href".
+  assert.equal(render_markdown('<a href="https://x.y">x</a>'), '<a href="https://x.y">x</a>');
+  for (const tag of ['form', 'input', 'button', 'textarea', 'select', 'style', 'img']) {
+    assert.ok(config.FORBID_TAGS.includes(tag), tag);
+  }
+
+  assert.equal(typeof hooks.afterSanitizeAttributes, 'function');
+  const attrs = (initial) => {
+    const a = new Map(Object.entries(initial));
+    return { a, node: { hasAttribute: (k) => a.has(k), setAttribute: (k, v) => a.set(k, v) } };
+  };
+  const link = attrs({ href: 'https://x.y' });
+  hooks.afterSanitizeAttributes({ tagName: 'A', ...link.node });
+  assert.equal(link.a.get('target'), '_blank');
+  assert.equal(link.a.get('rel'), 'noopener noreferrer');
+  const para = attrs({});
+  hooks.afterSanitizeAttributes({ tagName: 'P', ...para.node });
+  assert.equal(para.a.size, 0);
+
+  // The hook is registered once per DOMPurify instance, not on every render.
+  let added = 0;
+  window.DOMPurify.addHook = () => { added += 1; };
+  render_markdown('again');
+  assert.equal(added, 0);
 });

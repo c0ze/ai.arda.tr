@@ -55,8 +55,29 @@ function escapeHtml(text) {
   });
 }
 
+// Tags the bot's replies never need; forbidden even though DOMPurify would
+// otherwise keep them (a fake form or an image beacon in a reply).
+const FORBID_TAGS = ["form", "input", "button", "textarea", "select", "style", "img"];
+
+// Links in replies open in a new tab. Set on the sanitised DOM nodes by a
+// DOMPurify hook, registered once per DOMPurify instance.
+let hookedPurify = null;
+function purifier() {
+  const purify = window.DOMPurify;
+  if (purify !== hookedPurify) {
+    purify.addHook("afterSanitizeAttributes", (node) => {
+      if (node.tagName === "A" && node.hasAttribute("href")) {
+        node.setAttribute("target", "_blank");
+        node.setAttribute("rel", "noopener noreferrer");
+      }
+    });
+    hookedPurify = purify;
+  }
+  return purify;
+}
+
 // Render markdown -> sanitised HTML:
-//   marked.parse -> DOMPurify.sanitize -> rewrite <a ...> to open in a new tab.
+//   marked.parse -> DOMPurify.sanitize (links get target/rel in a hook).
 // DOMPurify is REQUIRED. If it (or marked) is missing we fall back to escaped
 // plain text and never return raw, unsanitised HTML (fail closed).
 export function render_markdown(text) {
@@ -77,8 +98,7 @@ export function render_markdown(text) {
     html = "<p>" + escapeHtml(text) + "</p>";
   }
 
-  html = window.DOMPurify.sanitize(html, { ADD_ATTR: ["target"] });
-  return html.replace(/<a href/g, '<a target="_blank" rel="noopener noreferrer" href');
+  return purifier().sanitize(html, { FORBID_TAGS });
 }
 
 // A reply as a screen reader should hear it: the rendered markdown's text,
