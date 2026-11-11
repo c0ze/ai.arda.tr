@@ -27,16 +27,20 @@ on:
   # below uses for GCP), so that hop always needed a bearer credential of some
   # kind. A schedule needs none, so the credential is gone entirely.
   #
-  # 03:00 UTC is 12:00 JST. Staleness is bounded at 24h; for an immediate
-  # refresh after editing the résumé, run this workflow manually:
+  # 03:17 UTC is 12:17 JST: off the top of the hour, which is when GitHub's
+  # scheduler is busiest (runs at :00 have started 5-8 hours late). Scheduled
+  # runs can still start late, so staleness is bounded at roughly a day; for an
+  # immediate refresh after editing the résumé, run this workflow manually:
   #   gh workflow run deploy-backend.yml --repo c0ze/ai.arda.tr
+  # GitHub disables schedules in public repos after 60 days without repository
+  # activity; the keepalive job below re-enables this workflow on every
+  # scheduled run, which resets that clock.
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '17 3 * * *'
   workflow_dispatch:
 
-permissions:
-  contents: 'read'
-  id-token: 'write'
+# Each job asks for exactly what it needs.
+permissions: {}
 
 # Serialize backend deploys: merging PRs back-to-back would otherwise spawn
 # concurrent `gcloud run deploy` runs that race, and with build caching an
@@ -52,8 +56,25 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
+  # Keeps the daily schedule alive: GitHub would otherwise disable it after 60
+  # days without commits, and the résumé would silently go stale again. Uses
+  # only the run's own GITHUB_TOKEN.
+  keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Re-enable this workflow (resets the inactivity clock)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/deploy-backend.yml/enable"
+
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

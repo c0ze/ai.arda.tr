@@ -81,9 +81,9 @@ Once the secrets are set, **pushing backend changes to `main` deploys automatica
 
 ## Auto-refresh on résumé changes
 
-The bot bakes the résumé JSON into its image at **build time** (`gleam run -- fetch`), so the running service holds a snapshot from its last deploy. `deploy-backend.yml` therefore runs on a **daily schedule** (`0 3 * * *`, 12:00 JST) so résumé edits propagate on their own. **No setup and no credentials.**
+The bot bakes the résumé JSON into its image at **build time** (`gleam run -- fetch`), so the running service holds a snapshot from its last deploy. `deploy-backend.yml` therefore runs on a **daily schedule** (`17 3 * * *`, 12:17 JST) so résumé edits propagate on their own. **No setup and no credentials.**
 
-Staleness is bounded at 24 hours. After editing the résumé, refresh immediately with:
+GitHub starts scheduled runs late, by hours when its queue is busy (runs at the top of the hour were starting 5–8 hours late, which is why the cron sits at :17), so staleness is bounded at roughly a day, not exactly 24 hours. GitHub also disables schedules in public repositories after 60 days without repository activity; the workflow's `keepalive` job re-enables the workflow through the API with the run's own `GITHUB_TOKEN` on every scheduled run, which resets that clock. After editing the résumé, refresh immediately with:
 
 ```bash
 gh workflow run deploy-backend.yml --repo c0ze/ai.arda.tr
@@ -97,4 +97,4 @@ The obvious fix is keyless auth, and this repo already does that for GCP — the
 
 A schedule needs neither. The credential was removed rather than rotated, which is why there is nothing here to expire.
 
-**Cost note:** this deploy builds the container from source (`source: '.'`), so a scheduled run is a full Cloud Build image build, push and deploy — not a lightweight restart. At daily that is ~365 builds and 365 stored images a year for a document that changes a handful of times. If Artifact Registry storage grows, either widen the cron to weekly (`0 3 * * 1`) or add an Artifact Registry cleanup policy.
+**Cost note:** this deploy builds the container from source (`source: '.'`), so a scheduled run is a full Cloud Build image build, push and deploy — not a lightweight restart. At daily that is ~365 builds and 365 stored images a year for a document that changes a handful of times. If Artifact Registry storage grows, either widen the cron to weekly (`17 3 * * 1`) or add an Artifact Registry cleanup policy.

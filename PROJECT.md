@@ -124,7 +124,7 @@ docker run -p 8080:8080 \
 ## Key Implementation Details
 
 ### Resume Data Flow
-1. At build time (Docker) or on first startup, resume JSON is fetched from GitHub (`c0ze/resume`).
+1. At build time (Docker) or on first startup, resume JSON is fetched from GitHub (`c0ze/resume`). The deployed image is rebuilt daily by the scheduled backend deploy, so a résumé edit reaches the bot within about a day.
 2. Data is cached to `./data/`.
 3. On boot, `resume.load_from_disk` reads and decodes all five files.
 4. `prompt.build` compiles the system prompt. It opens with a scope guardrail (`scope_guardrail` in [prompt.gleam](src/ai_resume_bot/prompt.gleam)) that confines the bot to Arda-related topics, then the résumé sections. A curated [personal.md](personal.md) (interests, music, hobbies — beyond the résumé) is appended if present, then `job_requirements.md` if present, along with the `[[SEND_EMAIL]]` instructions (only when SMTP is configured; see [Contact Email Handoff](#contact-email-handoff)). Both files are baked into the Docker image and read at startup (see `maybe_append_personal` / `maybe_append_job_requirements` in [ai_resume_bot.gleam](src/ai_resume_bot.gleam)).
@@ -192,6 +192,7 @@ Local end-to-end: `TTS_BACKEND=mock gleam run` (real Gemini, fake audio), or aga
 ## Deployment
 
 - **Backend**: `./cloud_deploy.sh` or `.github/workflows/deploy-backend.yml` → Cloud Run (`ai-arda-tr-api`, asia-northeast1)
+  - The workflow also runs **daily** (`17 3 * * *`, 12:17 JST, though GitHub often starts it hours late) to rebuild with the current résumé, which is baked in at build time; `gh workflow run deploy-backend.yml --repo c0ze/ai.arda.tr` refreshes at once. Its `keepalive` job re-enables the workflow on each scheduled run so GitHub's 60-day inactivity rule never switches the schedule off. See [DEPLOYMENT_OPTIONS.md](DEPLOYMENT_OPTIONS.md#auto-refresh-on-résumé-changes).
 - **Frontend**: Push to `main` triggers `.github/workflows/deploy-ui.yml` → GitHub Pages
 - Cloud Run URL: `https://ai-arda-tr-api-599610058688.asia-northeast1.run.app`
 

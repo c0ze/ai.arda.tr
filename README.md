@@ -61,6 +61,8 @@ Reads `GCP_PROJECT_ID`, `GEMINI_API_KEY`, `ALLOWED_ORIGINS`, and optional `GMAIL
 
 The resume JSON is fetched at build time and baked into the image. The built frontend bundle is also baked in, so the single Cloud Run service can serve both.
 
+[.github/workflows/deploy-backend.yml](.github/workflows/deploy-backend.yml) deploys on pushes to `main` that touch the backend, and also once a day (`17 3 * * *`, 12:17 JST; GitHub often starts scheduled runs late) so résumé edits reach the bot without a push. To refresh at once: `gh workflow run deploy-backend.yml --repo c0ze/ai.arda.tr`. See [DEPLOYMENT_OPTIONS.md](DEPLOYMENT_OPTIONS.md).
+
 ### Frontend — GitHub Pages
 
 [.github/workflows/deploy-ui.yml](.github/workflows/deploy-ui.yml) installs the Gleam toolchain, runs `lustre/dev build --minify --outdir=../public` from [frontend/](frontend/), and publishes [public/](public/) to GitHub Pages. In production the frontend hits the hard-coded Cloud Run URL (see `cloud_run_base` in [frontend/src/frontend.gleam](frontend/src/frontend.gleam)).
