@@ -8,7 +8,7 @@
 %% calls) so memory stays bounded by the number of distinct active clients.
 
 -module(rate_limit_ffi).
--export([init/0, allow/4, now_ms/0]).
+-export([init/0, allow/4, now_ms/0, client_prefix/1]).
 
 -define(TABLE, rate_limit_buckets).
 
@@ -59,4 +59,18 @@ maybe_sweep(WindowStart) ->
             ok;
         _ ->
             ok
+    end.
+
+%% The rate-limit key for one client address. IPv6 clients are keyed on their
+%% /64 (a single subscriber holds at least that much and can rotate addresses
+%% inside it); IPv4-mapped IPv6 addresses are keyed as the IPv4 address; IPv4
+%% and anything that does not parse are returned unchanged.
+client_prefix(Ip) when is_binary(Ip) ->
+    case inet:parse_strict_address(binary_to_list(Ip)) of
+        {ok, {0, 0, 0, 0, 0, 16#ffff, X, Y}} ->
+            list_to_binary(inet:ntoa({X bsr 8, X band 255, Y bsr 8, Y band 255}));
+        {ok, {A, B, C, D, _, _, _, _}} ->
+            list_to_binary(inet:ntoa({A, B, C, D, 0, 0, 0, 0}) ++ "/64");
+        _ ->
+            Ip
     end.

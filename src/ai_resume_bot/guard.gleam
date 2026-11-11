@@ -8,6 +8,7 @@
 import gleam/int
 import gleam/json
 import gleam/list
+import gleam/result
 import gleam/string
 import shared.{type ChatRequest, ChatMessage, ChatRequest}
 
@@ -66,5 +67,71 @@ pub fn check_chat_request(req: ChatRequest) -> Result(ChatRequest, Rejection) {
               }),
           ))
       }
+  }
+}
+
+/// Header checks for a chat POST, made before the rate limiter and before the
+/// body is read.
+///
+/// - A request with an `Origin` that is neither in `allowed` nor the backend's
+///   own origin (its `Host`) gets 403: a browser page elsewhere must not spend
+///   the model budget, even though it could never read the reply. Requests
+///   without an `Origin` (curl, server-side callers) pass.
+/// - Anything but an `application/json` body (a charset parameter is fine)
+///   gets 415. All three clients send JSON; a "simple" `text/plain` POST,
+///   which browsers send cross-origin without a preflight, does not count.
+pub fn check_headers(
+  origin origin: Result(String, Nil),
+  host host: Result(String, Nil),
+  content_type content_type: Result(String, Nil),
+  allowed allowed: List(String),
+) -> Result(Nil, Rejection) {
+  use _ <- result.try(check_origin(origin, host, allowed))
+  check_content_type(content_type)
+}
+
+fn check_origin(
+  origin: Result(String, Nil),
+  host: Result(String, Nil),
+  allowed: List(String),
+) -> Result(Nil, Rejection) {
+  case origin {
+    Error(_) -> Ok(Nil)
+    Ok(o) ->
+      case list.contains(allowed, o) || same_origin(o, host) {
+        True -> Ok(Nil)
+        False -> Error(Rejection(403, "Origin not allowed"))
+      }
+  }
+}
+
+/// The page was served by this backend (the run.app URL, or localhost on any
+/// port), so its requests are same-origin and need no CORS allowance.
+fn same_origin(origin: String, host: Result(String, Nil)) -> Bool {
+  let origin_host = case origin {
+    "https://" <> rest -> Ok(rest)
+    "http://" <> rest -> Ok(rest)
+    _ -> Error(Nil)
+  }
+  case origin_host, host {
+    Ok(a), Ok(b) -> a != "" && string.lowercase(a) == string.lowercase(b)
+    _, _ -> False
+  }
+}
+
+fn check_content_type(
+  content_type: Result(String, Nil),
+) -> Result(Nil, Rejection) {
+  let media_type = case content_type {
+    Ok(value) ->
+      case string.split_once(value, ";") {
+        Ok(#(media_type, _params)) -> media_type
+        Error(_) -> value
+      }
+    Error(_) -> ""
+  }
+  case string.lowercase(string.trim(media_type)) {
+    "application/json" -> Ok(Nil)
+    _ -> Error(Rejection(415, "Content-Type must be application/json"))
   }
 }

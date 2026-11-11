@@ -124,26 +124,44 @@ fn maybe_set_header(
 // ---------------------------------------------------------------------------
 
 fn handle_chat(req: Request, config: Config) -> Response {
+  use <- require_post(req)
+  // Header checks come before the rate limiter, so a foreign page can't use up
+  // a visitor's quota either.
   case
-    rate_limit.check(
-      config.rate_limit,
-      request.get_header(req, "x-forwarded-for"),
+    guard.check_headers(
+      origin: request.get_header(req, "origin"),
+      host: request.get_header(req, "host"),
+      content_type: request.get_header(req, "content-type"),
+      allowed: config.allowed_origins,
     )
   {
-    False ->
-      json_response(
-        429,
-        models.error_response("Too many requests. Please slow down."),
-      )
-      |> set_header(
-        "retry-after",
-        int.to_string(rate_limit.retry_after_seconds(config.rate_limit)),
-      )
-    True ->
-      case req.method {
-        http.Post -> do_chat(req, config)
-        _ -> json_response(405, models.error_response("Method not allowed"))
+    Error(guard.Rejection(status, message)) ->
+      json_response(status, models.error_response(message))
+    Ok(_) ->
+      case
+        rate_limit.check(
+          config.rate_limit,
+          request.get_header(req, "x-forwarded-for"),
+        )
+      {
+        False ->
+          json_response(
+            429,
+            models.error_response("Too many requests. Please slow down."),
+          )
+          |> set_header(
+            "retry-after",
+            int.to_string(rate_limit.retry_after_seconds(config.rate_limit)),
+          )
+        True -> do_chat(req, config)
       }
+  }
+}
+
+fn require_post(req: Request, next: fn() -> Response) -> Response {
+  case req.method {
+    http.Post -> next()
+    _ -> json_response(405, models.error_response("Method not allowed"))
   }
 }
 

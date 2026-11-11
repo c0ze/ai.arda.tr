@@ -357,6 +357,27 @@ pub fn client_key_takes_last_forwarded_ip_test() {
   |> should.equal("1.2.3.4")
 }
 
+pub fn ipv6_clients_share_a_key_per_64_test() {
+  // An IPv6 client owns at least a /64 and could rotate addresses inside it
+  // to dodge a per-address limit.
+  rate_limit.client_key(Ok("2001:db8:1:2:aaaa:bbbb:cccc:dddd"))
+  |> should.equal("2001:db8:1:2::/64")
+  rate_limit.client_key(Ok("1.1.1.1, 2001:db8:1:2::1"))
+  |> should.equal("2001:db8:1:2::/64")
+  rate_limit.client_key(Ok("2001:db8:1:3::1"))
+  |> should.equal("2001:db8:1:3::/64")
+}
+
+pub fn ipv4_mapped_ipv6_is_keyed_as_ipv4_test() {
+  rate_limit.client_key(Ok("::ffff:1.2.3.4"))
+  |> should.equal("1.2.3.4")
+}
+
+pub fn unparseable_hops_are_kept_as_they_are_test() {
+  rate_limit.client_key(Ok("not-an-ip"))
+  |> should.equal("not-an-ip")
+}
+
 pub fn client_key_trims_whitespace_test() {
   rate_limit.client_key(Ok("  1.2.3.4  "))
   |> should.equal("1.2.3.4")

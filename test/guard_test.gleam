@@ -77,3 +77,85 @@ pub fn parse_applies_the_same_checks_test() {
   guard.parse_chat_request("{\"message\":\"hello\"}")
   |> should.equal(Ok(ChatRequest(message: "hello", history: [])))
 }
+
+// ---------------------------------------------------------------------------
+// Header checks: a browser page on a foreign origin must not be able to spend
+// the model budget, and only JSON bodies (what all three clients send) count.
+// ---------------------------------------------------------------------------
+
+const allowed = ["https://ai.arda.tr", "https://arda.tr"]
+
+const host = Ok("ai-arda-tr-api.example.run.app")
+
+pub fn allowed_origin_passes_test() {
+  guard.check_headers(
+    Ok("https://arda.tr"),
+    host,
+    Ok("application/json"),
+    allowed,
+  )
+  |> should.equal(Ok(Nil))
+}
+
+pub fn no_origin_passes_for_curl_and_server_side_callers_test() {
+  guard.check_headers(Error(Nil), host, Ok("application/json"), allowed)
+  |> should.equal(Ok(Nil))
+}
+
+pub fn foreign_origin_is_forbidden_test() {
+  guard.check_headers(
+    Ok("https://evil.example"),
+    host,
+    Ok("application/json"),
+    allowed,
+  )
+  |> should.equal(Error(Rejection(403, "Origin not allowed")))
+}
+
+pub fn null_origin_is_forbidden_test() {
+  guard.check_headers(Ok("null"), host, Ok("application/json"), allowed)
+  |> should.equal(Error(Rejection(403, "Origin not allowed")))
+}
+
+pub fn same_origin_page_passes_even_if_not_listed_test() {
+  // The bundle is also served by the backend itself (the run.app URL, or
+  // localhost on any port); its requests carry that origin.
+  guard.check_headers(
+    Ok("https://ai-arda-tr-api.example.run.app"),
+    host,
+    Ok("application/json"),
+    allowed,
+  )
+  |> should.equal(Ok(Nil))
+  guard.check_headers(
+    Ok("http://localhost:9123"),
+    Ok("localhost:9123"),
+    Ok("application/json"),
+    allowed,
+  )
+  |> should.equal(Ok(Nil))
+}
+
+pub fn json_with_a_charset_passes_test() {
+  guard.check_headers(
+    Error(Nil),
+    host,
+    Ok("Application/JSON; charset=UTF-8"),
+    allowed,
+  )
+  |> should.equal(Ok(Nil))
+}
+
+pub fn text_plain_is_unsupported_test() {
+  guard.check_headers(Error(Nil), host, Ok("text/plain"), allowed)
+  |> should.equal(
+    Error(Rejection(415, "Content-Type must be application/json")),
+  )
+}
+
+pub fn missing_content_type_is_unsupported_test() {
+  guard.check_headers(Error(Nil), host, Error(Nil), allowed)
+  |> should.equal(
+    Error(Rejection(415, "Content-Type must be application/json")),
+  )
+}

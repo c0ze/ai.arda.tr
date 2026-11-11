@@ -64,3 +64,33 @@ pub fn over_large_body_is_a_413_test() {
   resp.status |> should.equal(413)
   simulate.read_body(resp) |> should.equal(error_body("Request body too large"))
 }
+
+pub fn foreign_origin_is_a_403_test() {
+  let req =
+    chat("{\"message\":\"hi\"}")
+    |> simulate.header("origin", "https://evil.example")
+  let resp = server.handle(req, config())
+  resp.status |> should.equal(403)
+  simulate.read_body(resp) |> should.equal(error_body("Origin not allowed"))
+}
+
+pub fn text_plain_post_is_a_415_test() {
+  let req =
+    chat("{\"message\":\"hi\"}")
+    |> simulate.header("content-type", "text/plain")
+  let resp = server.handle(req, config())
+  resp.status |> should.equal(415)
+  simulate.read_body(resp)
+  |> should.equal(error_body("Content-Type must be application/json"))
+}
+
+pub fn no_origin_json_post_gets_past_the_header_checks_test() {
+  // curl and server-side callers send no Origin; the empty message proves the
+  // request got as far as the body checks (and never reached Gemini).
+  let req =
+    simulate.request(http.Post, "/api/chat")
+    |> simulate.string_body("{\"message\":\"\"}")
+    |> simulate.header("content-type", "application/json; charset=utf-8")
+  let resp = server.handle(req, config())
+  resp.status |> should.equal(400)
+}

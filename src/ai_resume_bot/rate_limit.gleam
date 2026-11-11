@@ -59,7 +59,9 @@ pub fn retry_after_seconds(config: Config) -> Int {
 /// entry. (Behind a custom HTTPS load balancer the authoritative hop would be
 /// the second-from-right instead — revisit if the ingress changes.) A missing
 /// or blank header falls back to a shared `"unknown"` bucket so those requests
-/// are limited *together* rather than bypassing the limit.
+/// are limited *together* rather than bypassing the limit. IPv6 clients are
+/// keyed on their /64 (`2001:db8:1:2::/64`), since one subscriber can rotate
+/// addresses inside it; IPv4 addresses are used as they are.
 pub fn client_key(forwarded_for: Result(String, Nil)) -> String {
   case forwarded_for {
     Ok(value) -> {
@@ -69,7 +71,7 @@ pub fn client_key(forwarded_for: Result(String, Nil)) -> String {
         |> list.map(string.trim)
         |> list.filter(fn(hop) { hop != "" })
       case list.last(hops) {
-        Ok(ip) -> ip
+        Ok(ip) -> client_prefix(ip)
         Error(_) -> "unknown"
       }
     }
@@ -104,6 +106,9 @@ fn do_init() -> Nil
 
 @external(erlang, "rate_limit_ffi", "allow")
 fn do_allow(key: String, limit: Int, window_ms: Int, now_ms: Int) -> Bool
+
+@external(erlang, "rate_limit_ffi", "client_prefix")
+fn client_prefix(ip: String) -> String
 
 @external(erlang, "rate_limit_ffi", "now_ms")
 fn now_ms() -> Int

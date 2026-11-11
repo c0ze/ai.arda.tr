@@ -82,6 +82,16 @@ pub fn handle_stream(
     }
   }
 
+  // Header checks come before the rate limiter, so a foreign page can't use up
+  // a visitor's quota either.
+  let headers_ok =
+    guard.check_headers(
+      origin: request.get_header(req, "origin"),
+      host: request.get_header(req, "host"),
+      content_type: request.get_header(req, "content-type"),
+      allowed: config.allowed_origins,
+    )
+  use <- reject_headers(headers_ok, with_cors)
   case
     rate_limit.check(
       config.rate_limit,
@@ -124,6 +134,19 @@ pub fn handle_stream(
               }
           }
       }
+  }
+}
+
+fn reject_headers(
+  checked: Result(Nil, guard.Rejection),
+  with_cors: fn(response.Response(ResponseData)) ->
+    response.Response(ResponseData),
+  next: fn() -> response.Response(ResponseData),
+) -> response.Response(ResponseData) {
+  case checked {
+    Ok(_) -> next()
+    Error(guard.Rejection(status, message)) ->
+      with_cors(error_response(status, message))
   }
 }
 
