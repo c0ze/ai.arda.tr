@@ -590,17 +590,18 @@ fn header(model: Model, s: Strings) -> Element(Msg) {
     ]),
     html.span([attribute.class("bar-title")], [html.text(s.header_title)]),
     html.span([attribute.class("sp")], []),
-    language_toggle(model.language),
+    language_toggle(model.language, s),
     voice_toggle(model.voice_on, s),
-    theme_toggle(model.theme),
+    theme_toggle(model.theme, s),
   ])
 }
 
-fn theme_toggle(theme: Theme) -> Element(Msg) {
+fn theme_toggle(theme: Theme, s: Strings) -> Element(Msg) {
+  // Starts with the visible rendition name's context; contains it (WCAG 2.5.3).
   let label =
-    "Rendition: "
+    s.rendition
     <> theme_name(theme)
-    <> ". Switch to "
+    <> s.rendition_next
     <> theme_name(next_theme(theme))
   html.button(
     [
@@ -614,14 +615,14 @@ fn theme_toggle(theme: Theme) -> Element(Msg) {
   )
 }
 
-/// Mute / unmute the construct's voice. The label is constant for screen
-/// readers; `aria-pressed` carries the state.
+/// Mute / unmute the construct's voice; `aria-pressed` carries the state. The
+/// accessible name comes from the content (a visually hidden label plus the
+/// visible state word), so it contains what is shown (WCAG 2.5.3).
 fn voice_toggle(on: Bool, s: Strings) -> Element(Msg) {
   html.button(
     [
       attribute.type_("button"),
       attribute.class("voice-toggle"),
-      attribute.attribute("aria-label", s.voice_label),
       attribute.title(s.voice_label),
       attribute.attribute("aria-pressed", case on {
         True -> "true"
@@ -630,7 +631,14 @@ fn voice_toggle(on: Bool, s: Strings) -> Element(Msg) {
       event.on_click(UserToggledVoice),
     ],
     [
-      html.span([attribute.class("voice-glyph")], [html.text("♪")]),
+      html.span([attribute.class("sr-only")], [html.text(s.voice_label)]),
+      html.span(
+        [
+          attribute.class("voice-glyph"),
+          attribute.attribute("aria-hidden", "true"),
+        ],
+        [html.text("♪")],
+      ),
       // The state word is dropped on phones, where the struck-through ♪
       // alone shows "muted".
       html.span([attribute.class("voice-word")], [
@@ -643,17 +651,17 @@ fn voice_toggle(on: Bool, s: Strings) -> Element(Msg) {
   )
 }
 
-fn language_toggle(language: Language) -> Element(Msg) {
+fn language_toggle(language: Language, s: Strings) -> Element(Msg) {
   html.div(
     [
       attribute.class("language-toggle"),
       attribute.attribute("role", "group"),
-      attribute.attribute("aria-label", "Language"),
+      attribute.attribute("aria-label", s.language_label),
     ],
     [
-      language_button(En, "EN", "Switch to English", language),
-      language_button(Jp, "JP", "Switch to Japanese", language),
-      language_button(Tr, "TR", "Switch to Turkish", language),
+      language_button(En, "EN", s.switch_to_en, language),
+      language_button(Jp, "JP", s.switch_to_jp, language),
+      language_button(Tr, "TR", s.switch_to_tr, language),
     ],
   )
 }
@@ -673,7 +681,8 @@ fn language_button(
     [
       attribute.type_("button"),
       attribute.class(class),
-      attribute.attribute("aria-label", aria_label),
+      // Starts with the visible code, so the name contains it (WCAG 2.5.3).
+      attribute.attribute("aria-label", label <> ", " <> aria_label),
       attribute.attribute("aria-pressed", case is_active {
         True -> "true"
         False -> "false"
@@ -728,32 +737,41 @@ fn messages_container(model: Model, s: Strings) -> Element(Msg) {
     Thinking -> [view_pending(s)]
     _ -> []
   }
-  html.div([attribute.id("messages-container")], [
-    // The transcript is a log, but it does not announce itself: it changes on
-    // every chunk. The finished reply goes to `#reply-announcer` instead.
-    html.div(
-      [
-        attribute.id("messages"),
-        attribute.attribute("role", "log"),
-        attribute.attribute("aria-live", "off"),
-      ],
-      list.append(
-        list.map(model.history, fn(msg) {
-          view_message(msg, model.stream_state, model.speech, s)
-        }),
-        tail,
+  // The scrolling region: focusable, so it can be scrolled from the keyboard.
+  html.div(
+    [
+      attribute.id("messages-container"),
+      attribute.attribute("tabindex", "0"),
+      attribute.attribute("role", "region"),
+      attribute.attribute("aria-label", s.conversation_label),
+    ],
+    [
+      // The transcript is a log, but it does not announce itself: it changes on
+      // every chunk. The finished reply goes to `#reply-announcer` instead.
+      html.div(
+        [
+          attribute.id("messages"),
+          attribute.attribute("role", "log"),
+          attribute.attribute("aria-live", "off"),
+        ],
+        list.append(
+          list.map(model.history, fn(msg) {
+            view_message(msg, model.stream_state, model.speech, s)
+          }),
+          tail,
+        ),
       ),
-    ),
-    html.div(
-      [
-        attribute.id("reply-announcer"),
-        attribute.class("sr-only"),
-        attribute.attribute("aria-live", "polite"),
-        attribute.attribute("aria-atomic", "true"),
-      ],
-      [html.text(plain_text(model.announcement))],
-    ),
-  ])
+      html.div(
+        [
+          attribute.id("reply-announcer"),
+          attribute.class("sr-only"),
+          attribute.attribute("aria-live", "polite"),
+          attribute.attribute("aria-atomic", "true"),
+        ],
+        [html.text(plain_text(model.announcement))],
+      ),
+    ],
+  )
 }
 
 fn view_message(
@@ -882,7 +900,8 @@ fn input_footer(model: Model, s: Strings) -> Element(Msg) {
         [
           attribute.type_("button"),
           attribute.id("send-btn"),
-          attribute.attribute("aria-label", "Send message"),
+          // Contains the visible "enter" (WCAG 2.5.3).
+          attribute.attribute("aria-label", s.send_label),
           attribute.disabled(model.stream_state != Idle),
           event.on_click(UserClickedSend),
         ],

@@ -122,3 +122,37 @@ test('offline and timeout errors read in the UI language', () => {
   model = step(model, new StreamEventReceived(model.generation, '{"type":"error","message":"Response timed out. Please try again."}'));
   assert.match(model.history.toArray().at(-1).text, /時間内/);
 });
+
+// ---------------------------------------------------------------------------
+// Accessible names contain the visible text (WCAG 2.5.3) and follow the UI
+// language; the scrolling transcript can be reached from the keyboard.
+// ---------------------------------------------------------------------------
+
+const tagWith = (html, needle) => html.match(new RegExp('<[a-z]+[^>]*' + needle + '[^>]*>'))?.[0] ?? '';
+const attr = (tag, name) => tag.match(new RegExp(name + '="([^"]*)"'))?.[1];
+
+test('the send and voice buttons are named by what they show', () => {
+  const html = to_string(view(start()));
+  const send = tagWith(html, 'id="send-btn"');
+  assert.match(attr(send, 'aria-label'), /^enter\b/);
+  // The voice toggle is named by its content: a hidden label plus the visible word.
+  const voice = html.match(/<button[^>]*class="voice-toggle"[^>]*>(.*?)<\/button>/);
+  assert.equal(attr(voice[0], 'aria-label'), undefined);
+  assert.match(voice[1], /Read replies aloud/);
+  assert.match(voice[1], /<span class="voice-word"> on<\/span>/);
+});
+
+test('labels follow the UI language', () => {
+  const html = to_string(view(step(start(), new UserPickedLanguage(new Jp()))));
+  assert.equal(attr(tagWith(html, 'class="language-toggle"'), 'aria-label'), '言語');
+  assert.match(attr(tagWith(html, 'class="lang-btn active"'), 'aria-label'), /^JP/);
+  assert.match(attr(tagWith(html, 'class="lang-btn active"'), 'aria-label'), /日本語/);
+  assert.match(attr(tagWith(html, 'class="theme-toggle"'), 'aria-label'), /^表示モード/);
+  assert.match(attr(tagWith(html, 'id="send-btn"'), 'aria-label'), /送信/);
+});
+
+test('the scrolling transcript is focusable and labelled', () => {
+  const container = tagWith(to_string(view(start())), 'id="messages-container"');
+  assert.equal(attr(container, 'tabindex'), '0');
+  assert.equal(attr(container, 'aria-label'), 'Conversation');
+});
