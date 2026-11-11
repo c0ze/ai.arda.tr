@@ -22,8 +22,9 @@ proxy = { from = "/api", to = "http://localhost:8080/api" }
 [tools.lustre.html]
 lang = "en"
 title = "Arda's AI Construct"
+# lustre_dev_tools already writes <meta name="viewport"> itself, so it is not
+# repeated here.
 meta = [
-  { name = "viewport", content = "width=device-width, initial-scale=1.0" },
   { name = "description", content = "Answers questions about Arda's work, projects and music, and can pass a message on to him." },
   { property = "og:type", content = "website" },
   { property = "og:site_name", content = "Arda's AI Construct" },
@@ -40,6 +41,10 @@ meta = [
   { name = "twitter:description", content = "Answers questions about Arda's work, projects and music." },
   { name = "twitter:image", content = "https://ai.arda.tr/og-image.png" },
 ]
+links = [
+  { rel = "canonical", href = "https://ai.arda.tr/" },
+  { rel = "icon", type = "image/svg+xml", href = "/favicon.svg" },
+]
 stylesheets = [
   { href = "https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@400;500;700&display=swap" },
   { href = "/style.css?v=18" },
@@ -52,8 +57,8 @@ scripts = [
   { src = "/vendor/purify.min.js" },
   # Pre-hydration rendition: legacy ids (light/paper/dark/carbon) migrate by
   # role, exactly like `theme_from_string` in frontend.gleam; night is default.
-  { content = "var _c=document.createElement('link');_c.rel='canonical';_c.href='https://ai.arda.tr/';document.head.appendChild(_c);var _f=document.createElement('link');_f.rel='icon';_f.type='image/svg+xml';_f.href='/favicon.svg';document.head.appendChild(_f);document.addEventListener('DOMContentLoaded',function(){var t=null;try{t=localStorage.getItem('theme');}catch(e){}t={light:'xerox',paper:'xerox-hc',dark:'night',carbon:'night-hc'}[t]||t;if(['night','night-hc','xerox','xerox-hc'].indexOf(t)<0)t='night';document.body.setAttribute('data-theme',t);});" },
+  { content = "document.addEventListener('DOMContentLoaded',function(){var t=null;try{t=localStorage.getItem('theme');}catch(e){}t={light:'xerox',paper:'xerox-hc',dark:'night',carbon:'night-hc'}[t]||t;if(['night','night-hc','xerox','xerox-hc'].indexOf(t)<0)t='night';document.body.setAttribute('data-theme',t);});" },
 ]
 # The CF Web Analytics beacon lives in `body` (raw HTML) because Lustre's
 # `scripts` config can't express the required data-cf-beacon attribute.
-body = "<div id=\"app\"></div><!-- Cloudflare Web Analytics --><script defer src=\"https://static.cloudflareinsights.com/beacon.min.js\" data-cf-beacon='{\"token\": \"ec0a808ebf6b4be7b59a63377cbeff3a\"}'></script><!-- End Cloudflare Web Analytics -->"
+body = "<div id=\"app\"></div><noscript><p>This chat needs JavaScript. Arda's résumé is at <a href=\"https://resume.arda.tr\">resume.arda.tr</a>.</p></noscript><!-- Cloudflare Web Analytics --><script defer src=\"https://static.cloudflareinsights.com/beacon.min.js\" data-cf-beacon='{\"token\": \"ec0a808ebf6b4be7b59a63377cbeff3a\"}'></script><!-- End Cloudflare Web Analytics -->"
