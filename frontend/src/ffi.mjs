@@ -103,12 +103,34 @@ export function is_localhost() {
   return h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0";
 }
 
+// The request in flight, if any: `{ abort }`. Only one at a time.
+let active = null;
+
+// Abort the request in flight (a reset or a new question). It reports nothing
+// more: no events, not even an error.
+export function abort_stream() {
+  const a = active;
+  active = null;
+  if (a) a.abort();
+}
+
 // Stream a POST request to the SSE endpoint. Calls `on_event` for each
-// parsed SSE event object. The callback receives a JSON string.
+// parsed SSE event object. The callback receives a JSON string. Starting a
+// request aborts the previous one.
 export function stream_chat(url, body_json, on_event) {
+  abort_stream();
   let settled = false;
   let reader;
   const controller = new AbortController();
+  const handle = {
+    abort() {
+      settled = true;
+      clearTimeout(timer);
+      if (reader) reader.cancel().catch(() => {});
+      controller.abort();
+    },
+  };
+  active = handle;
   const onDeadline = () => {
     fail("Response timed out. Please try again.");
     controller.abort();
@@ -119,6 +141,7 @@ export function stream_chat(url, body_json, on_event) {
     if (settled) return;
     if (event.type === "done" || event.type === "error") {
       settled = true;
+      if (active === handle) active = null;
       clearTimeout(timer);
       if (reader) reader.cancel().catch(() => {});
     }

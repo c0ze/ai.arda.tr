@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { stream_chat, reveal_prefix } from '../build/dev/javascript/frontend/ffi.mjs';
+import { stream_chat, reveal_prefix, abort_stream } from '../build/dev/javascript/frontend/ffi.mjs';
 import { createSpeaker, requestFields, setVoiceEnabled, voiceEnabled } from '../build/dev/javascript/frontend/voice.mjs';
 
 async function collect(t, chunks, { delayed = false } = {}) {
@@ -197,4 +197,47 @@ test('voice:false from the server means no gating at all', (t) => {
   const s = createSpeaker({ onReveal: (n) => calls.push(n), onEnd: () => calls.push('end') });
   s.handle({ type: 'voice', on: false });
   assert.deepEqual(calls, [Infinity, 'end']);
+});
+
+// ---------------------------------------------------------------------------
+// One request at a time: a new send or a reset aborts the one in flight.
+// ---------------------------------------------------------------------------
+
+function controllableFetch(t) {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    const call = { signal: options.signal };
+    calls.push(call);
+    return new Response(new ReadableStream({ start(c) { call.controller = c; } }));
+  });
+  return calls;
+}
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+const sse = (obj) => new TextEncoder().encode('data: ' + JSON.stringify(obj) + '\n\n');
+
+test('a new request aborts the one in flight and silences it', async (t) => {
+  const calls = controllableFetch(t);
+  const first = [];
+  const second = [];
+  stream_chat('https://example.test/chat', '{}', (e) => first.push(JSON.parse(e)));
+  await tick();
+  stream_chat('https://example.test/chat', '{}', (e) => second.push(JSON.parse(e)));
+  await tick();
+  assert.equal(calls[0].signal.aborted, true);
+  try { calls[0].controller.enqueue(sse({ type: 'done', text: 'stale' })); } catch (_) {}
+  calls[1].controller.enqueue(sse({ type: 'done', text: 'fresh' }));
+  await tick();
+  assert.deepEqual(first, []);
+  assert.deepEqual(second, [{ type: 'done', text: 'fresh' }]);
+});
+
+test('abort_stream stops the request in flight without reporting an error', async (t) => {
+  const calls = controllableFetch(t);
+  const events = [];
+  stream_chat('https://example.test/chat', '{}', (e) => events.push(JSON.parse(e)));
+  await tick();
+  abort_stream();
+  await tick();
+  assert.equal(calls[0].signal.aborted, true);
+  assert.deepEqual(events, []);
 });

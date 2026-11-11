@@ -105,10 +105,13 @@ pub type Model {
     stream_state: StreamState,
     voice_on: Bool,
     speech: Speech,
+    // Bumped by every send and every reset; stream events carry the value
+    // they were started with, and events from an older request are dropped.
+    generation: Int,
   )
 }
 
-fn init(_flags) -> #(Model, Effect(Msg)) {
+pub fn init(_flags) -> #(Model, Effect(Msg)) {
   let theme = load_theme()
   apply_theme(theme)
   let language = load_language()
@@ -123,6 +126,7 @@ fn init(_flags) -> #(Model, Effect(Msg)) {
       stream_state: Idle,
       voice_on: do_voice_enabled(),
       speech: Silent,
+      generation: 0,
     )
   let #(model, effects) = reset_with_welcome(model, language)
   #(model, effect.batch([effects, orb_mount()]))
@@ -140,12 +144,13 @@ pub type Msg {
   UserClickedSend
   UserPickedPrompt(String)
   UserToggledVoice
-  StreamEventReceived(String)
+  /// An SSE event of the request started with `generation`.
+  StreamEventReceived(generation: Int, json: String)
   SpeechRevealed(Int)
   SpeechEnded
 }
 
-fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
+pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
     UserCycledTheme -> {
       let next = next_theme(model.theme)
@@ -183,7 +188,13 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       )
     }
 
-    StreamEventReceived(json_str) -> handle_stream_event(model, json_str)
+    // A reply to a request that was replaced or reset (a language switch
+    // mid-reply) must not land in the current conversation.
+    StreamEventReceived(generation, _) if generation != model.generation -> #(
+      model,
+      effect.none(),
+    )
+    StreamEventReceived(_, json_str) -> handle_stream_event(model, json_str)
 
     SpeechRevealed(shown) -> {
       let speech = case shown < 0, model.speech, model.stream_state {
@@ -312,10 +323,11 @@ fn reset_with_welcome(model: Model, lang: Language) -> #(Model, Effect(Msg)) {
       stream_state: Idle,
       input: "",
       speech: Silent,
+      generation: model.generation + 1,
     )
   let #(with_welcome, _) = push(cleared, Bot, s.welcome_msg)
   // A language switch mid-reply drops the stream, so quiet the construct.
-  #(with_welcome, effect.batch([speech_stop(), settle()]))
+  #(with_welcome, effect.batch([stream_abort(), speech_stop(), settle()]))
 }
 
 fn send_current(model: Model) -> #(Model, Effect(Msg)) {
@@ -328,16 +340,24 @@ fn send_current(model: Model) -> #(Model, Effect(Msg)) {
       // History sent to the backend is everything BEFORE the new user message,
       // matching the old script.js slice(0, -1) behaviour.
       let #(history_before_user, _) = split_last(with_user.history)
+      let generation = model.generation + 1
       let effect =
         call_api_stream(
           text,
           history_before_user,
           model.voice_on,
           lang_code(model.language),
+          generation,
         )
       #(
         // A new question interrupts the previous reply's voice.
-        Model(..with_user, input: "", stream_state: Thinking, speech: Silent),
+        Model(
+          ..with_user,
+          input: "",
+          stream_state: Thinking,
+          speech: Silent,
+          generation: generation,
+        ),
         effect.batch([effect, scroll_to_bottom(), cursor_trail()]),
       )
     }
@@ -402,6 +422,7 @@ fn call_api_stream(
   history: List(ChatMessage),
   voice_on: Bool,
   lang: String,
+  generation: Int,
 ) -> Effect(Msg) {
   let wire_history =
     history
@@ -437,7 +458,7 @@ fn call_api_stream(
     }
     do_stream_chat(stream_endpoint(), body, fn(json_str) {
       do_speech_feed(json_str)
-      dispatch(StreamEventReceived(json_str))
+      dispatch(StreamEventReceived(generation, json_str))
     })
   })
 }
@@ -478,6 +499,11 @@ fn orb_simmer(on: Bool) -> Effect(Msg) {
 /// at the end of the reply in the same frame the new text appears.
 fn cursor_trail() -> Effect(Msg) {
   effect.before_paint(fn(_dispatch, _root) { do_trail_cursor(streaming_reply) })
+}
+
+/// Abort the request in flight, if any; it reports nothing more.
+fn stream_abort() -> Effect(Msg) {
+  effect.from(fn(_dispatch) { do_stream_abort() })
 }
 
 fn speech_stop() -> Effect(Msg) {
@@ -936,6 +962,9 @@ fn is_localhost() -> Bool
 
 @external(javascript, "./ffi.mjs", "stream_chat")
 fn do_stream_chat(url: String, body: String, on_event: fn(String) -> Nil) -> Nil
+
+@external(javascript, "./ffi.mjs", "abort_stream")
+fn do_stream_abort() -> Nil
 
 @external(javascript, "./ffi.mjs", "mount_orb")
 fn do_mount_orb(selector: String) -> Nil

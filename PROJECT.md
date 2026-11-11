@@ -75,7 +75,7 @@ gleam run                   # builds Lustre bundle into ./public then boots HTTP
 gleam run -- fetch          # refresh resume JSON into ./data
 gleam test                  # pure-logic tests (backend only)
 # Frontend transport regressions (Node 24; no npm dependencies):
-(cd frontend && gleam build && node --test test/*.test.mjs)
+(cd frontend && gleam build && node --test test/*.test.mjs)   # transport + app update tests
 
 # `gleam run` detects frontend/gleam.toml and shells out to
 # `gleam run -m lustre/dev build --minify --outdir=../public` inside frontend/
@@ -164,6 +164,7 @@ docker run -p 8080:8080 \
 - Follows the family design system (`../DESIGN-SYSTEM.md`, section ai.arda.tr). Styles are hand-written in `public/style.css`; bump `style.css?v=` in `frontend/gleam.toml` when it changes.
 - Renditions: `night` (default), `night-hc`, `xerox`, `xerox-hc`, stored in localStorage `theme` and applied as `body[data-theme]`. Legacy ids migrate on read (`light`→xerox, `paper`→xerox-hc, `dark`→night, `carbon`→night-hc) in both the pre-hydration script (`frontend/gleam.toml`) and `theme_from_string` (`frontend.gleam`); keep the two in sync.
 - The construct orb and the crackle cursor are canvases created by `ffi.mjs`, outside Lustre's vdom: the orb mounts into `#construct-orb` (a vnode with no children, so re-renders never touch it); the cursor is re-appended to the end of `.msg.is-streaming .txt` in a `before_paint` effect after each chunk. The orb sizzles on every chunk, simmers between `thinking` and the first chunk, and does neither under `prefers-reduced-motion`.
+- One request at a time: `stream_chat` aborts the request in flight before starting another, and a reset (language switch) calls `abort_stream`. Each send/reset bumps `Model.generation`; stream events carry the generation they were started with and older ones are dropped, so a reply can never land in a newer conversation. `test/app.test.mjs` drives `init`/`update` in Node to check this.
 - `onebit.mjs` must stay byte-identical to `design-previews/onebit/onebit.js`, and `voice.mjs` to `design-previews/onebit/voice.js`; change the shared copy first.
 - Voice: while a reply is spoken, the model's `speech` is `Speaking(msg_id, shown)` and the message renders `reveal_prefix(text, shown)` (UTF-16 prefix, with a half-typed link or `**` tidied). The cursor trails the revealed text, and the status reads `speaking…`. `done` no longer ends the cursor while the voice runs; `SpeechEnded` does. The `♪` toggle (`.voice-toggle`, next to the language switch) shows `♪ on/off` (localised). On phones it shows only `♪`, struck through when muted.
 
