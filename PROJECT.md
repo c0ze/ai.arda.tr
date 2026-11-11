@@ -138,7 +138,8 @@ docker run -p 8080:8080 \
     and reports truncated or stalled responses as errors (45s idle deadline), releasing
     the busy composer. Its transport tests run in CI and before UI publication.
   - Handled at the raw Mist level (Wisp cannot do streaming responses).
-- `GET /*` → static files from `PUBLIC_DIR`.
+- `GET /healthz` (and `/health`, since Cloud Run's front end reserves some paths ending in `z`) → 200 `{"ok":true}`: no model call, no rate limit.
+- `GET /*` → static files from `PUBLIC_DIR`. `HEAD` is answered like `GET`, without the body.
 - Limits (`guard.gleam`, both endpoints): bodies over 256 KB get 413 `Request body too large`; an empty or whitespace-only `message` gets 400 `Message is empty`, one over 4000 characters (`shared.max_message_chars`, also the input's `maxlength`) 400 `Message is too long (at most 4000 characters)`. History is capped to the last 20 items and each item is cut to 8000 characters (`shared.max_history_item_chars`), not rejected: the sibling widgets resend a rejected message as history, which would wedge their conversation. The body limit is generous because those widgets send their whole conversation uncapped.
 - Header checks (`guard.check_headers`, both endpoints, before the rate limiter): a request whose `Origin` is neither in `ALLOWED_ORIGINS` nor the backend's own origin (its `Host`) gets 403 `Origin not allowed`; requests with no `Origin` (curl, server-side callers) pass. A body that is not `application/json` (a charset parameter is fine) gets 415 `Content-Type must be application/json`. All three clients send `Content-Type: application/json`.
 - Rate limiting is per client IP (right-most `X-Forwarded-For` hop); IPv6 clients are keyed on their /64.

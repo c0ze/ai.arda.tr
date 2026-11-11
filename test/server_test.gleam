@@ -11,6 +11,7 @@ import gleam/list
 import gleam/option.{None}
 import gleam/string
 import gleeunit/should
+import simplifile
 import wisp/simulate
 
 const allowed_origin = "https://ai.arda.tr"
@@ -116,4 +117,37 @@ pub fn preflight_varies_on_origin_and_allows_only_content_type_test() {
   list.key_find(resp.headers, "vary") |> should.equal(Ok("origin"))
   list.key_find(resp.headers, "access-control-allow-headers")
   |> should.equal(Ok("Content-Type"))
+}
+
+// ---------------------------------------------------------------------------
+// Health and HEAD: cheap probes that never touch the model or the limiter.
+// ---------------------------------------------------------------------------
+
+pub fn healthz_is_ok_without_a_model_call_or_rate_limit_test() {
+  // A limiter that allows nothing: /healthz must not be counted against it.
+  let cfg =
+    Config(
+      ..config(),
+      rate_limit: rate_limit.Config(max_requests: 0, window_ms: 1),
+    )
+  let resp = server.handle(simulate.request(http.Get, "/healthz"), cfg)
+  resp.status |> should.equal(200)
+  simulate.read_body(resp) |> should.equal("{\"ok\":true}")
+  let resp = server.handle(simulate.request(http.Get, "/health"), cfg)
+  resp.status |> should.equal(200)
+}
+
+pub fn head_on_the_root_is_like_get_without_a_body_test() {
+  let dir = "build/test-public"
+  let assert Ok(_) = simplifile.create_directory_all(dir)
+  let assert Ok(_) =
+    simplifile.write(dir <> "/index.html", "<!doctype html><title>t</title>")
+  let cfg = Config(..config(), public_dir: dir)
+  let get = server.handle(simulate.request(http.Get, "/"), cfg)
+  let head = server.handle(simulate.request(http.Head, "/"), cfg)
+  get.status |> should.equal(200)
+  head.status |> should.equal(200)
+  list.key_find(head.headers, "content-type")
+  |> should.equal(list.key_find(get.headers, "content-type"))
+  simulate.read_body(head) |> should.equal("")
 }

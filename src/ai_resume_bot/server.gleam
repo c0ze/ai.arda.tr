@@ -38,14 +38,28 @@ pub type Config {
 ///
 /// Route table mirrors main.go:
 ///   POST /api/chat  -> Gemini
+///   GET  /healthz   -> 200 {"ok":true} (no model call, no rate limit);
+///                      also /health
 ///   GET  /*         -> static files from `public_dir` (falls through to
 ///                      index.html on the root for SPA-ish behaviour)
+/// HEAD is answered like GET, without the body.
 pub fn handle(req: Request, config: Config) -> Response {
   use <- maybe_log_request(req, config.log_requests)
   use <- cors_middleware(req, config.allowed_origins)
   case wisp.path_segments(req) {
+    // Cloud Run reserves some paths ending in "z" at its front end, so
+    // /healthz may never reach the container on the run.app URL; /health is
+    // the same probe without that risk.
+    ["healthz"] | ["health"] -> health(req)
     ["api", "chat"] -> handle_chat(req, config)
     _ -> serve_frontend(req, config)
+  }
+}
+
+fn health(req: Request) -> Response {
+  case req.method {
+    http.Get | http.Head -> wisp.json_response("{\"ok\":true}", 200)
+    _ -> json_response(405, models.error_response("Method not allowed"))
   }
 }
 
@@ -67,8 +81,21 @@ fn serve_frontend(req: Request, config: Config) -> Response {
     "/" | "" -> request.set_path(req, "/index.html")
     _ -> req
   }
-  use <- wisp.serve_static(req, under: "/", from: config.public_dir)
-  wisp.not_found()
+  // serve_static only answers GET; answer HEAD the same way, minus the body
+  // (Mist does not drop a file body for HEAD by itself).
+  let is_head = req.method == http.Head
+  let req = case is_head {
+    True -> request.set_method(req, http.Get)
+    False -> req
+  }
+  let resp = {
+    use <- wisp.serve_static(req, under: "/", from: config.public_dir)
+    wisp.not_found()
+  }
+  case is_head {
+    True -> response.set_body(resp, wisp.Text(""))
+    False -> resp
+  }
 }
 
 // ---------------------------------------------------------------------------
