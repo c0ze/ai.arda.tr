@@ -1,5 +1,7 @@
 # Gleam Migration Plan
 
+> **Historical.** This plan was written before the migration, when the app was Go plus vanilla JavaScript. The migration is done: the backend and the frontend are both Gleam now, and the Go app is gone. See [PROJECT.md](../PROJECT.md) for the current architecture.
+
 ## Goal
 
 Rewrite this project from Go plus vanilla JavaScript into a Gleam-based system while keeping the current behavior:

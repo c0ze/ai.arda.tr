@@ -1,6 +1,6 @@
-# AGENTS.md
+# PROJECT.md
 
-This file provides guidance to coding agents working with this repository.
+The handoff document for this repository: architecture, constraints, key files, and how to run and validate. Rules for agents are in [CLAUDE.md](CLAUDE.md) (= `AGENTS.md`).
 
 ## Project Overview
 
@@ -38,7 +38,8 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │       ├── email.gleam     # [[SEND_EMAIL]] tag extract + sanitize
 │       ├── smtp.gleam      # SMTP delivery wrapper over the FFI
 │       ├── rate_limit.gleam         # Per-IP rate limiting over the ETS FFI
-│       ├── server.gleam    # Wisp handler: CORS, /api/chat, static serving
+│       ├── guard.gleam     # Request checks for both chat endpoints: origin, content type, size limits
+│       ├── server.gleam    # Wisp handler: CORS, /api/chat, /healthz, static serving
 │       ├── stream_handler.gleam     # Raw Mist handler for /api/chat/stream (SSE)
 │       ├── speech.gleam    # Voice: sentence splitter, markdown → words, SSML marks, raw offsets (pure)
 │       ├── voice.gleam     # Voice: per-reply session, bounded synthesis, in-order speech events (pure)
@@ -46,10 +47,13 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │       └── dotenv.gleam    # Minimal .env loader (real env vars win)
 ├── test/
 │   ├── ai_resume_bot_test.gleam     # gleeunit tests (prompt, email, SSE parsing, rate limit, blog)
+│   ├── guard_test.gleam             # request limits and header checks
+│   ├── server_test.gleam            # Wisp handler: 400/403/413/415, CORS, /healthz, HEAD (never reaches Gemini)
 │   ├── speech_test.gleam            # splitter / markdown stripper / UTF-16 offsets (EN, TR, JA)
 │   └── voice_test.gleam             # speech session with a mocked TTS, TTS wire format, request compat
 ├── frontend/               # Lustre (Gleam -> JS) frontend project
 │   ├── gleam.toml          # target = "javascript", [tools.lustre.*] config
+│   ├── test/               # node --test: ffi.test.mjs (transport, markdown), app.test.mjs (update/view)
 │   └── src/
 │       ├── frontend.gleam  # Lustre app: init/update/view, API effect, FFI
 │       ├── frontend/i18n.gleam    # EN/JP/TR translations + quick-prompt strings
@@ -98,7 +102,7 @@ docker run -p 8080:8080 \
 | Var | Required | Default | Purpose |
 |---|---|---|---|
 | `GEMINI_API_KEY` | yes | — | Google Gemini API key |
-| `ALLOWED_ORIGINS` | yes | — | Semicolon-delimited CORS allowlist |
+| `ALLOWED_ORIGINS` | yes | — | Semicolon-delimited CORS allowlist; must include `https://arda.tr` and `https://resume.arda.tr` for their widgets. Other origins get 403 |
 | `PORT` | no | `8080` | HTTP listen port |
 | `PUBLIC_DIR` | no | `./public` | Static asset directory |
 | `GEMINI_MODEL` | no | `gemini-3.5-flash` | Gemini model id |
@@ -115,7 +119,9 @@ docker run -p 8080:8080 \
 | `TTS_VOICE_EN` / `TTS_VOICE_TR` / `TTS_VOICE_JA` | no | `en-US-Standard-D` / `tr-TR-Standard-E` / `ja-JP-Standard-C` | Cloud TTS voice per language |
 | `TTS_PITCH` | no | `-4` | Semitones |
 | `TTS_SPEAKING_RATE` | no | `0.92` | 1.0 = normal |
+| `TTS_SPEAKING_RATE_JA` | no | `1.06` | Japanese speaking rate (Japanese speaks faster) |
 | `VOICE_MAX_CHARS` | no | `1200` | Spoken characters per reply; the rest is revealed after the audio |
+| `VOICE_MAX_CHARS_JA` | no | `400` | The same cap for Japanese replies |
 | `TTS_BACKEND` | no | `google` | `mock` = generated WAV tones with fake marks, for local end-to-end runs |
 | `TTS_ACCESS_TOKEN` / `TTS_QUOTA_PROJECT` | dev-only | — | Stand-ins for the metadata server when running locally against the real API: `TTS_ACCESS_TOKEN=$(gcloud auth print-access-token) TTS_QUOTA_PROJECT=ai-resume-chatbot-479106`. Never set in production. |
 
@@ -202,16 +208,3 @@ Local end-to-end: `TTS_BACKEND=mock gleam run` (real Gemini, fake audio), or aga
 - **Frontend**: Push to `main` triggers `.github/workflows/deploy-ui.yml` → GitHub Pages
 - Cloud Run URL: `https://ai-arda-tr-api-599610058688.asia-northeast1.run.app`
 
-
-<!-- ============================================================
-UNRECONCILED — 6 lines that existed only in CLAUDE.md when CLAUDE.md and
-AGENTS.md were consolidated (2026-08-08). Fold anything useful into the
-sections above, then delete this block.
-============================================================ -->
-
-Claude Code there.
-# CLAUDE.md
-guidance (stack, architecture, project structure, env vars, the blog-RSS
-prompt section, the `[[SEND_EMAIL]]` contact handoff, CORS, and deployment).
-Read **AGENTS.md** first — it is canonical. This file only exists to point
-This repository uses **[AGENTS.md](./AGENTS.md)** as the single source of agent

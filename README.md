@@ -24,7 +24,8 @@ A chatbot that answers questions about Arda's career and personal interests (inc
 2. **Create a `.env` file at the repo root:**
    ```env
    GEMINI_API_KEY=your_actual_key
-   ALLOWED_ORIGINS=https://ai.arda.tr;http://localhost:8080
+   # The arda.tr and resume.arda.tr chat widgets call this API too.
+   ALLOWED_ORIGINS=https://ai.arda.tr;https://arda.tr;https://resume.arda.tr;http://localhost:8080
    # Optional:
    # PORT=8080
    # LOG_REQUESTS=true              # per-request logs, off in prod by default
@@ -72,13 +73,22 @@ The resume JSON is fetched at build time and baked into the image. The built fro
 | Var | Required | Default | Purpose |
 |---|---|---|---|
 | `GEMINI_API_KEY` | yes | — | Google Gemini API key |
-| `ALLOWED_ORIGINS` | yes | — | Semicolon-delimited CORS allowlist |
+| `ALLOWED_ORIGINS` | yes | — | Semicolon-delimited CORS allowlist. Must include `https://arda.tr` and `https://resume.arda.tr` (their chat widgets call this API); other origins get 403 |
 | `PORT` | no | `8080` | HTTP listen port |
 | `PUBLIC_DIR` | no | `./public` | Static asset directory |
 | `GEMINI_MODEL` | no | `gemini-3.5-flash` | Gemini model id |
 | `LOG_REQUESTS` | no | off | `true`/`1`/`yes`/`on` enables per-request logs |
 | `RATE_LIMIT_REQUESTS` | no | `30` | Max chat requests per window per client IP |
 | `RATE_LIMIT_WINDOW_SECONDS` | no | `60` | Rate-limit window length, in seconds |
+| `BLOG_FEED_URL` | no | `https://blog.arda.tr/rss.xml` | RSS feed for the "recent posts" prompt section |
+| `BLOG_REFRESH_SECONDS` | no | `21600` | Refresh interval for the feed (default 6h) |
+| `VOICE_ENABLED` | no | `true` | Offer voice replies (`false`/`0`/`off` disables) |
+| `VOICE_MAX_CHARS` / `VOICE_MAX_CHARS_JA` | no | `1200` / `400` | Spoken characters per reply (Japanese has its own cap) |
+| `TTS_VOICE_EN` / `TTS_VOICE_TR` / `TTS_VOICE_JA` | no | `en-US-Standard-D` / `tr-TR-Standard-E` / `ja-JP-Standard-C` | Cloud Text-to-Speech voice per language |
+| `TTS_PITCH` | no | `-4` | Semitones |
+| `TTS_SPEAKING_RATE` / `TTS_SPEAKING_RATE_JA` | no | `0.92` / `1.06` | 1.0 = normal |
+| `TTS_BACKEND` | no | `google` | `mock` = generated tones, for local end-to-end runs |
+| `TTS_ACCESS_TOKEN` / `TTS_QUOTA_PROJECT` | dev-only | — | Local stand-ins for the metadata server; never set in production (see PROJECT.md) |
 | `GMAIL_USER` | no | — | SMTP user for contact-email handoff |
 | `GMAIL_APP_PASSWORD` | no | — | SMTP app password |
 | `CONTACT_ADDRESS` | no | `GMAIL_USER` | Recipient of contact emails |

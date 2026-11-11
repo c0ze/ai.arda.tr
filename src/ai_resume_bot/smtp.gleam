@@ -1,10 +1,8 @@
 //// SMTP delivery via Erlang interop.
 ////
 //// We call the `gen_smtp_client` Erlang module directly. gen_smtp is the
-//// canonical BEAM SMTP client (used by Bamboo, Swoosh, etc.) and is pulled
-//// in transitively by common Gleam email packages; if it is not already
-//// present in the release, add it to the `erlang.applications` list in
-//// gleam.toml or vendor it.
+//// canonical BEAM SMTP client (used by Bamboo, Swoosh, etc.) and is a direct
+//// dependency in gleam.toml, so it is always in the release.
 ////
 //// Falls back gracefully when not configured (see email.config_from_env).
 

@@ -6,8 +6,9 @@
 ////   - language switcher (en / jp / tr) with translated strings + quick
 ////     prompts, persisted in localStorage like the theme
 ////   - chat history sent with each request to `/api/chat/stream` (SSE)
-////   - markdown rendered through marked.js + DOMPurify (loaded from CDN
-////     globals in `index.html` and invoked through `ffi.mjs`)
+////   - markdown rendered through marked.js + DOMPurify (vendored under
+////     `public/vendor/`, loaded as globals by `index.html` and invoked
+////     through `ffi.mjs`)
 ////
 //// Streaming: The frontend POSTs to `/api/chat/stream` and receives SSE
 //// events: `thinking` → `chunk`* → `done`. The construct orb (a 1-bit

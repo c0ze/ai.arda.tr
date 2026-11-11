@@ -20,8 +20,9 @@ Best for rapid iteration.
       --region asia-northeast1 \
       --project YOUR_PROJECT_ID \
       --allow-unauthenticated \
-      --set-env-vars "GEMINI_API_KEY=your_key,ALLOWED_ORIGINS=https://ai.arda.tr;http://localhost:8080"
+      --update-env-vars "GEMINI_API_KEY=your_key,ALLOWED_ORIGINS=https://ai.arda.tr;https://arda.tr;https://resume.arda.tr;http://localhost:8080"
     ```
+    Use `--update-env-vars`, not `--set-env-vars`: `--set-env-vars` replaces every variable on the service (the `TTS_*` / `VOICE_*` / `GMAIL_*` ones included), which is why [cloud_deploy.sh](cloud_deploy.sh) uses `--update-env-vars` too. `ALLOWED_ORIGINS` must include `https://arda.tr` and `https://resume.arda.tr`, or their chat widgets get 403.
     `GEMINI_API_KEY` and `ALLOWED_ORIGINS` are required at startup. `GMAIL_USER` / `GMAIL_APP_PASSWORD` / `CONTACT_ADDRESS` are optional for the contact-email handoff.
 
 3.  **Finalize:**
@@ -75,7 +76,7 @@ Under `Settings → Secrets and variables → Actions` (or via `gh secret set`):
 
 ### Triggering
 
-Once the secrets are set, **pushing backend changes to `main` deploys automatically** (path-filtered to `Dockerfile`, `src/**`, `shared/src/**`, `gleam.toml`, `manifest.toml`, and `job_requirements.md`). You can also run it on demand from the Actions tab (`Deploy Backend to Cloud Run → Run workflow`).
+Once the secrets are set, **pushing backend changes to `main` deploys automatically** (path-filtered to `Dockerfile`, `src/**`, `shared/src/**`, `shared/gleam.toml`, `shared/manifest.toml`, `gleam.toml`, `manifest.toml`, `personal.md`, `job_requirements.md` and the workflow itself). You can also run it on demand from the Actions tab (`Deploy Backend to Cloud Run → Run workflow`).
 
 ---
 
@@ -97,4 +98,4 @@ The obvious fix is keyless auth, and this repo already does that for GCP — the
 
 A schedule needs neither. The credential was removed rather than rotated, which is why there is nothing here to expire.
 
-**Cost note:** this deploy builds the container from source (`source: '.'`), so a scheduled run is a full Cloud Build image build, push and deploy — not a lightweight restart. At daily that is ~365 builds and 365 stored images a year for a document that changes a handful of times. If Artifact Registry storage grows, either widen the cron to weekly (`17 3 * * 1`) or add an Artifact Registry cleanup policy.
+**Cost note:** this deploy builds the container from source (`source: '.'`), so a scheduled run is a full Cloud Build image build, push and deploy — not a lightweight restart. At daily that is ~365 builds and 365 stored images a year for a document that changes a handful of times. Artifact Registry already has a cleanup policy for these images; if storage still grows, widen the cron to weekly (`17 3 * * 1`).

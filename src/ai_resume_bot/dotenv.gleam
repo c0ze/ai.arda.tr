@@ -13,7 +13,7 @@ import gleam/string
 import simplifile
 
 /// Load `.env` from the current working directory, falling back to the
-/// parent directory. This lets you `cd gleam_backend && gleam run` and still
+/// parent directory. This lets you run from a subdirectory and still
 /// pick up a repo-root `.env`, matching what developers expect from
 /// godotenv/dotenv in Node. Never fails: a missing or malformed file is
 /// silently ignored so production (which injects real env vars) works the

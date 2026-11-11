@@ -234,10 +234,12 @@ fn require_env(name: String) -> String {
       io.println(
         "Set it in your shell, or put it in a .env file at the repo root",
       )
-      io.println("or in gleam_backend/. Example:")
+      io.println("or its parent directory. Example:")
       io.println("")
       io.println("  GEMINI_API_KEY=your_key")
-      io.println("  ALLOWED_ORIGINS=https://ai.arda.tr;http://localhost:8080")
+      io.println(
+        "  ALLOWED_ORIGINS=https://ai.arda.tr;https://arda.tr;https://resume.arda.tr;http://localhost:8080",
+      )
       io.println("")
       halt_flush(1)
       ""

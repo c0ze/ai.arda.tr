@@ -5,10 +5,9 @@
 %% Gleam side can pattern-match on a stable shape regardless of the
 %% underlying gen_smtp error tuple.
 %%
-%% gen_smtp is available on hex as `gen_smtp`. Add it to gleam.toml
-%% erlang.extra_applications once vendored; for local dev without gen_smtp
-%% installed, this module falls back to logging the payload so the rest of
-%% the pipeline stays testable.
+%% gen_smtp is a direct dependency in gleam.toml. If the module is ever
+%% missing at runtime, this shim logs and reports a send failure instead of
+%% crashing.
 
 -module(ai_resume_bot_smtp_ffi).
 -export([send/4, now_rfc5322/0]).
