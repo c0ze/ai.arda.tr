@@ -108,6 +108,9 @@ pub type Model {
     // Bumped by every send and every reset; stream events carry the value
     // they were started with, and events from an older request are dropped.
     generation: Int,
+    // The last completed reply, for the screen-reader live region. Set once
+    // when a reply completes (not on every chunk), cleared on send.
+    announcement: String,
   )
 }
 
@@ -127,6 +130,7 @@ pub fn init(_flags) -> #(Model, Effect(Msg)) {
       voice_on: do_voice_enabled(),
       speech: Silent,
       generation: 0,
+      announcement: "",
     )
   let #(model, effects) = reset_with_welcome(model, language)
   #(model, effect.batch([effects, orb_mount()]))
@@ -262,7 +266,11 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
             Streaming(bot_msg_id) -> {
               // Replace with the final complete text (may include email
               // success suffix from the server).
-              let model = replace_message_text(model, bot_msg_id, text)
+              let model =
+                Model(
+                  ..replace_message_text(model, bot_msg_id, text),
+                  announcement: text,
+                )
               // Still speaking: the cursor stays until the voice is done.
               case model.speech {
                 Speaking(..) -> #(
@@ -286,7 +294,7 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
 
         shared.StreamError(message) -> {
           let error_text = "System Malfunction: " <> message
-          let model = Model(..model, speech: Silent)
+          let model = Model(..model, speech: Silent, announcement: error_text)
           case model.stream_state {
             Streaming(bot_msg_id) -> {
               let has_partial_text =
@@ -324,6 +332,7 @@ fn reset_with_welcome(model: Model, lang: Language) -> #(Model, Effect(Msg)) {
       input: "",
       speech: Silent,
       generation: model.generation + 1,
+      announcement: "",
     )
   let #(with_welcome, _) = push(cleared, Bot, s.welcome_msg)
   // A language switch mid-reply drops the stream, so quiet the construct.
@@ -357,6 +366,7 @@ fn send_current(model: Model) -> #(Model, Effect(Msg)) {
           stream_state: Thinking,
           speech: Silent,
           generation: generation,
+          announcement: "",
         ),
         effect.batch([effect, scroll_to_bottom(), cursor_trail()]),
       )
@@ -523,7 +533,7 @@ fn settle() -> Effect(Msg) {
 // View
 // ---------------------------------------------------------------------------
 
-fn view(model: Model) -> Element(Msg) {
+pub fn view(model: Model) -> Element(Msg) {
   let s = i18n.strings(model.language)
 
   html.div([attribute.id("app")], [
@@ -683,14 +693,29 @@ fn messages_container(model: Model, s: Strings) -> Element(Msg) {
     _ -> []
   }
   html.div([attribute.id("messages-container")], [
+    // The transcript is a log, but it does not announce itself: it changes on
+    // every chunk. The finished reply goes to `#reply-announcer` instead.
     html.div(
-      [attribute.id("messages")],
+      [
+        attribute.id("messages"),
+        attribute.attribute("role", "log"),
+        attribute.attribute("aria-live", "off"),
+      ],
       list.append(
         list.map(model.history, fn(msg) {
           view_message(msg, model.stream_state, model.speech, s)
         }),
         tail,
       ),
+    ),
+    html.div(
+      [
+        attribute.id("reply-announcer"),
+        attribute.class("sr-only"),
+        attribute.attribute("aria-live", "polite"),
+        attribute.attribute("aria-atomic", "true"),
+      ],
+      [html.text(plain_text(model.announcement))],
     ),
   ])
 }
@@ -953,6 +978,9 @@ fn do_set_document_lang(lang: String) -> Nil
 
 @external(javascript, "./ffi.mjs", "render_markdown")
 fn render_markdown(text: String) -> String
+
+@external(javascript, "./ffi.mjs", "plain_text")
+fn plain_text(markdown: String) -> String
 
 @external(javascript, "./ffi.mjs", "scroll_to_bottom")
 fn do_scroll_to_bottom(selector: String) -> Nil

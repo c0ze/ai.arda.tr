@@ -39,3 +39,43 @@ test('events of the current request are still applied', () => {
   model = step(model, new StreamEventReceived(gen, '{"type":"done","text":"Hello."}'));
   assert.equal(texts(model).at(-1), 'Hello.');
 });
+
+// ---------------------------------------------------------------------------
+// Screen readers: the reply is announced once, when it is complete.
+// ---------------------------------------------------------------------------
+
+import { view } from '../build/dev/javascript/frontend/frontend.mjs';
+import { to_string } from '../build/dev/javascript/lustre/lustre/element.mjs';
+
+test('a reply is announced once, when it completes, not on every chunk', () => {
+  let model = start();
+  model = step(model, new UserTypedInput('Hi'));
+  model = step(model, new UserClickedSend());
+  const gen = model.generation;
+  model = step(model, new StreamEventReceived(gen, '{"type":"thinking"}'));
+  model = step(model, new StreamEventReceived(gen, '{"type":"chunk","text":"Hel"}'));
+  assert.equal(model.announcement, '', 'nothing is announced while the reply streams');
+  model = step(model, new StreamEventReceived(gen, '{"type":"chunk","text":"lo."}'));
+  assert.equal(model.announcement, '');
+  model = step(model, new StreamEventReceived(gen, '{"type":"done","text":"Hello."}'));
+  assert.equal(model.announcement, 'Hello.');
+  // The next question clears it, so an identical reply is announced again.
+  model = step(model, new UserTypedInput('Hi again'));
+  model = step(model, new UserClickedSend());
+  assert.equal(model.announcement, '');
+});
+
+test('the transcript is a log that does not announce itself; a polite region carries the reply', () => {
+  let model = start();
+  model = step(model, new UserTypedInput('Hi'));
+  model = step(model, new UserClickedSend());
+  model = step(model, new StreamEventReceived(model.generation, '{"type":"thinking"}'));
+  model = step(model, new StreamEventReceived(model.generation, '{"type":"done","text":"Hello there."}'));
+  const html = to_string(view(model));
+  const messages = html.match(/<div[^>]*id="messages"[^>]*>/)[0];
+  assert.match(messages, /role="log"/);
+  assert.match(messages, /aria-live="off"/);
+  const announcer = html.match(/<div[^>]*id="reply-announcer"[^>]*>([^<]*)<\/div>/);
+  assert.match(announcer[0], /aria-live="polite"/);
+  assert.equal(announcer[1], 'Hello there.');
+});

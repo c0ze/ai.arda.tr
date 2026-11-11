@@ -81,6 +81,15 @@ export function render_markdown(text) {
   return html.replace(/<a href/g, '<a target="_blank" rel="noopener noreferrer" href');
 }
 
+// A reply as a screen reader should hear it: the rendered markdown's text,
+// without the ** and []() markup. Outside a browser the text is returned as is.
+export function plain_text(markdown) {
+  if (!markdown || typeof document === "undefined") return markdown;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = render_markdown(markdown); // sanitised; detached, never shown
+  return tmp.textContent.replace(/\s+/g, " ").trim();
+}
+
 // Defer DOM mutations by a tick so Lustre has finished rendering the node
 // before we read its layout.
 export function scroll_to_bottom(selector) {

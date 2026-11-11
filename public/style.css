@@ -256,6 +256,19 @@ canvas.px {
 .ai-id .state.is-busy { color: var(--sig); }
 .ai-id .state.is-busy::before { content: "● "; }
 
+/* Read by screen readers, not shown (the finished reply, see #reply-announcer). */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* ─── Messages ────────────────────────────────── */
 #messages-container {
     flex: 1;
