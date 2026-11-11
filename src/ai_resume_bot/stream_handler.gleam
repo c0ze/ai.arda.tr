@@ -38,6 +38,7 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
+import gleam/result
 import gleam/string
 import gleam/string_tree
 import logging
@@ -109,13 +110,15 @@ pub fn handle_stream(
       )
     True ->
       // Read the request body
-      case mist.read_body(req, guard.max_body_bytes) {
+      case read_body(req, guard.max_body_bytes) {
         Error(mist.ExcessBody) ->
           with_cors(error_response(413, "Request body too large"))
+          // The rest of the body is still on the socket: don't reuse it.
+          |> response.set_header("connection", "close")
         Error(mist.MalformedBody) ->
           with_cors(error_response(400, "Failed to read request body"))
-        Ok(req_with_body) ->
-          case bit_array.to_string(req_with_body.body) {
+        Ok(body) ->
+          case bit_array.to_string(body) {
             Error(_) ->
               with_cors(error_response(400, "Invalid UTF-8 in request body"))
             Ok(body_str) ->
@@ -150,6 +153,57 @@ fn reject_headers(
       with_cors(error_response(status, message))
   }
 }
+
+/// Read the whole request body, at most `limit` bytes. `mist.read_body` only
+/// checks Content-Length and accumulates a chunked body without a limit, so
+/// the body is streamed and counted instead; a declared length over the limit
+/// is refused before anything is read.
+fn read_body(
+  req: request.Request(mist.Connection),
+  limit: Int,
+) -> Result(BitArray, mist.ReadError) {
+  let declared =
+    request.get_header(req, "content-length")
+    |> result.try(int.parse)
+    |> result.unwrap(0)
+  case declared > limit {
+    True -> Error(mist.ExcessBody)
+    False -> {
+      use consume <- result.try(mist.stream(req))
+      collect_body(consume, limit)
+    }
+  }
+}
+
+/// Pull chunks from a `mist.stream` consumer until it is done, failing with
+/// `ExcessBody` as soon as more than `limit` bytes have arrived.
+pub fn collect_body(
+  consume: fn(Int) -> Result(mist.Chunk, mist.ReadError),
+  limit: Int,
+) -> Result(BitArray, mist.ReadError) {
+  do_collect_body(consume, limit, <<>>)
+}
+
+fn do_collect_body(
+  consume: fn(Int) -> Result(mist.Chunk, mist.ReadError),
+  limit: Int,
+  acc: BitArray,
+) -> Result(BitArray, mist.ReadError) {
+  case consume(body_read_size) {
+    Error(e) -> Error(e)
+    Ok(mist.Done) -> Ok(acc)
+    Ok(mist.Chunk(data, next)) -> {
+      let acc = bit_array.append(acc, data)
+      case bit_array.byte_size(acc) > limit {
+        True -> Error(mist.ExcessBody)
+        False -> do_collect_body(next, limit, acc)
+      }
+    }
+  }
+}
+
+/// Bytes asked of the socket per read while collecting a body.
+const body_read_size = 65_536
 
 /// Messages to the SSE actor. Gemini's stream arrives on its own subject and
 /// is mapped in once the actor has installed its selector (`Start`).
