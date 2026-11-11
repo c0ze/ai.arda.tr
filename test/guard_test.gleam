@@ -172,3 +172,21 @@ pub fn missing_content_type_is_unsupported_test() {
     Error(Rejection(415, "Content-Type must be application/json")),
   )
 }
+
+pub fn same_origin_ignores_default_ports_and_case_test() {
+  let ok = fn(origin, host) {
+    guard.check_headers(Ok(origin), Ok(host), Ok("application/json"), allowed)
+  }
+  ok("https://api.example", "api.example:443") |> should.equal(Ok(Nil))
+  ok("https://api.example:443", "api.example") |> should.equal(Ok(Nil))
+  ok("http://api.example", "api.example:80") |> should.equal(Ok(Nil))
+  ok("https://API.Example", "api.example") |> should.equal(Ok(Nil))
+  ok("http://[::1]:8080", "[::1]:8080") |> should.equal(Ok(Nil))
+  // Different ports are different origins.
+  ok("https://api.example", "api.example:80")
+  |> should.equal(Error(Rejection(403, "Origin not allowed")))
+  ok("https://api.example:8443", "api.example")
+  |> should.equal(Error(Rejection(403, "Origin not allowed")))
+  ok("https://api.example.evil", "api.example")
+  |> should.equal(Error(Rejection(403, "Origin not allowed")))
+}

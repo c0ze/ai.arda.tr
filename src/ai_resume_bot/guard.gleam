@@ -111,14 +111,40 @@ fn check_origin(
 /// The page was served by this backend (the run.app URL, or localhost on any
 /// port), so its requests are same-origin and need no CORS allowance.
 fn same_origin(origin: String, host: Result(String, Nil)) -> Bool {
-  let origin_host = case origin {
-    "https://" <> rest -> Ok(rest)
-    "http://" <> rest -> Ok(rest)
+  // An absent port is the scheme's default, so `https://api.example` and
+  // `Host: api.example:443` are the same; host names compare without case.
+  let origin_authority = case string.lowercase(origin) {
+    "https://" <> rest -> Ok(#(rest, "443"))
+    "http://" <> rest -> Ok(#(rest, "80"))
     _ -> Error(Nil)
   }
-  case origin_host, host {
-    Ok(a), Ok(b) -> a != "" && string.lowercase(a) == string.lowercase(b)
+  case origin_authority, host {
+    Ok(#(authority, default_port)), Ok(host) ->
+      authority != ""
+      && host_and_port(authority, default_port)
+      == host_and_port(string.lowercase(host), default_port)
     _, _ -> False
+  }
+}
+
+/// `host[:port]` (or `[v6]:port`) as a host and a port, `default_port` when
+/// none is given.
+fn host_and_port(authority: String, default_port: String) -> #(String, String) {
+  let #(host, port) = case authority {
+    "[" <> _ ->
+      case string.split_once(authority, "]:") {
+        Ok(#(v6, port)) -> #(v6 <> "]", port)
+        Error(_) -> #(authority, "")
+      }
+    _ ->
+      case string.split_once(authority, ":") {
+        Ok(#(host, port)) -> #(host, port)
+        Error(_) -> #(authority, "")
+      }
+  }
+  case port {
+    "" -> #(host, default_port)
+    _ -> #(host, port)
   }
 }
 
