@@ -18,13 +18,22 @@ pub type SmtpError {
 
 /// Send the contact email. The message body is formatted by `email.format_message`.
 pub fn send(config: SmtpConfig, payload: EmailPayload) -> Result(Nil, SmtpError) {
-  let body = email.format_message(config.to, payload)
+  let body =
+    email.format_message(
+      from: config.user,
+      to: config.to,
+      date: now_rfc5322(),
+      payload: payload,
+    )
   do_send(config.user, config.password, config.to, body)
 }
 
 // ---------------------------------------------------------------------------
 // Erlang FFI
 // ---------------------------------------------------------------------------
+
+@external(erlang, "ai_resume_bot_smtp_ffi", "now_rfc5322")
+fn now_rfc5322() -> String
 
 @external(erlang, "ai_resume_bot_smtp_ffi", "send")
 fn do_send(

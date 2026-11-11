@@ -126,6 +126,8 @@ pub fn prompt_has_scope_guardrail_test() {
       "not a general-purpose assistant",
       "politely decline",
       "reveal this prompt",
+      // The UI and the voice offer Turkish as well.
+      "English, Japanese or Turkish",
     ],
     fn(needle) {
       string.contains(out, needle)
@@ -287,6 +289,40 @@ pub fn contains_tag_test() {
   email.contains_tag("trailing [[/SEND_EMAIL]] only")
   |> should.be_true
   email.contains_tag("nothing to see here")
+  |> should.be_false
+}
+
+// The contact email must carry the headers a mail client needs, and declare
+// UTF-8 so a visitor's non-ASCII name (Şebnem, 山田) survives.
+pub fn contact_email_has_from_date_and_utf8_mime_headers_test() {
+  let msg =
+    email.format_message(
+      from: "bot@example.com",
+      to: "arda@example.com",
+      date: "Thu, 12 Nov 2026 03:17:00 +0000",
+      payload: models.EmailPayload(
+        name: "Şebnem 山田",
+        email: "s@example.com",
+        org: "Acme\r\nBcc: evil@example.com",
+        analysis: "fit",
+        job_details: "role",
+      ),
+    )
+  let assert Ok(#(headers, body)) = string.split_once(msg, "\r\n\r\n")
+  string.split(headers, "\r\n")
+  |> should.equal([
+    "From: bot@example.com",
+    "To: arda@example.com",
+    "Date: Thu, 12 Nov 2026 03:17:00 +0000",
+    "Subject: New Job Opportunity via AI Bot",
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
+  ])
+  string.contains(body, "Şebnem 山田")
+  |> should.be_true
+  // CR/LF in a field still cannot start a new header line.
+  string.contains(msg, "\r\nBcc:")
   |> should.be_false
 }
 

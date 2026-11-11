@@ -11,7 +11,7 @@
 %% the pipeline stays testable.
 
 -module(ai_resume_bot_smtp_ffi).
--export([send/4]).
+-export([send/4, now_rfc5322/0]).
 
 send(User, Password, To, Body) ->
     case code:which(gen_smtp_client) of
@@ -95,3 +95,14 @@ do_send(Email, Options) ->
                 io_lib:format("~p:~p", [Class, Reason])
             )}}
     end.
+
+%% The current time as an RFC 5322 Date header value, in UTC:
+%% "Thu, 12 Nov 2026 03:17:00 +0000".
+now_rfc5322() ->
+    {{Y, Mo, D} = Date, {H, Mi, S}} = calendar:universal_time(),
+    Day = element(calendar:day_of_the_week(Date),
+                  {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}),
+    Month = element(Mo, {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}),
+    iolist_to_binary(io_lib:format("~s, ~2..0w ~s ~4..0w ~2..0w:~2..0w:~2..0w +0000",
+                                   [Day, D, Month, Y, H, Mi, S])).

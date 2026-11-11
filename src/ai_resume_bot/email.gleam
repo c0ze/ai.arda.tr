@@ -142,15 +142,30 @@ pub fn sanitize(s: String) -> String {
 // Message body formatter. Kept pure so it is trivially unit-testable.
 // ---------------------------------------------------------------------------
 
-pub fn format_message(to: String, payload: EmailPayload) -> String {
+/// The whole message, headers included. `date` is an RFC 5322 date (see
+/// `smtp.send`). The body is UTF-8 sent as 8bit, so a visitor's non-ASCII
+/// name or company survives.
+pub fn format_message(
+  from from: String,
+  to to: String,
+  date date: String,
+  payload payload: EmailPayload,
+) -> String {
   let name = sanitize(payload.name)
   let org = sanitize(payload.org)
   let email = sanitize(payload.email)
   let analysis = sanitize(payload.analysis)
   let job_details = sanitize(payload.job_details)
-  "To: "
-  <> to
-  <> "\r\nSubject: New Job Opportunity via AI Bot\r\n\r\n"
+  "From: "
+  <> sanitize(from)
+  <> "\r\nTo: "
+  <> sanitize(to)
+  <> "\r\nDate: "
+  <> sanitize(date)
+  <> "\r\nSubject: New Job Opportunity via AI Bot"
+  <> "\r\nMIME-Version: 1.0"
+  <> "\r\nContent-Type: text/plain; charset=UTF-8"
+  <> "\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
   <> "Hello,\r\n\r\n"
   <> "Today I got an interesting position from "
   <> name
