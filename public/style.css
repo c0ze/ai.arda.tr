@@ -648,3 +648,51 @@ canvas.px.cursor {
         padding: 4px 5px;
     }
 }
+
+/* ─── Short screens (phone landscape, zoomed desktop) ─
+   #app is pinned to the viewport, so the identity block and the footer would
+   leave the conversation no room: the block collapses to the orb, the title
+   and the status line, and the quick prompts go. */
+@media (max-height: 560px) {
+    .ai-id {
+        padding: 8px 0;
+        gap: 12px;
+    }
+
+    .orb {
+        width: 34px;
+        height: 34px;
+    }
+
+    .ai-id h1 { font-size: 24px; }
+    .ai-id h1:lang(ja) { font-size: 19px; line-height: 1.1; }
+
+    .ai-id .sub,
+    #quick-topics { display: none; }
+
+    .ai-id .state {
+        margin-top: 2px;
+        font-size: 11px;
+    }
+
+    #messages {
+        padding: 14px 0;
+        gap: 16px;
+    }
+
+    #input-footer { padding: 8px 0 10px; }
+
+    #user-input { padding: 10px 0; }
+
+    .input-hint {
+        margin-top: 4px;
+        font-size: 10.5px;
+    }
+}
+
+@media (max-height: 300px) {
+    .ai-id { padding: 4px 0; }
+    .ai-id h1 { font-size: 20px; }
+    #input-footer { padding: 6px 0; }
+    #user-input { padding: 8px 0; }
+}
