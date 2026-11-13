@@ -275,6 +275,54 @@ pub fn requests_without_a_body_keep_the_connection_alive_test() {
   connection(server.handle(preflight, config())) |> should.equal(Error(Nil))
 }
 
+// Mist reads a body only for `Transfer-Encoding: chunked` (exactly) or a
+// plain decimal Content-Length; any other framing it would read as an empty
+// body and leave the real one on the socket. Both headers at once is the
+// classic disagreement between a proxy and a server. Such requests are
+// refused before anything is read, and the connection is closed.
+pub fn requests_with_framing_mist_cannot_read_are_refused_and_closed_test() {
+  let body = "{\"message\":\"\"}"
+  let framed = fn(headers: List(#(String, String))) {
+    list.fold(headers, chat(body), fn(req, h) {
+      request.prepend_header(req, h.0, h.1)
+    })
+  }
+  [
+    [#("transfer-encoding", "Chunked")],
+    [#("transfer-encoding", "CHUNKED")],
+    [#("transfer-encoding", "gzip, chunked")],
+    [#("transfer-encoding", "gzip")],
+    [#("transfer-encoding", "chunked"), #("transfer-encoding", "chunked")],
+    [#("transfer-encoding", "chunked"), #("content-length", "14")],
+    [#("content-length", "abc")],
+    [#("content-length", "+14")],
+    [#("content-length", "-1")],
+    [#("content-length", "14"), #("content-length", "14")],
+  ]
+  |> list.each(fn(headers) {
+    let resp = server.handle(framed(headers), config())
+    resp.status |> should.equal(400)
+    simulate.read_body(resp)
+    |> should.equal(error_body("Unsupported request framing"))
+    connection(resp) |> should.equal(Ok("close"))
+  })
+}
+
+pub fn chunked_and_content_length_bodies_are_read_as_before_test() {
+  // The empty message proves the body was read (and the request got no
+  // further than the body checks).
+  let body = "{\"message\":\"\"}"
+  [
+    request.set_header(chat(body), "transfer-encoding", "chunked"),
+    with_length(chat(body), body),
+  ]
+  |> list.each(fn(req) {
+    let resp = server.handle(req, config())
+    simulate.read_body(resp) |> should.equal(error_body("Message is empty"))
+    connection(resp) |> should.equal(Error(Nil))
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Health and HEAD: cheap probes that never touch the model or the limiter.
 // ---------------------------------------------------------------------------

@@ -119,10 +119,11 @@ fn with_cors(
   }
 }
 
-/// The checks made before the body is read: the headers, then the rate
-/// limit (header checks come first, so a foreign page can't use up a
-/// visitor's quota either). Their rejections leave the body unread, so they
-/// close the connection (`guard.close_if_body_unread`). `next` reads the body.
+/// The checks made before the body is read: the body's framing, the other
+/// headers, then the rate limit (header checks come first, so a foreign page
+/// can't use up a visitor's quota either). Their rejections leave the body
+/// unread, so they close the connection (`guard.close_if_body_unread`; a
+/// framing Mist cannot read always closes it). `next` reads the body.
 pub fn check_before_body(
   req: request.Request(a),
   config: StreamConfig,
@@ -131,6 +132,7 @@ pub fn check_before_body(
   let reject = fn(resp) {
     with_cors(resp, req, config) |> guard.close_if_body_unread(req)
   }
+  use <- reject_framing(req, config)
   case
     guard.check_headers(
       origin: request.get_header(req, "origin"),
@@ -158,6 +160,19 @@ pub fn check_before_body(
           )
         True -> next()
       }
+  }
+}
+
+fn reject_framing(
+  req: request.Request(a),
+  config: StreamConfig,
+  next: fn() -> response.Response(ResponseData),
+) -> response.Response(ResponseData) {
+  case guard.check_framing(req.headers) {
+    Ok(_) -> next()
+    Error(guard.Rejection(status, message)) ->
+      with_cors(error_response(status, message), req, config)
+      |> response.set_header("connection", "close")
   }
 }
 

@@ -200,6 +200,40 @@ fn host_and_port(authority: String, default_port: String) -> #(String, String) {
   }
 }
 
+/// Checked before a chat body is read: the request must frame its body the
+/// way Mist reads one, by a single `Transfer-Encoding: chunked` (exactly
+/// that value) or a single decimal Content-Length, not both. Mist reads any
+/// other framing (`Chunked`, `gzip`, `+14`) as an empty body and would leave
+/// the real one on the socket, and a request with both headers is the classic
+/// disagreement between a proxy and a server. The handlers answer a
+/// rejection with `connection: close`. Browsers send a Content-Length.
+pub fn check_framing(headers: List(#(String, String))) -> Result(Nil, Rejection) {
+  let values = fn(name) {
+    list.filter_map(headers, fn(header) {
+      case string.lowercase(header.0) == name {
+        True -> Ok(header.1)
+        False -> Error(Nil)
+      }
+    })
+  }
+  case values("transfer-encoding"), values("content-length") {
+    [], [] | ["chunked"], [] -> Ok(Nil)
+    [], [length] ->
+      case length != "" && is_digits(length) {
+        True -> Ok(Nil)
+        False -> Error(unsupported_framing)
+      }
+    _, _ -> Error(unsupported_framing)
+  }
+}
+
+const unsupported_framing = Rejection(400, "Unsupported request framing")
+
+fn is_digits(text: String) -> Bool {
+  string.to_graphemes(text)
+  |> list.all(fn(c) { string.contains("0123456789", c) })
+}
+
 /// For a response sent without reading the request's body (a rejection made
 /// on the headers alone, a preflight, a GET): close the connection after it
 /// if the request declared a body. Mist would otherwise parse the unread body

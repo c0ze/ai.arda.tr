@@ -113,6 +113,36 @@ pub fn stream_rejections_before_the_body_close_the_connection_test() {
   })
 }
 
+pub fn stream_requests_with_framing_mist_cannot_read_are_refused_test() {
+  let base =
+    request.new()
+    |> request.set_method(http.Post)
+    |> request.set_header("content-type", "application/json")
+    |> request.set_header("origin", "https://ai.arda.tr")
+  [
+    [#("transfer-encoding", "Chunked")],
+    [#("transfer-encoding", "gzip")],
+    [#("transfer-encoding", "chunked"), #("content-length", "33")],
+    [#("content-length", "abc")],
+  ]
+  |> list.each(fn(headers) {
+    let req =
+      list.fold(headers, base, fn(req, h) {
+        request.prepend_header(req, h.0, h.1)
+      })
+    let resp =
+      stream_handler.check_before_body(
+        req,
+        stream_config(1000),
+        never_read_the_body,
+      )
+    resp.status |> should.equal(400)
+    list.key_find(resp.headers, "connection") |> should.equal(Ok("close"))
+    list.key_find(resp.headers, "access-control-allow-origin")
+    |> should.equal(Ok("https://ai.arda.tr"))
+  })
+}
+
 pub fn a_request_that_passes_goes_on_to_read_its_body_test() {
   let req = post("application/json", "https://ai.arda.tr")
   let resp =

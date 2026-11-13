@@ -158,6 +158,7 @@ fn maybe_set_header(
 
 fn handle_chat(req: Request, config: Config) -> Response {
   use <- require_post(req)
+  use <- require_readable_framing(req)
   // Header checks come before the rate limiter, so a foreign page can't use up
   // a visitor's quota either.
   case
@@ -199,6 +200,17 @@ fn require_post(req: Request, next: fn() -> Response) -> Response {
     _ ->
       json_response(405, models.error_response("Method not allowed"))
       |> guard.close_if_body_unread(req)
+  }
+}
+
+/// A body Mist cannot read as framed (see `guard.check_framing`) is refused
+/// before anything is read, and the connection closed.
+fn require_readable_framing(req: Request, next: fn() -> Response) -> Response {
+  case guard.check_framing(req.headers) {
+    Ok(_) -> next()
+    Error(guard.Rejection(status, message)) ->
+      json_response(status, models.error_response(message))
+      |> set_header("connection", "close")
   }
 }
 
