@@ -55,9 +55,22 @@ function escapeHtml(text) {
   });
 }
 
-// Tags the bot's replies never need; forbidden even though DOMPurify would
-// otherwise keep them (a fake form or an image beacon in a reply).
-const FORBID_TAGS = ["form", "input", "button", "textarea", "select", "style", "img"];
+// Only what markdown renders to is allowed. A deny list cannot keep up: an
+// image beacon also fits in <svg><image>, <video poster>, <audio>, <picture>
+// or <table background>, and a full-page overlay in <div style>. Attributes:
+// links (href, title), ordered-list starts and table alignment, exactly what
+// marked emits. Not `class` (a reply could borrow the page's own classes; the
+// code block's language class styles nothing), nor data-* / aria-*.
+const SANITIZE = {
+  ALLOWED_TAGS: [
+    "p", "br", "strong", "b", "em", "i", "del", "s", "code", "pre", "blockquote",
+    "ul", "ol", "li", "a", "h1", "h2", "h3", "h4", "h5", "h6", "hr",
+    "table", "thead", "tbody", "tr", "th", "td",
+  ],
+  ALLOWED_ATTR: ["href", "title", "start", "align"],
+  ALLOW_DATA_ATTR: false,
+  ALLOW_ARIA_ATTR: false,
+};
 
 // Links in replies open in a new tab. Set on the sanitised DOM nodes by a
 // DOMPurify hook, registered once per DOMPurify instance.
@@ -77,7 +90,8 @@ function purifier() {
 }
 
 // Render markdown -> sanitised HTML:
-//   marked.parse -> DOMPurify.sanitize (links get target/rel in a hook).
+//   marked.parse -> DOMPurify.sanitize with the SANITIZE allowlist (links get
+//   target/rel in a hook).
 // DOMPurify is REQUIRED. If it (or marked) is missing we fall back to escaped
 // plain text and never return raw, unsanitised HTML (fail closed).
 export function render_markdown(text) {
@@ -98,7 +112,7 @@ export function render_markdown(text) {
     html = "<p>" + escapeHtml(text) + "</p>";
   }
 
-  return purifier().sanitize(html, { FORBID_TAGS });
+  return purifier().sanitize(html, SANITIZE);
 }
 
 // A reply as a screen reader should hear it: the rendered markdown's text,

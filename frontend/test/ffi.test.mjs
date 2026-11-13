@@ -252,27 +252,123 @@ test('a network failure is reported as "Network error", which the app localises'
 
 // ---------------------------------------------------------------------------
 // Markdown: links open in a new tab through a DOMPurify hook (not a regex on
-// the sanitised string), and tags the bot never needs are forbidden.
+// the sanitised string), and only the tags and attributes markdown needs are
+// allowed: a reply can carry no beacon (an image, a video poster, a table
+// background) and no overlay (a fixed-position div).
 // ---------------------------------------------------------------------------
 
-test('render_markdown sanitises with a link hook and forbids form, style and img tags', (t) => {
+const MARKDOWN_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'del', 's', 'code', 'pre', 'blockquote',
+  'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td'];
+
+// Renders with a stub DOMPurify that records the config it is given.
+function sanitizerConfig(t) {
   const hooks = {};
-  let config;
+  const seen = {};
   globalThis.window = {
     marked: { parse: (text) => text },
     DOMPurify: {
       addHook: (name, fn) => { hooks[name] = fn; },
-      sanitize: (html, cfg) => { config = cfg; return html; },
+      sanitize: (html, cfg) => { seen.config = cfg; return html; },
     },
   };
   t.after(() => { delete globalThis.window; });
+  seen.html = render_markdown('<a href="https://x.y">x</a>');
+  seen.hooks = hooks;
+  return seen;
+}
 
+// Tags and attributes in an HTML string (what marked emits, or a payload).
+function elements(html) {
+  return [...html.matchAll(/<([a-zA-Z][\w-]*)([^>]*)>/g)].map(([, tag, rest]) => ({
+    tag: tag.toLowerCase(),
+    attrs: [...rest.matchAll(/([^\s=/"']+)(?:=(?:"[^"]*"|'[^']*'|[^\s>]+))?/g)].map((m) => m[1].toLowerCase()),
+  }));
+}
+
+function survives(config, { tag, attrs }) {
+  if (!config.ALLOWED_TAGS.includes(tag)) return [];
+  return attrs.filter((a) => config.ALLOWED_ATTR.includes(a));
+}
+
+test('render_markdown sanitises with an allowlist of the markdown tags and attributes', (t) => {
+  const { config, html } = sanitizerConfig(t);
   // The sanitised string comes back untouched: no regex rewriting of "<a href".
-  assert.equal(render_markdown('<a href="https://x.y">x</a>'), '<a href="https://x.y">x</a>');
-  for (const tag of ['form', 'input', 'button', 'textarea', 'select', 'style', 'img']) {
-    assert.ok(config.FORBID_TAGS.includes(tag), tag);
-  }
+  assert.equal(html, '<a href="https://x.y">x</a>');
+  assert.deepEqual([...config.ALLOWED_TAGS].sort(), [...MARKDOWN_TAGS].sort());
+  assert.deepEqual([...config.ALLOWED_ATTR].sort(), ['align', 'href', 'start', 'title']);
+  // data-* and aria-* would otherwise be allowed on top of ALLOWED_ATTR.
+  assert.equal(config.ALLOW_DATA_ATTR, false);
+  assert.equal(config.ALLOW_ARIA_ATTR, false);
+});
 
+test('beacons and overlays the old FORBID_TAGS list let through are not allowed', (t) => {
+  const { config } = sanitizerConfig(t);
+  const payloads = [
+    '<svg><image href="https://beacon.example/1"></image></svg>',
+    '<video src="https://beacon.example/2" poster="https://beacon.example/3"></video>',
+    '<audio src="https://beacon.example/4"></audio>',
+    '<picture><source srcset="https://beacon.example/5"></picture>',
+    '<table background="https://beacon.example/6"><tr><td>x</td></tr></table>',
+    '<div style="position:fixed;inset:0;background:url(https://beacon.example/7)">x</div>',
+    '<p style="position:fixed;inset:0">x</p>',
+    '<img src="https://beacon.example/8">',
+    '<form action="https://evil.example"><input name="q"><button>go</button></form>',
+    '<style>body{display:none}</style>',
+    '<a href="https://x.y" class="theme-toggle" style="position:fixed">x</a>',
+  ];
+  for (const payload of payloads) {
+    for (const el of elements(payload)) {
+      // Whatever survives may not load anything or move anything.
+      for (const attr of survives(config, el)) {
+        assert.ok(attr === 'href' && el.tag === 'a' || ['title', 'start', 'align'].includes(attr),
+          `${payload}: <${el.tag} ${attr}> survives`);
+      }
+      for (const tag of ['svg', 'image', 'video', 'audio', 'picture', 'source', 'div', 'img', 'form',
+        'input', 'button', 'style']) {
+        if (el.tag === tag) assert.ok(!config.ALLOWED_TAGS.includes(tag), `${payload}: <${tag}> allowed`);
+      }
+    }
+  }
+});
+
+test('normal markdown keeps every tag and attribute marked 18 emits for it', async (t) => {
+  const { config } = sanitizerConfig(t);
+  const { createRequire } = await import('node:module');
+  const marked = createRequire(import.meta.url)('../../public/vendor/marked.min.js');
+  const html = marked.parse([
+    '# Title', '## Section', '### Sub', '#### Small',
+    '', 'Some **bold**, *italic*, ~~gone~~ and `code`; a [link](https://arda.tr "Arda") and <https://x.y>.',
+    'line one  ', 'line two',
+    '', '- one', '- two', '  1. nested',
+    '', '3. third', '4. fourth',
+    '', '> quoted', '', '---',
+    '', '| left | centre | right |', '|:--|:-:|--:|', '| 1 | 2 | 3 |',
+    '', '```gleam', 'pub fn main() { Nil }', '```',
+    '', '- [ ] a task', '- [x] done',
+  ].join('\n'));
+  const dropped = [];
+  for (const el of elements(html)) {
+    if (!config.ALLOWED_TAGS.includes(el.tag)) { dropped.push(el.tag); continue; }
+    for (const attr of el.attrs) {
+      if (!config.ALLOWED_ATTR.includes(attr)) dropped.push(`${el.tag}[${attr}]`);
+    }
+  }
+  // Only the task-list checkboxes (forbidden before as well) and the code
+  // block's language class go. Nothing styles that class, and a reply could
+  // otherwise borrow the page's own classes.
+  assert.deepEqual([...new Set(dropped)].sort(), ['code[class]', 'input']);
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../../public/style.css', import.meta.url), 'utf8');
+  assert.equal(/language-|\.txt [^{]*\[class/.test(css.replace(/\.language-toggle/g, '')), false);
+  // Ordered-list starts, table alignment, titles and links are all kept.
+  for (const needed of ['ol start', 'th align', 'td align', 'a href', 'a title']) {
+    const [tag, attr] = needed.split(' ');
+    assert.ok(elements(html).some((el) => el.tag === tag && el.attrs.includes(attr)), needed);
+  }
+});
+
+test('links get target and rel in the sanitiser hook, once per DOMPurify instance', (t) => {
+  const { hooks } = sanitizerConfig(t);
   assert.equal(typeof hooks.afterSanitizeAttributes, 'function');
   const attrs = (initial) => {
     const a = new Map(Object.entries(initial));
