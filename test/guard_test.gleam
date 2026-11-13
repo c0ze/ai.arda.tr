@@ -46,6 +46,17 @@ pub fn a_message_with_visible_text_is_forwarded_as_sent_test() {
   |> should.be_ok
 }
 
+pub fn visible_format_signs_count_as_text_test() {
+  // Not all of Unicode's Cf is invisible: the Arabic number sign and the
+  // other prepended concatenation marks draw a glyph, so a message of them is
+  // not empty. This pins the policy in `guard.is_blank`.
+  ["\u{0600}", "\u{06DD}", "\u{070F}", "\u{110BD}"]
+  |> list.each(fn(message) {
+    guard.check_chat_request(ChatRequest(message:, history: []))
+    |> should.equal(Ok(ChatRequest(message:, history: [])))
+  })
+}
+
 pub fn a_pasted_job_description_fits_test() {
   // The sibling widgets have no maxlength, and a pasted job description is
   // often longer than a few thousand characters.

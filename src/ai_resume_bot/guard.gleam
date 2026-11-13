@@ -79,12 +79,17 @@ pub fn check_chat_request(req: ChatRequest) -> Result(ChatRequest, Rejection) {
   }
 }
 
-/// A message that shows nothing: only Unicode whitespace (NBSP, the
-/// ideographic space...), control characters (NUL, NEL...), and invisible
-/// format or default-ignorable characters (zero-width space, joiners, BOM,
-/// bidi marks, soft hyphen, variation selectors, Hangul fillers, tags).
-/// `string.trim` alone lets these through to the paid model call. The three
-/// clients trim with JavaScript's `String.prototype.trim` first.
+/// A message that shows nothing. The policy: Unicode whitespace (White_Space:
+/// NBSP, the ideographic space...), control characters (Cc: NUL, NEL...) and
+/// default-ignorable code points (Default_Ignorable_Code_Point: zero-width
+/// space, joiners, BOM, bidi marks, soft hyphen, variation selectors, Hangul
+/// fillers, tags), plus the invisible format controls U+FFF9-FFFB and
+/// U+13430-1343F, count as nothing. Format characters that draw a glyph (the
+/// prepended concatenation marks such as the Arabic number sign U+0600-0605,
+/// U+06DD, U+070F, U+0890-0891, U+08E2, U+110BD, U+110CD) are visible and
+/// count as text, so not all of `Cf` is blank. `string.trim` alone lets the
+/// blank ones through to the paid model call. The three clients trim with
+/// JavaScript's `String.prototype.trim` first.
 fn is_blank(message: String) -> Bool {
   message
   |> string.to_utf_codepoints
@@ -102,10 +107,11 @@ fn invisible(c: Int) -> Bool {
   || { c >= 0x2028 && c <= 0x202F }
   || { c >= 0x205F && c <= 0x206F }
   || c == 0x3000
-  // Format characters (Cf) and other default-ignorable code points: soft
+  // Default-ignorable code points and invisible format controls: soft
   // hyphen, combining grapheme joiner, Arabic letter mark, Hangul fillers,
   // Khmer inherent vowels, Mongolian selectors, variation selectors, BOM,
-  // interlinear annotation, shorthand format, musical format, tags.
+  // interlinear annotation, hieroglyph format controls, shorthand format,
+  // musical format, tags. Not the visible format signs (see `is_blank`).
   || c == 0xAD
   || c == 0x34F
   || c == 0x61C
