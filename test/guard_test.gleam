@@ -17,6 +17,35 @@ pub fn whitespace_only_message_is_rejected_test() {
   |> should.equal(Error(Rejection(400, "Message is empty")))
 }
 
+pub fn invisible_only_message_is_rejected_test() {
+  // Characters that show nothing would otherwise reach the paid model call:
+  // NBSP, ideographic space, zero-width space, NEL, NUL, BOM, soft hyphen,
+  // word joiner, a bidi mark, a Hangul filler, and a mix of them.
+  [
+    "\u{00A0}", "\u{3000}", "\u{200B}", "\u{0085}", "\u{0000}", "\u{FEFF}",
+    "\u{00AD}", "\u{2060}", "\u{200F}", "\u{3164}",
+    " \u{00A0}\u{200B}\u{3000}\t\u{0000}\u{2028}",
+  ]
+  |> list.each(fn(message) {
+    guard.check_chat_request(ChatRequest(message:, history: []))
+    |> should.equal(Error(Rejection(400, "Message is empty")))
+  })
+}
+
+pub fn a_message_with_visible_text_is_forwarded_as_sent_test() {
+  // Only the emptiness test ignores the invisible characters; the message
+  // itself goes on unchanged.
+  let message = "\u{200B}\u{00A0}hi\u{3000}"
+  guard.check_chat_request(ChatRequest(message:, history: []))
+  |> should.equal(Ok(ChatRequest(message:, history: [])))
+  // Emoji built with joiners and selectors are visible.
+  let message = "👩\u{200D}💻\u{FE0F}"
+  guard.check_chat_request(ChatRequest(message:, history: []))
+  |> should.be_ok
+  guard.check_chat_request(ChatRequest(message: "日本語", history: []))
+  |> should.be_ok
+}
+
 pub fn a_pasted_job_description_fits_test() {
   // The sibling widgets have no maxlength, and a pasted job description is
   // often longer than a few thousand characters.

@@ -39,17 +39,18 @@ pub fn parse_chat_request(body: String) -> Result(ChatRequest, Rejection) {
   }
 }
 
-/// Reject an empty (or whitespace-only) message and one over
-/// `shared.max_message_chars`; keep the last `default_max_history` history
-/// items and cut each to `shared.max_history_item_chars`.
+/// Reject an empty message (nothing but whitespace and other invisible
+/// characters, see `is_blank`) and one over `shared.max_message_chars`; keep
+/// the last `default_max_history` history items and cut each to
+/// `shared.max_history_item_chars`. An accepted message goes on as sent.
 ///
 /// Over-long history items are cut rather than rejected: the sibling widgets
 /// keep a rejected message in their history and send it again with every
 /// later question, so rejecting it would wedge their conversation.
 pub fn check_chat_request(req: ChatRequest) -> Result(ChatRequest, Rejection) {
-  case string.trim(req.message) {
-    "" -> Error(Rejection(400, "Message is empty"))
-    _ ->
+  case is_blank(req.message) {
+    True -> Error(Rejection(400, "Message is empty"))
+    False ->
       case string.length(req.message) > shared.max_message_chars {
         True ->
           Error(Rejection(
@@ -76,6 +77,52 @@ pub fn check_chat_request(req: ChatRequest) -> Result(ChatRequest, Rejection) {
           ))
       }
   }
+}
+
+/// A message that shows nothing: only Unicode whitespace (NBSP, the
+/// ideographic space...), control characters (NUL, NEL...), and invisible
+/// format or default-ignorable characters (zero-width space, joiners, BOM,
+/// bidi marks, soft hyphen, variation selectors, Hangul fillers, tags).
+/// `string.trim` alone lets these through to the paid model call. The three
+/// clients trim with JavaScript's `String.prototype.trim` first.
+fn is_blank(message: String) -> Bool {
+  message
+  |> string.to_utf_codepoints
+  |> list.all(fn(c) { invisible(string.utf_codepoint_to_int(c)) })
+}
+
+fn invisible(c: Int) -> Bool {
+  // Control characters (Cc), \t \n \r and NEL among them.
+  c <= 0x20
+  || { c >= 0x7F && c <= 0xA0 }
+  // Whitespace (Zs, Zl, Zp), with the zero-width and bidi format characters
+  // that sit between them.
+  || c == 0x1680
+  || { c >= 0x2000 && c <= 0x200F }
+  || { c >= 0x2028 && c <= 0x202F }
+  || { c >= 0x205F && c <= 0x206F }
+  || c == 0x3000
+  // Format characters (Cf) and other default-ignorable code points: soft
+  // hyphen, combining grapheme joiner, Arabic letter mark, Hangul fillers,
+  // Khmer inherent vowels, Mongolian selectors, variation selectors, BOM,
+  // interlinear annotation, shorthand format, musical format, tags.
+  || c == 0xAD
+  || c == 0x34F
+  || c == 0x61C
+  || c == 0x115F
+  || c == 0x1160
+  || c == 0x17B4
+  || c == 0x17B5
+  || { c >= 0x180B && c <= 0x180F }
+  || c == 0x3164
+  || { c >= 0xFE00 && c <= 0xFE0F }
+  || c == 0xFEFF
+  || c == 0xFFA0
+  || { c >= 0xFFF0 && c <= 0xFFFB }
+  || { c >= 0x13430 && c <= 0x1343F }
+  || { c >= 0x1BCA0 && c <= 0x1BCA3 }
+  || { c >= 0x1D173 && c <= 0x1D17A }
+  || { c >= 0xE0000 && c <= 0xE0FFF }
 }
 
 /// Header checks for a chat POST, made before the rate limiter and before the
