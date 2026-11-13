@@ -632,3 +632,19 @@ canvas.px.cursor {
 
     .input-hint { font-size: 10.5px; }
 }
+
+/* The bar fits a 320px screen in every language and rendition. */
+@media (max-width: 360px) {
+    .bar {
+        gap: 6px;
+        padding: 0 8px;
+    }
+
+    .lang-btn { padding: 4px 6px; }
+
+    .theme-toggle,
+    .voice-toggle {
+        min-width: 0;
+        padding: 4px 5px;
+    }
+}
