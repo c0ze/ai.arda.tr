@@ -10,6 +10,7 @@ import ai_resume_bot/tts
 import gleam/erlang/process
 import gleam/list
 import gleam/option.{None}
+import gleam/otp/actor
 import gleeunit/should
 import shared
 
@@ -77,4 +78,39 @@ pub fn the_first_chunk_does_not_repeat_thinking_test() {
     stream_handler.FromGemini(gemini_stream.Chunk(<<chunk:utf8>>)),
   )
   |> should.equal([shared.StreamChunk(text: "Hi")])
+}
+
+// A client that has gone already must not leave the paid model request
+// running: when the first events cannot be sent, the actor stops (and the
+// stream FFI, whose owner it is, cancels the upstream request).
+pub fn the_stream_stops_if_thinking_cannot_be_sent_test() {
+  stream_handler.handle_message(
+    new_state(config(Error(Nil)), False),
+    stream_handler.Start,
+    fn(_) { Error(Nil) },
+  )
+  |> should.equal(actor.stop())
+}
+
+pub fn the_stream_stops_if_the_voice_event_cannot_be_sent_test() {
+  stream_handler.handle_message(
+    new_state(config(Ok("mock")), True),
+    stream_handler.Start,
+    fn(event) {
+      case event {
+        shared.StreamThinking -> Ok(Nil)
+        _ -> Error(Nil)
+      }
+    },
+  )
+  |> should.equal(actor.stop())
+}
+
+pub fn the_stream_goes_on_when_the_first_events_are_sent_test() {
+  stream_handler.handle_message(
+    new_state(config(Ok("mock")), True),
+    stream_handler.Start,
+    fn(_) { Ok(Nil) },
+  )
+  |> should.not_equal(actor.stop())
 }

@@ -353,15 +353,22 @@ pub fn handle_message(
     // Sent once, by `init`, before any of Gemini's messages can arrive: tell
     // the client at once that the model is thinking (and whether a voice will
     // follow), so bytes reach it while it waits for the first chunk.
-    Start -> {
-      let _ = emit(shared.StreamThinking)
-      actor.continue(start_voice(state, emit))
-      |> actor.with_selector(
-        process.new_selector()
-        |> process.select(state.self)
-        |> process.select_map(state.gemini, FromGemini),
-      )
-    }
+    // If the client has gone already, stop: the stream FFI, whose owner this
+    // actor is, then cancels the upstream request.
+    Start ->
+      case
+        emit(shared.StreamThinking)
+        |> result.try(fn(_) { start_voice(state, emit) })
+      {
+        Error(_) -> actor.stop()
+        Ok(state) ->
+          actor.continue(state)
+          |> actor.with_selector(
+            process.new_selector()
+            |> process.select(state.self)
+            |> process.select_map(state.gemini, FromGemini),
+          )
+      }
     FromGemini(message) -> on_gemini(state, message, emit)
     ClipReady(job, result) ->
       case state.voice {
@@ -475,13 +482,13 @@ fn end_if_empty(
 }
 
 /// Right after `thinking`: tell a voice client whether speech will follow.
-fn start_voice(state: SseState, emit: Emit) -> SseState {
+fn start_voice(state: SseState, emit: Emit) -> Result(SseState, Nil) {
   case state.voice_opts.on {
-    False -> state
+    False -> Ok(state)
     True -> {
       let cfg = state.config.tts
       let on = tts.available(cfg)
-      let _ = emit(shared.StreamVoice(on:))
+      use _ <- result.map(emit(shared.StreamVoice(on:)))
       case on {
         False -> state
         True ->
