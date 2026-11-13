@@ -260,7 +260,10 @@ test('a network failure is reported as "Network error", which the app localises'
 const MARKDOWN_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'del', 's', 'code', 'pre', 'blockquote',
   'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td'];
 
-// Renders with a stub DOMPurify that records the config it is given.
+// Renders with a stub DOMPurify that records the config it is given. These
+// tests check the configuration (and the hook on fake nodes), not DOMPurify's
+// output: Node has no DOM and the frontend has no dependencies to bring one,
+// so URI filtering and the final target/rel are not exercised here.
 function sanitizerConfig(t) {
   const hooks = {};
   const seen = {};
@@ -290,7 +293,7 @@ function survives(config, { tag, attrs }) {
   return attrs.filter((a) => config.ALLOWED_ATTR.includes(a));
 }
 
-test('render_markdown sanitises with an allowlist of the markdown tags and attributes', (t) => {
+test('sanitiser config: render_markdown passes DOMPurify an allowlist of the markdown tags and attributes', (t) => {
   const { config, html } = sanitizerConfig(t);
   // The sanitised string comes back untouched: no regex rewriting of "<a href".
   assert.equal(html, '<a href="https://x.y">x</a>');
@@ -301,7 +304,7 @@ test('render_markdown sanitises with an allowlist of the markdown tags and attri
   assert.equal(config.ALLOW_ARIA_ATTR, false);
 });
 
-test('beacons and overlays the old FORBID_TAGS list let through are not allowed', (t) => {
+test('sanitiser config: the allowlist admits no tag or attribute of the beacon and overlay payloads', (t) => {
   const { config } = sanitizerConfig(t);
   const payloads = [
     '<svg><image href="https://beacon.example/1"></image></svg>',
@@ -331,7 +334,7 @@ test('beacons and overlays the old FORBID_TAGS list let through are not allowed'
   }
 });
 
-test('normal markdown keeps every tag and attribute marked 18 emits for it', async (t) => {
+test('sanitiser config: the allowlist admits every tag and attribute marked 18 emits for normal markdown', async (t) => {
   const { config } = sanitizerConfig(t);
   const { createRequire } = await import('node:module');
   const marked = createRequire(import.meta.url)('../../public/vendor/marked.min.js');
@@ -367,7 +370,7 @@ test('normal markdown keeps every tag and attribute marked 18 emits for it', asy
   }
 });
 
-test('links get target and rel in the sanitiser hook, once per DOMPurify instance', (t) => {
+test('sanitiser hook: on fake nodes, links get target and rel; registered once per DOMPurify instance', (t) => {
   const { hooks } = sanitizerConfig(t);
   assert.equal(typeof hooks.afterSanitizeAttributes, 'function');
   const attrs = (initial) => {
