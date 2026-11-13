@@ -219,20 +219,19 @@ const body_read_size = 65_536
 
 /// Messages to the SSE actor. Gemini's stream arrives on its own subject and
 /// is mapped in once the actor has installed its selector (`Start`).
-type SseMsg {
+pub type SseMsg {
   Start
   FromGemini(StreamMsg)
   ClipReady(Job, Result(tts.Clip, String))
 }
 
-type SseState {
+pub opaque type SseState {
   SseState(
     // The whole reply from Gemini so far, [[SEND_EMAIL]] block included.
     accumulated: String,
     // Bytes of `email.streamable(accumulated)` already sent as chunks (and fed
     // to the voice): the block, and a possible partial tag, are held back.
     sent_bytes: Int,
-    sent_thinking: Bool,
     // Bytes from an incomplete trailing SSE line, carried between Chunk
     // messages so a `data:` line split across chunks isn't dropped.
     pending: BitArray,
@@ -297,60 +296,77 @@ fn start_sse(
         }
       }
       process.send(subject, Start)
-
-      SseState(
-        accumulated: "",
-        sent_bytes: 0,
-        sent_thinking: False,
-        pending: <<>>,
-        config: config,
-        self: subject,
-        gemini: gemini_subject,
-        voice_opts: voice_opts,
-        voice: None,
-        final: None,
-      )
+      new_state(config, subject, gemini_subject, voice_opts)
     },
     loop: fn(state, message, conn) {
-      case message {
-        Start ->
-          actor.continue(state)
-          |> actor.with_selector(
-            process.new_selector()
-            |> process.select(state.self)
-            |> process.select_map(state.gemini, FromGemini),
-          )
-        FromGemini(message) -> on_gemini(state, message, conn)
-        ClipReady(job, result) ->
-          case state.voice {
-            None -> actor.continue(state)
-            Some(session) -> {
-              case result {
-                Error(e) -> logging.log(logging.Warning, e)
-                Ok(_) -> Nil
-              }
-              apply_voice(state, voice.on_clip(session, job, result), conn)
-            }
-          }
-      }
+      handle_message(state, message, fn(evt) { send_sse_event(conn, evt) })
     },
   )
+}
+
+/// The actor's state before its first message.
+pub fn new_state(
+  config: StreamConfig,
+  self: Subject(SseMsg),
+  gemini: Subject(StreamMsg),
+  voice_opts: shared.VoiceOptions,
+) -> SseState {
+  SseState(
+    accumulated: "",
+    sent_bytes: 0,
+    pending: <<>>,
+    config: config,
+    self: self,
+    gemini: gemini,
+    voice_opts: voice_opts,
+    voice: None,
+    final: None,
+  )
+}
+
+/// Sends one event to the client; an `Error` means the client has gone.
+pub type Emit =
+  fn(shared.StreamEvent) -> Result(Nil, Nil)
+
+/// One message to the SSE actor; `emit` sends an event to the client.
+pub fn handle_message(
+  state: SseState,
+  message: SseMsg,
+  emit: Emit,
+) -> actor.Next(SseState, SseMsg) {
+  case message {
+    // Sent once, by `init`, before any of Gemini's messages can arrive: tell
+    // the client at once that the model is thinking (and whether a voice will
+    // follow), so bytes reach it while it waits for the first chunk.
+    Start -> {
+      let _ = emit(shared.StreamThinking)
+      actor.continue(start_voice(state, emit))
+      |> actor.with_selector(
+        process.new_selector()
+        |> process.select(state.self)
+        |> process.select_map(state.gemini, FromGemini),
+      )
+    }
+    FromGemini(message) -> on_gemini(state, message, emit)
+    ClipReady(job, result) ->
+      case state.voice {
+        None -> actor.continue(state)
+        Some(session) -> {
+          case result {
+            Error(e) -> logging.log(logging.Warning, e)
+            Ok(_) -> Nil
+          }
+          apply_voice(state, voice.on_clip(session, job, result), emit)
+        }
+      }
+  }
 }
 
 fn on_gemini(
   state: SseState,
   message: StreamMsg,
-  conn: SSEConnection,
+  emit: Emit,
 ) -> actor.Next(SseState, SseMsg) {
-  // Send thinking event on first message if not yet sent
-  let state = case state.sent_thinking {
-    True -> state
-    False -> {
-      let _ = send_sse_event(conn, shared.StreamThinking)
-      start_voice(SseState(..state, sent_thinking: True), conn)
-    }
-  }
-
   case message {
     Chunk(data) -> {
       let #(deltas, pending) =
@@ -372,12 +388,12 @@ fn on_gemini(
       case to_send {
         "" -> actor.continue(state)
         _ ->
-          case send_sse_event(conn, shared.StreamChunk(text: to_send)) {
+          case emit(shared.StreamChunk(text: to_send)) {
             Ok(_) ->
               case state.voice {
                 None -> actor.continue(state)
                 Some(session) ->
-                  apply_voice(state, voice.on_text(session, to_send), conn)
+                  apply_voice(state, voice.on_text(session, to_send), emit)
               }
             Error(_) -> actor.stop()
           }
@@ -390,7 +406,7 @@ fn on_gemini(
       let tail = gemini_stream.flush_sse_buffer(state.pending)
       let tail_text = list.fold(tail, "", fn(acc, d) { acc <> d })
       let full_reply = state.accumulated <> tail_text
-      use full_reply <- end_if_empty(full_reply, conn)
+      use full_reply <- end_if_empty(full_reply, emit)
       // Text held back in case it began a tag (and the stream's tail): the
       // voice still gets it; the client gets it with `done`.
       let rest =
@@ -398,22 +414,21 @@ fn on_gemini(
       let final_reply = final_reply(full_reply, smtp.sender(state.config.smtp))
       case state.voice {
         None -> {
-          let _ = send_sse_event(conn, shared.StreamDone(text: final_reply))
+          let _ = emit(shared.StreamDone(text: final_reply))
           actor.stop()
         }
         Some(session) ->
           apply_voice(
             SseState(..state, final: Some(final_reply)),
             voice.on_text_done(session, rest),
-            conn,
+            emit,
           )
       }
     }
 
     StreamError(reason) -> {
       logging.log(logging.Error, "Gemini stream error: " <> reason)
-      let _ =
-        send_sse_event(conn, shared.StreamError(message: "Internal AI Error"))
+      let _ = emit(shared.StreamError(message: "Internal AI Error"))
       actor.stop()
     }
   }
@@ -431,27 +446,27 @@ pub fn reply_or_error(full_reply: String) -> Result(String, shared.StreamEvent) 
 
 fn end_if_empty(
   full_reply: String,
-  conn: SSEConnection,
+  emit: Emit,
   next: fn(String) -> actor.Next(SseState, SseMsg),
 ) -> actor.Next(SseState, SseMsg) {
   case reply_or_error(full_reply) {
     Ok(reply) -> next(reply)
     Error(event) -> {
       logging.log(logging.Warning, "Gemini returned an empty reply")
-      let _ = send_sse_event(conn, event)
+      let _ = emit(event)
       actor.stop()
     }
   }
 }
 
 /// Right after `thinking`: tell a voice client whether speech will follow.
-fn start_voice(state: SseState, conn: SSEConnection) -> SseState {
+fn start_voice(state: SseState, emit: Emit) -> SseState {
   case state.voice_opts.on {
     False -> state
     True -> {
       let cfg = state.config.tts
       let on = tts.available(cfg)
-      let _ = send_sse_event(conn, shared.StreamVoice(on:))
+      let _ = emit(shared.StreamVoice(on:))
       case on {
         False -> state
         True ->
@@ -474,7 +489,7 @@ fn start_voice(state: SseState, conn: SSEConnection) -> SseState {
 fn apply_voice(
   state: SseState,
   step: voice.Step,
-  conn: SSEConnection,
+  emit: Emit,
 ) -> actor.Next(SseState, SseMsg) {
   let cfg = state.config.tts
   let reply_to = state.self
@@ -483,12 +498,12 @@ fn apply_voice(
       process.send(reply_to, ClipReady(job, tts.synthesize(cfg, job)))
     })
   })
-  let sent = list.try_each(step.emit, fn(evt) { send_sse_event(conn, evt) })
+  let sent = list.try_each(step.emit, emit)
   let state = SseState(..state, voice: Some(step.session))
   case sent, voice.ended(step.session), state.final {
     Error(_), _, _ -> actor.stop()
     Ok(_), True, Some(final_reply) -> {
-      let _ = send_sse_event(conn, shared.StreamDone(text: final_reply))
+      let _ = emit(shared.StreamDone(text: final_reply))
       actor.stop()
     }
     Ok(_), _, _ -> actor.continue(state)
