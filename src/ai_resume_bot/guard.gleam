@@ -17,12 +17,12 @@ import gleam/string
 import shared.{type ChatRequest, ChatMessage, ChatRequest}
 
 /// Largest body `/api/chat/stream` reads, in bytes: its long-standing
-/// allowance. `/api/chat` keeps Wisp's default limit (8,000,000 bytes), as it
-/// always had: the sibling widgets (arda.tr, resume.arda.tr) send their whole
-/// conversation, uncapped, with every question, and fall back to `/api/chat`
-/// when the stream fails, so a conversation too long for the stream is still
-/// answered there instead of being refused for good. The server trims the
-/// history to the last `default_max_history` messages (each cut to
+/// allowance. `/api/chat` reads up to Wisp's default limit (8,000,000 bytes),
+/// as it always has. The sibling widgets (arda.tr, resume.arda.tr) send their
+/// whole conversation, uncapped, with every question, so a long one can pass
+/// the stream's limit; after the stream's 413 they retry on `/api/chat`,
+/// which still reads it. The server trims the history to the last
+/// `default_max_history` messages (each cut to
 /// `shared.max_history_item_chars`) after parsing; that, not the body limit,
 /// bounds what reaches the model.
 pub const max_stream_body_bytes = 1_000_000

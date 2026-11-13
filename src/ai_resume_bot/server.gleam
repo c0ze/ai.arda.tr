@@ -215,9 +215,9 @@ fn require_readable_framing(req: Request, next: fn() -> Response) -> Response {
 }
 
 fn do_chat(req: Request, config: Config) -> Response {
-  // Wisp's default body limit, as this endpoint always had: it is the
-  // fallback for conversations too long for the stream path (see
-  // `guard.max_stream_body_bytes`).
+  // Wisp's default body limit, as this endpoint always had: larger than the
+  // stream's, so a conversation the stream refuses with a 413 is still read
+  // here (see `guard.max_stream_body_bytes`).
   case wisp.read_body_bits(req) {
     Error(_) ->
       json_response(413, models.error_response("Request body too large"))

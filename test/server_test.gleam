@@ -73,9 +73,9 @@ pub fn a_long_conversation_gets_past_the_body_limit_test() {
 }
 
 pub fn the_fallback_still_reads_bodies_the_stream_refuses_test() {
-  // The sibling widgets fall back to /api/chat when the stream fails, with
-  // the same whole history. Over the stream's 1,000,000 bytes the fallback
-  // must still read it (and trim the history), as it always has; the empty
+  // The sibling widgets retry on /api/chat after the stream's 413, with the
+  // same whole history. Over the stream's 1,000,000 bytes /api/chat must
+  // still read it (and trim the history), as it always has; the empty
   // message then stops it before Gemini.
   let body =
     "{\"message\":\"\",\"history\":[{\"role\":\"user\",\"content\":\""
