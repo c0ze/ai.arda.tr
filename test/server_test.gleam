@@ -275,11 +275,15 @@ pub fn requests_without_a_body_keep_the_connection_alive_test() {
   connection(server.handle(preflight, config())) |> should.equal(Error(Nil))
 }
 
-// Mist reads a body only for `Transfer-Encoding: chunked` (exactly) or a
-// plain decimal Content-Length; any other framing it would read as an empty
-// body and leave the real one on the socket. Both headers at once is the
-// classic disagreement between a proxy and a server. Such requests are
-// refused before anything is read, and the connection is closed.
+// The framing policy (`guard.check_framing`): exactly one
+// `Transfer-Encoding: chunked` or exactly one all-digit Content-Length, not
+// both. Mist reads `Chunked`, `gzip` or a length like `abc` as an empty body
+// and would leave the real one on the socket; `+14` would parse but is
+// outside the policy; both headers at once is where a proxy and a server can
+// disagree. Such requests are refused before anything is read, and the
+// connection is closed. Mist keeps one value per header name (the last wins),
+// so the duplicate-header cases below exercise the function, not the
+// transport: two such headers on the wire reach the check as one.
 pub fn requests_with_framing_mist_cannot_read_are_refused_and_closed_test() {
   let body = "{\"message\":\"\"}"
   let framed = fn(headers: List(#(String, String))) {

@@ -206,13 +206,23 @@ fn host_and_port(authority: String, default_port: String) -> #(String, String) {
   }
 }
 
-/// Checked before a chat body is read: the request must frame its body the
-/// way Mist reads one, by a single `Transfer-Encoding: chunked` (exactly
-/// that value) or a single decimal Content-Length, not both. Mist reads any
-/// other framing (`Chunked`, `gzip`, `+14`) as an empty body and would leave
-/// the real one on the socket, and a request with both headers is the classic
-/// disagreement between a proxy and a server. The handlers answer a
-/// rejection with `connection: close`. Browsers send a Content-Length.
+/// Checked before a chat body is read. The policy: exactly one
+/// `Transfer-Encoding: chunked` (that exact value), or exactly one
+/// Content-Length made only of digits, and not both. Everything else is
+/// refused, and the handlers answer with `connection: close`. Browsers send
+/// a Content-Length.
+///
+/// Why: Mist reads a chunked body only for that exact value, so it reads
+/// `Chunked` or `gzip` as an empty body (as it does a Content-Length it
+/// cannot parse, such as `abc`) and would leave the real body on the socket.
+/// A request with both headers is the classic disagreement between a proxy
+/// and a server. A Content-Length like `+14` would parse, but the policy
+/// accepts digits only.
+///
+/// Mist keeps one value per header name (the last one wins; duplicates are
+/// not joined), so two Content-Length or Transfer-Encoding headers on the
+/// wire reach this check as one. The list cases for duplicates guard the
+/// function, not the transport.
 pub fn check_framing(headers: List(#(String, String))) -> Result(Nil, Rejection) {
   let values = fn(name) {
     list.filter_map(headers, fn(header) {
