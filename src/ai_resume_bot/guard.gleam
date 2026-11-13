@@ -7,6 +7,8 @@
 //// `check_chat_request`, not by those. The handlers turn a `Rejection` into a
 //// JSON `{"error": message}` response with its status.
 
+import gleam/http/request
+import gleam/http/response
 import gleam/int
 import gleam/json
 import gleam/list
@@ -149,6 +151,35 @@ fn host_and_port(authority: String, default_port: String) -> #(String, String) {
     "" -> #(host, default_port)
     _ -> #(host, port)
   }
+}
+
+/// For a response sent without reading the request's body (a rejection made
+/// on the headers alone, a preflight, a GET): close the connection after it
+/// if the request declared a body. Mist would otherwise parse the unread body
+/// as the next request on the keep-alive socket, one whose headers (its
+/// X-Forwarded-For too) the sender wrote, so it would get past the per-IP rate
+/// limit. Mist closes the socket after a response carrying
+/// `connection: close`. Requests without a body keep the connection alive.
+pub fn close_if_body_unread(
+  resp: response.Response(a),
+  req: request.Request(b),
+) -> response.Response(a) {
+  case declares_body(req.headers) {
+    True -> response.set_header(resp, "connection", "close")
+    False -> resp
+  }
+}
+
+/// Whether request headers announce a body: any Transfer-Encoding, or a
+/// Content-Length other than 0 (an unparseable one counts as a body).
+pub fn declares_body(headers: List(#(String, String))) -> Bool {
+  list.any(headers, fn(header) {
+    case string.lowercase(header.0) {
+      "transfer-encoding" -> True
+      "content-length" -> string.trim(header.1) != "0"
+      _ -> False
+    }
+  })
 }
 
 fn check_content_type(

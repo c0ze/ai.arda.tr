@@ -43,6 +43,10 @@ pub type Config {
 ///   GET  /*         -> static files from `public_dir` (falls through to
 ///                      index.html on the root for SPA-ish behaviour)
 /// HEAD is answered like GET, without the body.
+///
+/// Only `/api/chat` reads request bodies; every response sent without reading
+/// one goes through `guard.close_if_body_unread`, so an unread body is never
+/// parsed as the next request on the connection.
 pub fn handle(req: Request, config: Config) -> Response {
   use <- maybe_log_request(req, config.log_requests)
   use <- cors_middleware(req, config.allowed_origins)
@@ -50,9 +54,9 @@ pub fn handle(req: Request, config: Config) -> Response {
     // Cloud Run reserves some paths ending in "z" at its front end, so
     // /healthz may never reach the container on the run.app URL; /health is
     // the same probe without that risk.
-    ["healthz"] | ["health"] -> health(req)
+    ["healthz"] | ["health"] -> health(req) |> guard.close_if_body_unread(req)
     ["api", "chat"] -> handle_chat(req, config)
-    _ -> serve_frontend(req, config)
+    _ -> serve_frontend(req, config) |> guard.close_if_body_unread(req)
   }
 }
 
@@ -121,7 +125,7 @@ fn cors_middleware(
   }
 
   let base = case req.method {
-    http.Options -> wisp.ok()
+    http.Options -> wisp.ok() |> guard.close_if_body_unread(req)
     _ -> next()
   }
 
@@ -166,6 +170,7 @@ fn handle_chat(req: Request, config: Config) -> Response {
   {
     Error(guard.Rejection(status, message)) ->
       json_response(status, models.error_response(message))
+      |> guard.close_if_body_unread(req)
     Ok(_) ->
       case
         rate_limit.check(
@@ -182,6 +187,7 @@ fn handle_chat(req: Request, config: Config) -> Response {
             "retry-after",
             int.to_string(rate_limit.retry_after_seconds(config.rate_limit)),
           )
+          |> guard.close_if_body_unread(req)
         True -> do_chat(req, config)
       }
   }
@@ -190,7 +196,9 @@ fn handle_chat(req: Request, config: Config) -> Response {
 fn require_post(req: Request, next: fn() -> Response) -> Response {
   case req.method {
     http.Post -> next()
-    _ -> json_response(405, models.error_response("Method not allowed"))
+    _ ->
+      json_response(405, models.error_response("Method not allowed"))
+      |> guard.close_if_body_unread(req)
   }
 }
 
@@ -201,6 +209,8 @@ fn do_chat(req: Request, config: Config) -> Response {
   case wisp.read_body_bits(req) {
     Error(_) ->
       json_response(413, models.error_response("Request body too large"))
+      // The rest of the body is still on the socket: don't reuse it.
+      |> set_header("connection", "close")
     Ok(bits) ->
       case bit_array.to_string(bits) {
         Error(_) ->
@@ -310,7 +320,7 @@ fn send_and_respond(
 /// Handle an OPTIONS preflight for endpoints served at the Mist level
 /// (outside of Wisp), such as `/api/chat/stream`.
 pub fn cors_preflight(
-  req: request.Request(mist.Connection),
+  req: request.Request(a),
   allowed_origins: List(String),
 ) -> response.Response(mist.ResponseData) {
   let origin = case request.get_header(req, "origin") {
@@ -327,6 +337,7 @@ pub fn cors_preflight(
     True -> response.set_header(base, "access-control-allow-origin", origin)
     False -> base
   }
+  |> guard.close_if_body_unread(req)
 }
 
 // ---------------------------------------------------------------------------

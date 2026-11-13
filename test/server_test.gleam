@@ -6,6 +6,9 @@ import ai_resume_bot/gemini
 import ai_resume_bot/rate_limit
 import ai_resume_bot/server.{Config}
 import gleam/http
+import gleam/http/request
+import gleam/http/response
+import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{None}
@@ -143,6 +146,133 @@ pub fn preflight_varies_on_origin_and_allows_only_content_type_test() {
   list.key_find(resp.headers, "vary") |> should.equal(Ok("origin"))
   list.key_find(resp.headers, "access-control-allow-headers")
   |> should.equal(Ok("Content-Type"))
+}
+
+// ---------------------------------------------------------------------------
+// A response sent without reading the request's body must close the
+// connection: Mist would otherwise parse the unread body as the next request
+// on the keep-alive socket, one whose headers (X-Forwarded-For) the sender
+// wrote, past the per-IP rate limiter.
+// ---------------------------------------------------------------------------
+
+/// A request with a declared body. `simulate` sets no Content-Length itself
+/// (and `string_body` sets a text/plain Content-Type, so it comes first).
+fn with_body(req, body: String) {
+  req
+  |> simulate.string_body(body)
+  |> with_length(body)
+}
+
+fn with_length(req, body: String) {
+  simulate.header(req, "content-length", int.to_string(string.byte_size(body)))
+}
+
+const smuggled = "GET /health HTTP/1.1\r\nhost: x\r\n\r\n"
+
+fn connection(resp: response.Response(a)) -> Result(String, Nil) {
+  list.key_find(resp.headers, "connection")
+}
+
+pub fn rejections_before_the_body_is_read_close_the_connection_test() {
+  let json_post = fn(method, path) {
+    simulate.request(method, path)
+    |> with_body(smuggled)
+    |> simulate.header("content-type", "application/json")
+    |> simulate.header("origin", allowed_origin)
+  }
+  let limited =
+    Config(
+      ..config(),
+      rate_limit: rate_limit.Config(max_requests: 0, window_ms: 60_000),
+    )
+  let cases = [
+    // 403: foreign origin
+    #(
+      json_post(http.Post, "/api/chat")
+        |> simulate.header("origin", "https://evil.example"),
+      config(),
+      403,
+    ),
+    // 415: not JSON
+    #(
+      json_post(http.Post, "/api/chat")
+        |> simulate.header("content-type", "text/plain"),
+      config(),
+      415,
+    ),
+    // 429: over the rate limit
+    #(json_post(http.Post, "/api/chat"), limited, 429),
+    // 405: wrong method on the chat and health routes
+    #(json_post(http.Put, "/api/chat"), config(), 405),
+    #(json_post(http.Post, "/health"), config(), 405),
+    // static routes answer non-GET requests with 404, unread
+    #(json_post(http.Post, "/nope"), config(), 404),
+  ]
+  list.each(cases, fn(c) {
+    let #(req, cfg, status) = c
+    let resp = server.handle(req, cfg)
+    resp.status |> should.equal(status)
+    connection(resp) |> should.equal(Ok("close"))
+  })
+}
+
+pub fn a_body_on_a_get_or_a_preflight_closes_the_connection_test() {
+  // Nothing reads these bodies either.
+  let get = simulate.request(http.Get, "/health") |> with_body(smuggled)
+  let resp = server.handle(get, config())
+  resp.status |> should.equal(200)
+  connection(resp) |> should.equal(Ok("close"))
+
+  let preflight =
+    simulate.request(http.Options, "/api/chat")
+    |> simulate.header("origin", allowed_origin)
+    |> with_body(smuggled)
+  let resp = server.handle(preflight, config())
+  resp.status |> should.equal(200)
+  connection(resp) |> should.equal(Ok("close"))
+
+  let preflight =
+    request.new()
+    |> request.set_method(http.Options)
+    |> request.set_header("origin", allowed_origin)
+    |> request.set_header("content-length", "33")
+  let resp = server.cors_preflight(preflight, [allowed_origin])
+  connection(resp) |> should.equal(Ok("close"))
+}
+
+pub fn a_body_over_the_limit_closes_the_connection_test() {
+  let body =
+    "{\"message\":\"hi\",\"history\":[{\"role\":\"user\",\"content\":\""
+    <> string.repeat("a", 8_000_001)
+    <> "\"}]}"
+  let resp = server.handle(chat(body) |> with_length(body), config())
+  resp.status |> should.equal(413)
+  connection(resp) |> should.equal(Ok("close"))
+}
+
+pub fn a_body_that_was_read_keeps_the_connection_alive_test() {
+  // The empty message is rejected after the whole body was read: nothing is
+  // left on the socket, so the connection stays open.
+  let body = "{\"message\":\"\"}"
+  let resp = server.handle(chat(body) |> with_length(body), config())
+  resp.status |> should.equal(400)
+  connection(resp) |> should.equal(Error(Nil))
+}
+
+pub fn requests_without_a_body_keep_the_connection_alive_test() {
+  let resp = server.handle(simulate.request(http.Get, "/health"), config())
+  connection(resp) |> should.equal(Error(Nil))
+  let resp =
+    server.handle(
+      simulate.request(http.Get, "/health")
+        |> simulate.header("content-length", "0"),
+      config(),
+    )
+  connection(resp) |> should.equal(Error(Nil))
+  let preflight =
+    simulate.request(http.Options, "/api/chat")
+    |> simulate.header("origin", allowed_origin)
+  connection(server.handle(preflight, config())) |> should.equal(Error(Nil))
 }
 
 // ---------------------------------------------------------------------------

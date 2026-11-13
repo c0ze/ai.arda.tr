@@ -63,94 +63,101 @@ pub fn handle_stream(
   req: request.Request(mist.Connection),
   config: StreamConfig,
 ) -> response.Response(ResponseData) {
+  let with_cors = with_cors(_, req, config)
+  use <- check_before_body(req, config)
+  case read_body(req, guard.max_stream_body_bytes) {
+    Error(mist.ExcessBody) ->
+      with_cors(error_response(413, "Request body too large"))
+      // The rest of the body is still on the socket: don't reuse it.
+      |> response.set_header("connection", "close")
+    Error(mist.MalformedBody) ->
+      with_cors(error_response(400, "Failed to read request body"))
+      // Where the body ends is unknown: don't reuse the socket either.
+      |> response.set_header("connection", "close")
+    Ok(body) ->
+      case bit_array.to_string(body) {
+        Error(_) ->
+          with_cors(error_response(400, "Invalid UTF-8 in request body"))
+        Ok(body_str) ->
+          case guard.parse_chat_request(body_str) {
+            Error(guard.Rejection(status, message)) ->
+              with_cors(error_response(status, message))
+            Ok(chat_req) -> {
+              // Voice fields are optional; a malformed one means no voice.
+              let voice_opts = case
+                json.parse(body_str, shared.voice_options_decoder())
+              {
+                Ok(v) -> v
+                Error(_) -> shared.VoiceOptions(on: False, lang: "en")
+              }
+              start_sse(req, chat_req, voice_opts, config)
+            }
+          }
+      }
+  }
+}
+
+/// Error responses must carry CORS headers too, otherwise the browser hides
+/// the 429/400 body from the (cross-origin) frontend.
+fn with_cors(
+  resp: response.Response(ResponseData),
+  req: request.Request(a),
+  config: StreamConfig,
+) -> response.Response(ResponseData) {
   let origin = case request.get_header(req, "origin") {
     Ok(v) -> v
     Error(_) -> ""
   }
-  // Error responses must carry CORS headers too, otherwise the browser hides
-  // the 429/400 body from the (cross-origin) frontend.
-  let with_cors = fn(resp: response.Response(ResponseData)) {
-    let resp =
-      resp
-      |> response.set_header(
-        "access-control-allow-methods",
-        "POST, GET, OPTIONS",
-      )
-      |> response.set_header("access-control-allow-headers", "Content-Type")
-      |> response.set_header("vary", "origin")
-    case list.contains(config.allowed_origins, origin) {
-      True -> response.set_header(resp, "access-control-allow-origin", origin)
-      False -> resp
-    }
+  let resp =
+    resp
+    |> response.set_header("access-control-allow-methods", "POST, GET, OPTIONS")
+    |> response.set_header("access-control-allow-headers", "Content-Type")
+    |> response.set_header("vary", "origin")
+  case list.contains(config.allowed_origins, origin) {
+    True -> response.set_header(resp, "access-control-allow-origin", origin)
+    False -> resp
   }
+}
 
-  // Header checks come before the rate limiter, so a foreign page can't use up
-  // a visitor's quota either.
-  let headers_ok =
+/// The checks made before the body is read: the headers, then the rate
+/// limit (header checks come first, so a foreign page can't use up a
+/// visitor's quota either). Their rejections leave the body unread, so they
+/// close the connection (`guard.close_if_body_unread`). `next` reads the body.
+pub fn check_before_body(
+  req: request.Request(a),
+  config: StreamConfig,
+  next: fn() -> response.Response(ResponseData),
+) -> response.Response(ResponseData) {
+  let reject = fn(resp) {
+    with_cors(resp, req, config) |> guard.close_if_body_unread(req)
+  }
+  case
     guard.check_headers(
       origin: request.get_header(req, "origin"),
       host: request.get_header(req, "host"),
       content_type: request.get_header(req, "content-type"),
       allowed: config.allowed_origins,
     )
-  use <- reject_headers(headers_ok, with_cors)
-  case
-    rate_limit.check(
-      config.rate_limit,
-      request.get_header(req, "x-forwarded-for"),
-    )
   {
-    False ->
-      with_cors(
-        error_response(429, "Too many requests. Please slow down.")
-        |> response.set_header(
-          "retry-after",
-          int.to_string(rate_limit.retry_after_seconds(config.rate_limit)),
-        ),
-      )
-    True ->
-      // Read the request body
-      case read_body(req, guard.max_stream_body_bytes) {
-        Error(mist.ExcessBody) ->
-          with_cors(error_response(413, "Request body too large"))
-          // The rest of the body is still on the socket: don't reuse it.
-          |> response.set_header("connection", "close")
-        Error(mist.MalformedBody) ->
-          with_cors(error_response(400, "Failed to read request body"))
-        Ok(body) ->
-          case bit_array.to_string(body) {
-            Error(_) ->
-              with_cors(error_response(400, "Invalid UTF-8 in request body"))
-            Ok(body_str) ->
-              case guard.parse_chat_request(body_str) {
-                Error(guard.Rejection(status, message)) ->
-                  with_cors(error_response(status, message))
-                Ok(chat_req) -> {
-                  // Voice fields are optional; a malformed one means no voice.
-                  let voice_opts = case
-                    json.parse(body_str, shared.voice_options_decoder())
-                  {
-                    Ok(v) -> v
-                    Error(_) -> shared.VoiceOptions(on: False, lang: "en")
-                  }
-                  start_sse(req, chat_req, voice_opts, config)
-                }
-              }
-          }
-      }
-  }
-}
-
-fn reject_headers(
-  checked: Result(Nil, guard.Rejection),
-  with_cors: fn(response.Response(ResponseData)) ->
-    response.Response(ResponseData),
-  next: fn() -> response.Response(ResponseData),
-) -> response.Response(ResponseData) {
-  case checked {
-    Ok(_) -> next()
     Error(guard.Rejection(status, message)) ->
-      with_cors(error_response(status, message))
+      reject(error_response(status, message))
+    Ok(_) ->
+      case
+        rate_limit.check(
+          config.rate_limit,
+          request.get_header(req, "x-forwarded-for"),
+        )
+      {
+        False ->
+          reject(
+            error_response(429, "Too many requests. Please slow down.")
+            |> response.set_header(
+              "retry-after",
+              int.to_string(rate_limit.retry_after_seconds(config.rate_limit)),
+            ),
+          )
+        True -> next()
+      }
   }
 }
 

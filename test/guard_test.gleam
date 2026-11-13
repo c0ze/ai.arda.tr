@@ -190,3 +190,24 @@ pub fn same_origin_ignores_default_ports_and_case_test() {
   ok("https://api.example.evil", "api.example")
   |> should.equal(Error(Rejection(403, "Origin not allowed")))
 }
+
+// ---------------------------------------------------------------------------
+// A response sent without reading a declared body closes the connection, or
+// Mist would parse that body as the next request on it.
+// ---------------------------------------------------------------------------
+
+pub fn a_content_length_or_transfer_encoding_declares_a_body_test() {
+  guard.declares_body([#("content-length", "12")]) |> should.be_true
+  guard.declares_body([#("Transfer-Encoding", "chunked")]) |> should.be_true
+  // Anything Mist might still read as a length counts as a body.
+  guard.declares_body([#("content-length", "+0")]) |> should.be_true
+  guard.declares_body([#("content-length", "0"), #("content-length", "5")])
+  |> should.be_true
+}
+
+pub fn no_body_or_a_zero_length_declares_none_test() {
+  guard.declares_body([]) |> should.be_false
+  guard.declares_body([#("host", "x"), #("content-length", "0")])
+  |> should.be_false
+  guard.declares_body([#("content-length", " 0 ")]) |> should.be_false
+}
