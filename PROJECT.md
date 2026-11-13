@@ -47,13 +47,16 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │       └── dotenv.gleam    # Minimal .env loader (real env vars win)
 ├── test/
 │   ├── ai_resume_bot_test.gleam     # gleeunit tests (prompt, email, SSE parsing, rate limit, blog)
-│   ├── guard_test.gleam             # request limits and header checks
-│   ├── server_test.gleam            # Wisp handler: 400/403/413/415, CORS, /healthz, HEAD (never reaches Gemini)
+│   ├── email_reply_test.gleam       # several [[SEND_EMAIL]] blocks: only the first is sent, none is shown (fake sender)
+│   ├── guard_test.gleam             # request limits, invisible-only messages, header checks, declared bodies
+│   ├── server_test.gleam            # Wisp handler: 400/403/405/413/415/429, connection: close, CORS, /healthz, HEAD (never reaches Gemini)
 │   ├── speech_test.gleam            # splitter / markdown stripper / UTF-16 offsets (EN, TR, JA)
+│   ├── stream_body_test.gleam       # stream path: chunked body limit, pre-body rejections close the connection
+│   ├── stream_events_test.gleam     # SSE actor driven without a socket: thinking/voice at start, chunks
 │   └── voice_test.gleam             # speech session with a mocked TTS, TTS wire format, request compat
 ├── frontend/               # Lustre (Gleam -> JS) frontend project
 │   ├── gleam.toml          # target = "javascript", [tools.lustre.*] config
-│   ├── test/               # node --test: ffi.test.mjs (transport, markdown), app.test.mjs (update/view)
+│   ├── test/               # node --test: ffi.test.mjs (transport, markdown sanitiser), app.test.mjs (update/view)
 │   └── src/
 │       ├── frontend.gleam  # Lustre app: init/update/view, API effect, FFI
 │       ├── frontend/i18n.gleam    # EN/JP/TR translations + quick-prompt strings
@@ -148,6 +151,7 @@ docker run -p 8080:8080 \
 - `GET /*` → static files from `PUBLIC_DIR`. `HEAD` is answered like `GET`, without the body.
 - Limits (`guard.gleam`, both endpoints): an empty `message`, or one with nothing visible in it (Unicode whitespace such as NBSP or U+3000, control characters, zero-width and other format or default-ignorable characters; `guard.is_blank`), gets 400 `Message is empty` (an accepted message is forwarded as sent), one over 20,000 characters (graphemes; `shared.max_message_chars`, also the input's `maxlength`, which counts UTF-16 units and so never allows more) 400 `Message is too long (at most 20000 characters)`. 20,000 leaves room for a pasted job description. History is capped to the last 20 items and each item is cut to 8000 characters (`shared.max_history_item_chars`), not rejected: the sibling widgets resend a rejected message as history, which would wedge their conversation. That trimming, not the body limit, bounds what reaches the model.
 - Body limits (413 `Request body too large`): `/api/chat/stream` reads at most 1,000,000 bytes (`guard.max_stream_body_bytes`), counted as it reads, so a chunked body is limited too, except that the pinned Mist (6.0.2) assembles each HTTP chunk whole before handing it over, so a single oversized chunk is buffered in memory once before it is rejected. `/api/chat` keeps Wisp's default, 8,000,000 bytes, as it always had: the sibling widgets send their whole conversation uncapped with every question and fall back to `/api/chat` when the stream fails, so a conversation too long for the stream (70 turns of 2,500 Japanese characters is ~1.05 MB) is still answered there.
+- Connections: a response sent without reading a declared request body (Content-Length other than 0, or any Transfer-Encoding) carries `connection: close`, and Mist closes the socket after it, so the unread body is never parsed as a further request (one whose `X-Forwarded-For` the sender wrote): the 403/415/429 rejections, 405, the 413s, non-GET static requests (404), and GETs or preflights that carry a body (`guard.close_if_body_unread`). Requests without a body, and those whose body was read (200, 400), keep the connection.
 - Header checks (`guard.check_headers`, both endpoints, before the rate limiter): a request whose `Origin` is neither in `ALLOWED_ORIGINS` nor the backend's own origin (its `Host`) gets 403 `Origin not allowed`; requests with no `Origin` (curl, server-side callers) pass. A body that is not `application/json` (a charset parameter is fine) gets 415 `Content-Type must be application/json`. All three clients send `Content-Type: application/json`.
 - Rate limiting is per client IP (right-most `X-Forwarded-For` hop); IPv6 clients are keyed on their /64.
 - Error shapes (`{"error": "..."}`): 400 `Invalid JSON` / the limits above, 403, 413, 415, 429 (with `retry-after`), 500 `Internal AI Error`, 502 contact-email failure.
@@ -170,7 +174,9 @@ docker run -p 8080:8080 \
 - Without SMTP configuration (`GMAIL_*`), the `[[SEND_EMAIL]]` instructions are not put in the prompt at all (`prompt.job_requirements_rider`): the bot says it cannot pass messages on and points people to the contact details on the résumé (https://resume.arda.tr) or LinkedIn. If a block still arrives, the user gets `contact_failure_message` and an error log.
 
 ### Frontend design (One Bit Forest)
-- Follows the family design system (`../DESIGN-SYSTEM.md`, section ai.arda.tr). Styles are hand-written in `public/style.css`; bump `style.css?v=` in `frontend/gleam.toml` when it changes.
+- Follows the family design system (`../DESIGN-SYSTEM.md`, section ai.arda.tr).
+- `#app` is pinned to the viewport. On short screens (`max-height: 560px`: phone landscape, a zoomed desktop) the identity block collapses to a 34px orb, the title and the status line, and the quick prompts are hidden, so the conversation keeps its room (≈190px at 640x360). Up to 360px wide the status bar tightens to fit 320px.
+- Replies are sanitised with an allowlist (`SANITIZE` in `ffi.mjs`): the tags markdown renders to, and only `href`, `title`, `start`, `align`. Nothing that loads a resource or positions itself survives. Styles are hand-written in `public/style.css`; bump `style.css?v=` in `frontend/gleam.toml` when it changes.
 - Renditions: `night` (default), `night-hc`, `xerox`, `xerox-hc`, stored in localStorage `theme` and applied as `body[data-theme]`. Legacy ids migrate on read (`light`→xerox, `paper`→xerox-hc, `dark`→night, `carbon`→night-hc) in both the pre-hydration script (`frontend/gleam.toml`) and `theme_from_string` (`frontend.gleam`); keep the two in sync.
 - The construct orb and the crackle cursor are canvases created by `ffi.mjs`, outside Lustre's vdom: the orb mounts into `#construct-orb` (a vnode with no children, so re-renders never touch it); the cursor is re-appended to the end of `.msg.is-streaming .txt` in a `before_paint` effect after each chunk. The orb sizzles on every chunk, simmers between `thinking` and the first chunk, and does neither under `prefers-reduced-motion`.
 - Error lines are `ChatMessage(is_error: True)` and, like empty replies, never go back to the model (`wire_history`). The transport's `HTTP 429`, `Network error` and timeout map to localised lines in `i18n.gleam`; other errors show after a localised `System Malfunction:` prefix.
