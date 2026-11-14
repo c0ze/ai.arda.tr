@@ -45,6 +45,15 @@ test('one description says what the page is, and does not promise to pass messag
   }
 });
 
+const body = () => topLevel('body');
+
+test('without JavaScript, the page still links Arda\'s site, résumé and blog', () => {
+  const noscript = body().match(/<noscript>(.*?)<\/noscript>/s);
+  assert.ok(noscript, 'a <noscript> fallback');
+  const hrefs = [...noscript[1].matchAll(/<a href="([^"]*)">/g)].map((m) => m[1]);
+  assert.deepEqual(hrefs, ['https://arda.tr', 'https://resume.arda.tr', 'https://blog.arda.tr']);
+});
+
 test('the page config never links coze.org', () => {
   assert.doesNotMatch(section, /coze\.org/);
 });
