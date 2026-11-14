@@ -162,3 +162,37 @@ test('the input allows as much as the server accepts', () => {
   // one unit), so nothing the input allows is rejected.
   assert.equal(attr(tagWith(to_string(view(start())), 'id="user-input"'), 'maxlength'), '20000');
 });
+
+// ---------------------------------------------------------------------------
+// The arda.tr family: the chat links to its sibling sites in every language,
+// and never to coze.org (the owner keeps that domain apart from this family).
+// ---------------------------------------------------------------------------
+
+import { Tr } from '../build/dev/javascript/frontend/frontend/i18n.mjs';
+
+const familyHosts = ['arda.tr', 'blog.arda.tr', 'resume.arda.tr', 'lind.arda.tr'];
+const decode = (s) => s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+
+for (const [name, lang, label] of [
+  ['EN', null, "Arda's other sites"],
+  ['JP', new Jp(), 'Ardaのほかのサイト'],
+  ['TR', new Tr(), "Arda'nın diğer siteleri"],
+]) {
+  test(`the footer links the four family sites under a ${name} label`, () => {
+    const model = lang ? step(start(), new UserPickedLanguage(lang)) : start();
+    const html = to_string(view(model));
+    const nav = html.match(/<nav[^>]*class="input-hint family"[^>]*>(.*?)<\/nav>/);
+    assert.ok(nav, 'a family nav is rendered');
+    assert.equal(decode(attr(nav[0], 'aria-label')), label);
+    const links = [...nav[1].matchAll(/<a href="([^"]*)">([^<]*)<\/a>/g)].map((m) => [m[1], m[2]]);
+    // Link texts are hostnames, the same in every language.
+    assert.deepEqual(links, familyHosts.map((h) => ['https://' + h, h]));
+  });
+}
+
+test('the rendered app has no link to coze.org', () => {
+  for (const lang of [null, new Jp(), new Tr()]) {
+    const model = lang ? step(start(), new UserPickedLanguage(lang)) : start();
+    assert.doesNotMatch(to_string(view(model)), /coze\.org/);
+  }
+});

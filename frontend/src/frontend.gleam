@@ -912,6 +912,29 @@ fn input_footer(model: Model, s: Strings) -> Element(Msg) {
     html.p([attribute.class("input-hint")], [
       html.text(s.disclaimer),
     ]),
+    // The arda.tr family, linked from every site's chrome. Link texts are
+    // hostnames in every language.
+    html.nav(
+      [
+        attribute.class("input-hint family"),
+        attribute.attribute("aria-label", s.family_label),
+      ],
+      [
+        html.a([attribute.href("https://arda.tr")], [html.text("arda.tr")]),
+        html.text(" · "),
+        html.a([attribute.href("https://blog.arda.tr")], [
+          html.text("blog.arda.tr"),
+        ]),
+        html.text(" · "),
+        html.a([attribute.href("https://resume.arda.tr")], [
+          html.text("resume.arda.tr"),
+        ]),
+        html.text(" · "),
+        html.a([attribute.href("https://lind.arda.tr")], [
+          html.text("lind.arda.tr"),
+        ]),
+      ],
+    ),
   ])
 }
 

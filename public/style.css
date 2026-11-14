@@ -549,6 +549,20 @@ canvas.px.cursor {
     color: var(--fg-2);
 }
 
+/* The arda.tr family under the disclaimer: a second hint line, in its colour.
+   Focus keeps the page's ring (:focus-visible above). */
+.input-hint.family { margin-top: 2px; }
+
+.family a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+}
+
+.family a:hover,
+.family a:focus-visible { color: var(--sig); }
+
 @keyframes blink { 50% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -688,6 +702,10 @@ canvas.px.cursor {
         margin-top: 4px;
         font-size: 10.5px;
     }
+
+    /* The conversation needs the line more; <noscript> and the JSON-LD
+       still carry the family links. */
+    .input-hint.family { display: none; }
 }
 
 @media (max-height: 300px) {
