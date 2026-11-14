@@ -1,36 +1,49 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 // The page's <head> and static <body> come from [tools.lustre.html] in
-// gleam.toml; lustre_dev_tools copies them into public/index.html as they are
-// (the `body` string verbatim). These tests read the config, so they run
-// without a Lustre build.
+// gleam.toml. These tests check the index.html that lustre_dev_tools makes of
+// it: they parse gleam.toml with the same TOML parser (tom) and run the same
+// generator (lustre_dev_tools/build/html), both compiled to JavaScript by
+// `gleam build`, so they need no Lustre build (CI runs them before one). A key
+// the generator does not read, or a table that swallows one, fails here.
 
-const toml = readFileSync(new URL('../gleam.toml', import.meta.url), 'utf8');
-const section = toml.split('[tools.lustre.html]')[1];
+const build = '../build/dev/javascript/';
+const tom = await import(build + 'tom/tom.mjs');
+const { Project } = await import(build + 'lustre_dev_tools/lustre_dev_tools/project.mjs');
+const { generate } = await import(build + 'lustre_dev_tools/lustre_dev_tools/build/html.mjs');
+const { None } = await import(build + 'gleam_stdlib/gleam/option.mjs');
+const { toList } = await import(build + 'prelude.mjs');
 
-// The values are one-line TOML basic strings; their escapes (\" and \\) read
-// the same as JSON's.
-const unquote = (literal) => JSON.parse(literal);
-const STRING = '("(?:[^"\\\\]|\\\\.)*")';
+function generatedIndexHtml() {
+  const parsed = tom.parse(readFileSync(new URL('../gleam.toml', import.meta.url), 'utf8'));
+  assert.equal(parsed.constructor.name, 'Ok', 'gleam.toml parses');
+  const lustre = tom.get_table(parsed[0], toList(['tools', 'lustre']));
+  assert.equal(lustre.constructor.name, 'Ok', 'gleam.toml has [tools.lustre]');
+  // What `lustre/dev build --minify` does: the entry is the project name.
+  const project = new Project('frontend', lustre[0], './', 'src', 'dev', 'assets', '.lustre/bin', '.lustre/build', false);
+  return generate(project, 'frontend', new None(), true);
+}
 
-const topLevel = (key) => {
-  const all = [...section.matchAll(new RegExp('^' + key + ' = ' + STRING, 'gm'))];
-  assert.equal(all.length, 1, `one ${key} in [tools.lustre.html]`);
-  return unquote(all[0][1]);
-};
+const html = generatedIndexHtml();
+
+const decode = (s) => s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const attrs = (tag) => Object.fromEntries([...tag.matchAll(/([a-z:-]+)="([^"]*)"/g)].map((m) => [m[1], decode(m[2])]));
+const metas = [...html.matchAll(/<meta [^>]*>/g)].map((m) => attrs(m[0]));
 const meta = (kind, name) => {
-  const all = [...section.matchAll(new RegExp('\\{ ' + kind + ' = "' + name + '", content = ' + STRING + ' \\}', 'g'))];
-  assert.equal(all.length, 1, `one ${kind}=${name} meta`);
-  return unquote(all[0][1]);
+  const found = metas.filter((m) => m[kind] === name);
+  assert.equal(found.length, 1, `one ${kind}=${name} meta`);
+  return found[0].content;
 };
+const body = () => html.match(/<body>(.*)<\/body>/s)[1];
 
 const TITLE = "Arda's AI Construct - Ask about Arda Karaduman";
 const DESCRIPTION = "An AI chat that answers questions about Arda Karaduman's work, projects and music.";
 
 test('the title says whose construct it is, with the surname, everywhere it is shared', () => {
-  assert.equal(topLevel('title'), TITLE);
+  const titles = [...html.matchAll(/<title>(.*?)<\/title>/g)].map((m) => decode(m[1]));
+  assert.deepEqual(titles, [TITLE]);
   assert.equal(meta('property', 'og:title'), TITLE);
   assert.equal(meta('name', 'twitter:title'), TITLE);
 });
@@ -45,7 +58,10 @@ test('one description says what the page is, and does not promise to pass messag
   }
 });
 
-const body = () => topLevel('body');
+test('the canonical URL is the site root', () => {
+  const canonical = [...html.matchAll(/<link [^>]*>/g)].map((m) => attrs(m[0])).filter((l) => l.rel === 'canonical');
+  assert.deepEqual(canonical.map((l) => l.href), ['https://ai.arda.tr/']);
+});
 
 test('without JavaScript, the page still links Arda\'s site, résumé and blog', () => {
   const noscript = body().match(/<noscript>(.*?)<\/noscript>/s);
@@ -58,16 +74,28 @@ test('the JSON-LD names the site and points at the one Person shared by the fami
   const blocks = [...body().matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)];
   assert.equal(blocks.length, 1, 'one JSON-LD block');
   const ld = JSON.parse(blocks[0][1]);
+  assert.equal(ld['@context'], 'https://schema.org');
   assert.equal(ld['@type'], 'WebSite');
   assert.equal(ld['@id'], 'https://ai.arda.tr/#website');
   assert.equal(ld.url, 'https://ai.arda.tr/');
-  // arda.tr defines the Person; every family site refers to the same @id.
-  assert.equal(ld.about['@type'], 'Person');
-  assert.equal(ld.about['@id'], 'https://arda.tr/#person');
-  assert.equal(ld.about.name, 'Arda Karaduman');
+  // arda.tr defines the Person; every family site refers to the same
+  // identity: the same @id, name and URL.
+  assert.deepEqual(ld.about, {
+    '@type': 'Person',
+    '@id': 'https://arda.tr/#person',
+    name: 'Arda Karaduman',
+    url: 'https://arda.tr/',
+  });
   assert.deepEqual(ld.author, { '@id': 'https://arda.tr/#person' });
 });
 
-test('the page config never links coze.org', () => {
-  assert.doesNotMatch(section, /coze\.org/);
+test('the page never links coze.org', () => {
+  assert.doesNotMatch(html, /coze\.org/);
+});
+
+// After a Lustre build (deploy-ui.yml builds before it tests), the file that
+// is published must be exactly what these tests checked.
+const built = new URL('../../public/index.html', import.meta.url);
+test('the built public/index.html is the page checked above', { skip: !existsSync(built) && 'no Lustre build in ../public' }, () => {
+  assert.equal(readFileSync(built, 'utf8'), html);
 });
