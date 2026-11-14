@@ -54,6 +54,20 @@ test('without JavaScript, the page still links Arda\'s site, résumé and blog',
   assert.deepEqual(hrefs, ['https://arda.tr', 'https://resume.arda.tr', 'https://blog.arda.tr']);
 });
 
+test('the JSON-LD names the site and points at the one Person shared by the family', () => {
+  const blocks = [...body().matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)];
+  assert.equal(blocks.length, 1, 'one JSON-LD block');
+  const ld = JSON.parse(blocks[0][1]);
+  assert.equal(ld['@type'], 'WebSite');
+  assert.equal(ld['@id'], 'https://ai.arda.tr/#website');
+  assert.equal(ld.url, 'https://ai.arda.tr/');
+  // arda.tr defines the Person; every family site refers to the same @id.
+  assert.equal(ld.about['@type'], 'Person');
+  assert.equal(ld.about['@id'], 'https://arda.tr/#person');
+  assert.equal(ld.about.name, 'Arda Karaduman');
+  assert.deepEqual(ld.author, { '@id': 'https://arda.tr/#person' });
+});
+
 test('the page config never links coze.org', () => {
   assert.doesNotMatch(section, /coze\.org/);
 });
