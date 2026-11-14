@@ -56,7 +56,7 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │   └── voice_test.gleam             # speech session with a mocked TTS, TTS wire format, request compat
 ├── frontend/               # Lustre (Gleam -> JS) frontend project
 │   ├── gleam.toml          # target = "javascript", [tools.lustre.*] config
-│   ├── test/               # node --test: ffi.test.mjs (transport, markdown sanitiser), app.test.mjs (update/view)
+│   ├── test/               # node --test: ffi.test.mjs (transport, markdown sanitiser), app.test.mjs (update/view), page.test.mjs (head, noscript, JSON-LD in gleam.toml)
 │   └── src/
 │       ├── frontend.gleam  # Lustre app: init/update/view, API effect, FFI
 │       ├── frontend/i18n.gleam    # EN/JP/TR translations + quick-prompt strings
@@ -176,7 +176,9 @@ docker run -p 8080:8080 \
 
 ### Frontend design (One Bit Forest)
 - Follows the family design system (`../DESIGN-SYSTEM.md`, section ai.arda.tr).
-- `#app` is pinned to the viewport. On short screens (`max-height: 560px`: phone landscape, a zoomed desktop) the identity block collapses to a 34px orb, the title and the status line, and the quick prompts are hidden, so the conversation keeps its room (≈190px at 640x360). Up to 360px wide the status bar tightens to fit 320px.
+- `#app` is pinned to the viewport. On short screens (`max-height: 560px`: phone landscape, a zoomed desktop) the identity block collapses to a 34px orb, the title and the status line, and the quick prompts and the family line are hidden, so the conversation keeps its room (≈190px at 640x360). Up to 360px wide the status bar tightens to fit 320px.
+- Under the disclaimer, a `nav.family` links the arda.tr family: arda.tr, blog.arda.tr, resume.arda.tr, lind.arda.tr (hostnames in every language; the label is `family_label` in `i18n.gleam`). It wraps to two lines at 320px. Never link coze.org from this page.
+- The page head and static body are `[tools.lustre.html]` in `frontend/gleam.toml`: title and og/twitter title "Arda's AI Construct - Ask about Arda Karaduman", one description for all three description tags (it must not say the chat passes messages on: production has no SMTP), a `<noscript>` linking arda.tr, the résumé and the blog, and a WebSite JSON-LD block at the end of `body` whose `about`/`author` is `https://arda.tr/#person`, the Person arda.tr defines for the family. `body` is copied into `index.html` verbatim. `test/page.test.mjs` checks them.
 - Replies are sanitised with an allowlist (`SANITIZE` in `ffi.mjs`): the tags markdown renders to, and only `href`, `title`, `start`, `align`. Nothing that loads a resource or positions itself survives. Styles are hand-written in `public/style.css`; bump `style.css?v=` in `frontend/gleam.toml` when it changes.
 - Renditions: `night` (default), `night-hc`, `xerox`, `xerox-hc`, stored in localStorage `theme` and applied as `body[data-theme]`. Legacy ids migrate on read (`light`→xerox, `paper`→xerox-hc, `dark`→night, `carbon`→night-hc) in both the pre-hydration script (`frontend/gleam.toml`) and `theme_from_string` (`frontend.gleam`); keep the two in sync.
 - The construct orb and the crackle cursor are canvases created by `ffi.mjs`, outside Lustre's vdom: the orb mounts into `#construct-orb` (a vnode with no children, so re-renders never touch it); the cursor is re-appended to the end of `.msg.is-streaming .txt` in a `before_paint` effect after each chunk. The orb sizzles on every chunk, simmers between `thinking` and the first chunk, and does neither under `prefers-reduced-motion`.

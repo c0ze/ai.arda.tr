@@ -42,7 +42,7 @@ A chatbot that answers questions about Arda's career and personal interests (inc
    gleam run                # builds the Lustre bundle into ./public, then boots HTTP server on $PORT (default 8080)
    gleam run -- fetch       # just refresh resume JSON under ./data and exit
    gleam test               # backend tests: request guards, handlers and the SSE actor (never reaching Gemini), prompt, email, speech, voice
-   (cd frontend && gleam build && node --test test/*.test.mjs)   # frontend: transport, markdown sanitiser, app updates
+   (cd frontend && gleam build && node --test test/*.test.mjs)   # frontend: transport, markdown sanitiser, app updates, page meta
    ```
    `gleam run` detects [frontend/gleam.toml](frontend/gleam.toml) and runs `lustre/dev build --minify --outdir=../public` as a prerequisite. In the production Docker image the `frontend/` tree is not copied into the runtime stage, so this check is a no-op there and the bundle is produced by an earlier Docker stage instead. For HMR-style dev you can still run `gleam run -m lustre/dev start` from inside [frontend/](frontend/) — it proxies `/api` to `http://localhost:8080` (see `[tools.lustre.dev]` in [frontend/gleam.toml](frontend/gleam.toml)).
 
