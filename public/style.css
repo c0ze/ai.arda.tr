@@ -702,9 +702,11 @@ canvas.px.cursor {
         margin-top: 4px;
         font-size: 10.5px;
     }
+}
 
-    /* The conversation needs the line more; <noscript> and the JSON-LD
-       still carry the family links. */
+/* The family line is hidden to keep the conversation's space: on short
+   screens, and at 320x568, where it wraps to two lines. */
+@media (max-height: 600px) {
     .input-hint.family { display: none; }
 }
 
