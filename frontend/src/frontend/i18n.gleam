@@ -65,7 +65,7 @@ pub fn strings(language: Language) -> Strings {
     En ->
       Strings(
         construct_title: "Ask about Arda",
-        construct_subline: "Answers questions about Arda's work, projects, and music, and forwards messages to him.",
+        construct_subline: "Answers questions about Arda's work, projects, and music.",
         status_ready: "Ready",
         status_thinking: "Thinking…",
         status_writing: "Writing…",
@@ -86,7 +86,7 @@ pub fn strings(language: Language) -> Strings {
         scheme_light: "Light",
         scheme_dark: "Dark",
         conversation_label: "Conversation",
-        welcome_msg: "Ask about Arda's work, projects, education, or music. If you have a role for him, send the details here and I will pass them on.",
+        welcome_msg: "Ask about Arda's work, projects, education, or music.",
         input_placeholder: "Ask a question",
         try_asking: "Try asking",
         disclaimer: "Answers can be wrong. Verify important details with Arda.",
@@ -111,7 +111,7 @@ pub fn strings(language: Language) -> Strings {
     Jp ->
       Strings(
         construct_title: "Ardaについて質問する",
-        construct_subline: "Ardaの仕事、プロジェクト、音楽についての質問に答え、本人への連絡も取り次ぎます。",
+        construct_subline: "Ardaの仕事、プロジェクト、音楽についての質問に答えます。",
         status_ready: "待機中",
         status_thinking: "考え中…",
         status_writing: "入力中…",
@@ -132,7 +132,7 @@ pub fn strings(language: Language) -> Strings {
         scheme_light: "ライト",
         scheme_dark: "ダーク",
         conversation_label: "会話",
-        welcome_msg: "Ardaの仕事、プロジェクト、学歴、音楽についてお答えします。仕事の相談があれば、詳細を送ってください。本人に伝えます。",
+        welcome_msg: "Ardaの仕事、プロジェクト、学歴、音楽についてお答えします。",
         input_placeholder: "質問を入力",
         try_asking: "質問の例",
         disclaimer: "回答は誤る場合があります。重要な点はArda本人に確認してください。",
@@ -157,7 +157,7 @@ pub fn strings(language: Language) -> Strings {
     Tr ->
       Strings(
         construct_title: "Arda hakkında sorun",
-        construct_subline: "Arda'nın işi, projeleri ve müziği hakkındaki soruları yanıtlar, mesajlarınızı ona iletir.",
+        construct_subline: "Arda'nın işi, projeleri ve müziği hakkındaki soruları yanıtlar.",
         status_ready: "Hazır",
         status_thinking: "Düşünüyor…",
         status_writing: "Yazıyor…",
@@ -178,7 +178,7 @@ pub fn strings(language: Language) -> Strings {
         scheme_light: "Açık",
         scheme_dark: "Koyu",
         conversation_label: "Sohbet",
-        welcome_msg: "Arda'nın işi, projeleri, eğitimi veya müziği hakkında sorabilirsiniz. İş teklifiniz varsa ayrıntıları yazın, kendisine iletirim.",
+        welcome_msg: "Arda'nın işi, projeleri, eğitimi veya müziği hakkında sorabilirsiniz.",
         input_placeholder: "Bir soru sorun",
         try_asking: "Örnek sorular",
         disclaimer: "Yanıtlar hatalı olabilir. Önemli bilgileri Arda ile doğrulayın.",
