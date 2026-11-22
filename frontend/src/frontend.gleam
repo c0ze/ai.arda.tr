@@ -1,28 +1,30 @@
 //// Lustre port of the chat UI that lives at ai.arda.tr.
 ////
 //// Shape mirrors the old `public/script.js`:
-////   - rendition (night / night-hc / xerox / xerox-hc) persisted in
-////     localStorage under `theme`; legacy ids migrate on read
+////   - light or dark scheme, dark unless the visitor pins light; the pin is
+////     kept in localStorage under `theme` by the family's `scheme.js`, and the
+////     page reads it before first paint (see `frontend/gleam.toml`)
 ////   - language switcher (en / jp / tr) with translated strings + quick
-////     prompts, persisted in localStorage like the theme
+////     prompts, persisted in localStorage
 ////   - chat history sent with each request to `/api/chat/stream` (SSE)
 ////   - markdown rendered through marked.js + DOMPurify (vendored under
 ////     `public/vendor/`, loaded as globals by `index.html` and invoked
 ////     through `ffi.mjs`)
 ////
 //// Streaming: The frontend POSTs to `/api/chat/stream` and receives SSE
-//// events: `thinking` → `chunk`* → `done`. The construct orb (a 1-bit
-//// canvas owned by `ffi.mjs`, see `onebit.mjs`) simmers while the model
-//// thinks and sizzles on every chunk; a crackling block cursor trails the
-//// reply while it streams. Chunks are appended progressively with markdown
-//// rendered live.
+//// events: `thinking` → `chunk`* → `done`. Chunks are appended progressively
+//// with markdown rendered live. The assistant is the square dot of the arda.tr
+//// wordmark (`.ix-mark` in brand.css): it blinks while a reply is awaited or
+//// written, and that is all the motion there is.
 ////
-//// Voice: unless muted (the `♪` toggle, persisted by voice.mjs), requests ask
-//// for speech too. The speaker in `ffi.mjs` / `voice.mjs` plays it through a
-//// robot filter and reports how far the voice has got; the reply is shown
-//// only up to there (`Speaking`), so it is written as it is spoken.
+//// Voice: unless muted (the voice toggle, persisted by voice.mjs), requests
+//// ask for speech too. The speaker in `ffi.mjs` / `voice.mjs` plays it through
+//// a robot filter and reports how far the voice has got; the reply is shown
+//// only up to there (`Speaking`), so it is written as it is spoken, and the
+//// square swells with the voice's loudness.
 
 import frontend/i18n.{type Language, type Strings, En, Jp, Tr}
+import frontend/wordmark
 import gleam/dynamic/decode
 import gleam/int
 import gleam/json
@@ -51,23 +53,13 @@ const cloud_run_base = "https://ai-arda-tr-api-599610058688.asia-northeast1.run.
 /// re-applies the same cap on untrusted input.
 const max_history_messages = shared.default_max_history
 
-/// Host element for the construct orb's canvas (created by `ffi.mjs`).
-const orb_host = "#construct-orb"
-
-/// Where the crackle cursor goes while a reply streams.
-const streaming_reply = ".msg.is-streaming .txt"
+/// The square of the reply being written or spoken. While the voice speaks,
+/// `ffi.mjs` sets its loudness on it as `--ix-level` (see brand.css).
+const speaking_mark = ".msg.is-streaming .ix-mark"
 
 // ---------------------------------------------------------------------------
 // Model
 // ---------------------------------------------------------------------------
-
-/// The four One Bit Forest renditions (see DESIGN-SYSTEM.md).
-pub type Theme {
-  Night
-  NightHc
-  Xerox
-  XeroxHc
-}
 
 pub type Sender {
   User
@@ -100,7 +92,6 @@ pub type StreamState {
 
 pub type Model {
   Model(
-    theme: Theme,
     language: Language,
     input: String,
     history: List(ChatMessage),
@@ -118,13 +109,10 @@ pub type Model {
 }
 
 pub fn init(_flags) -> #(Model, Effect(Msg)) {
-  let theme = load_theme()
-  apply_theme(theme)
   let language = load_language()
   apply_language(language)
   let model =
     Model(
-      theme: theme,
       language: language,
       input: "",
       history: [],
@@ -136,7 +124,7 @@ pub fn init(_flags) -> #(Model, Effect(Msg)) {
       announcement: "",
     )
   let #(model, effects) = reset_with_welcome(model, language)
-  #(model, effect.batch([effects, orb_mount()]))
+  #(model, effect.batch([effects, scheme_watch()]))
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +132,7 @@ pub fn init(_flags) -> #(Model, Effect(Msg)) {
 // ---------------------------------------------------------------------------
 
 pub type Msg {
-  UserCycledTheme
+  UserToggledScheme
   UserPickedLanguage(Language)
   UserTypedInput(String)
   UserPressedEnter
@@ -159,12 +147,12 @@ pub type Msg {
 
 pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
-    UserCycledTheme -> {
-      let next = next_theme(model.theme)
-      save_theme(next)
-      apply_theme(next)
-      #(Model(..model, theme: next), effect.none())
-    }
+    // The scheme is not in the model: scheme.js keeps it on <html>, and
+    // brand.css shows the switch's label from there.
+    UserToggledScheme -> #(
+      model,
+      effect.from(fn(_dispatch) { do_scheme_toggle() }),
+    )
 
     UserPickedLanguage(lang) ->
       // Re-clicking the active language must not wipe the conversation.
@@ -210,16 +198,13 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         False, Silent, Streaming(id) -> Speaking(msg_id: id, shown:)
         False, Silent, _ -> Silent
       }
-      #(
-        Model(..model, speech: speech),
-        effect.batch([scroll_to_bottom(), cursor_trail()]),
-      )
+      #(Model(..model, speech: speech), scroll_to_bottom())
     }
 
     SpeechEnded -> {
       let model = Model(..model, speech: Silent)
       case model.stream_state {
-        Idle -> #(model, settle())
+        Idle -> #(model, scroll_to_bottom())
         _ -> #(model, effect.none())
       }
     }
@@ -233,16 +218,11 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
       case evt {
         shared.StreamThinking -> {
           // Add a placeholder bot message; until its first chunk it shows
-          // only the crackle cursor while the orb simmers.
+          // only the blinking square.
           let #(model, bot_id) = push(model, Bot, "")
           #(
             Model(..model, stream_state: Streaming(bot_msg_id: bot_id)),
-            effect.batch([
-              scroll_to_bottom(),
-              orb_sizzle(),
-              orb_simmer(True),
-              cursor_trail(),
-            ]),
+            scroll_to_bottom(),
           )
         }
 
@@ -250,15 +230,7 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
           case model.stream_state {
             Streaming(bot_msg_id) -> {
               let model = append_to_message(model, bot_msg_id, text)
-              #(
-                model,
-                effect.batch([
-                  scroll_to_bottom(),
-                  orb_sizzle(),
-                  orb_simmer(False),
-                  cursor_trail(),
-                ]),
-              )
+              #(model, scroll_to_bottom())
             }
             _ -> #(model, effect.none())
           }
@@ -274,18 +246,21 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
                   ..replace_message_text(model, bot_msg_id, text),
                   announcement: text,
                 )
-              // Still speaking: the cursor stays until the voice is done.
+              // Still speaking: the reply goes on appearing with the voice.
               case model.speech {
                 Speaking(..) -> #(
                   Model(..model, stream_state: Idle),
-                  orb_simmer(False),
+                  effect.none(),
                 )
-                Silent -> #(Model(..model, stream_state: Idle), settle())
+                Silent -> #(
+                  Model(..model, stream_state: Idle),
+                  scroll_to_bottom(),
+                )
               }
             }
             _ -> {
               let #(model, _) = push(model, Bot, text)
-              #(Model(..model, stream_state: Idle), settle())
+              #(Model(..model, stream_state: Idle), scroll_to_bottom())
             }
           }
         }
@@ -296,8 +271,15 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
         | shared.StreamSpeechEnd(_) -> #(model, effect.none())
 
         shared.StreamError(message) -> {
-          let error_text = error_text(i18n.strings(model.language), message)
-          let model = Model(..model, speech: Silent, announcement: error_text)
+          let s = i18n.strings(model.language)
+          let error_text = error_text(s, message)
+          // Heard as it is seen: the label, then the line.
+          let model =
+            Model(
+              ..model,
+              speech: Silent,
+              announcement: s.error_label <> ": " <> error_text,
+            )
           case model.stream_state {
             Streaming(bot_msg_id) -> {
               let has_partial_text =
@@ -308,11 +290,11 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
                 True -> push_error(model, error_text)
                 False -> replace_with_error(model, bot_msg_id, error_text)
               }
-              #(Model(..model, stream_state: Idle), settle())
+              #(Model(..model, stream_state: Idle), scroll_to_bottom())
             }
             _ -> #(
               Model(..push_error(model, error_text), stream_state: Idle),
-              settle(),
+              scroll_to_bottom(),
             )
           }
         }
@@ -335,8 +317,11 @@ fn reset_with_welcome(model: Model, lang: Language) -> #(Model, Effect(Msg)) {
       announcement: "",
     )
   let #(with_welcome, _) = push(cleared, Bot, s.welcome_msg)
-  // A language switch mid-reply drops the stream, so quiet the construct.
-  #(with_welcome, effect.batch([stream_abort(), speech_stop(), settle()]))
+  // A language switch mid-reply drops the stream, and its voice with it.
+  #(
+    with_welcome,
+    effect.batch([stream_abort(), speech_stop(), scroll_to_bottom()]),
+  )
 }
 
 fn send_current(model: Model) -> #(Model, Effect(Msg)) {
@@ -368,7 +353,7 @@ fn send_current(model: Model) -> #(Model, Effect(Msg)) {
           generation: generation,
           announcement: "",
         ),
-        effect.batch([effect, scroll_to_bottom(), cursor_trail()]),
+        effect.batch([effect, scroll_to_bottom()]),
       )
     }
   }
@@ -403,13 +388,13 @@ fn replace_with_error(model: Model, msg_id: Int, text: String) -> Model {
 /// What an error says in the UI language. The transport reports `HTTP 429`
 /// (rate limited), `Network error` (offline, or the server unreachable) and
 /// `Response timed out. Please try again.` (see ffi.mjs); anything else is
-/// shown after a localised prefix.
+/// shown as it came. The view puts the localised "Error" label above it.
 fn error_text(s: Strings, message: String) -> String {
   case message {
     "HTTP 429" -> s.error_rate_limited
     "Network error" -> s.error_offline
     "Response timed out. Please try again." -> s.error_timeout
-    _ -> s.error_prefix <> message
+    _ -> message
   }
 }
 
@@ -443,16 +428,6 @@ fn split_last(items: List(a)) -> #(List(a), Bool) {
   }
 }
 
-fn next_theme(theme: Theme) -> Theme {
-  // Night -> Night HC -> Xerox -> Xerox HC -> Night
-  case theme {
-    Night -> NightHc
-    NightHc -> Xerox
-    Xerox -> XeroxHc
-    XeroxHc -> Night
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Effects
 // ---------------------------------------------------------------------------
@@ -480,7 +455,7 @@ fn call_api_stream(
       True -> {
         do_unlock_audio()
         do_speech_begin(
-          orb_host,
+          speaking_mark,
           fn(shown) { dispatch(SpeechRevealed(shown)) },
           fn() { dispatch(SpeechEnded) },
         )
@@ -502,7 +477,7 @@ pub fn wire_history(history: List(ChatMessage)) -> List(shared.ChatMessage) {
   // turn (and we needn't spend tokens echoing our own canned greeting).
   |> list.drop_while(fn(m) { m.sender == Bot })
   // Error lines and empty replies are not the model's words; sent back, they
-  // would read as its own turns ("Error: HTTP 429").
+  // would read as its own turns ("HTTP 429").
   |> list.filter(fn(m) { !m.is_error && string.trim(m.text) != "" })
   |> list.map(fn(m) {
     shared.ChatMessage(role: role_of(m.sender), content: m.text)
@@ -528,24 +503,9 @@ fn scroll_to_bottom() -> Effect(Msg) {
   effect.from(fn(_dispatch) { do_scroll_to_bottom("#messages-container") })
 }
 
-/// The orb's canvas lives outside Lustre's vdom, so mount it once the host
-/// element exists.
-fn orb_mount() -> Effect(Msg) {
-  effect.after_paint(fn(_dispatch, _root) { do_mount_orb(orb_host) })
-}
-
-fn orb_sizzle() -> Effect(Msg) {
-  effect.from(fn(_dispatch) { do_sizzle_orb(orb_host) })
-}
-
-fn orb_simmer(on: Bool) -> Effect(Msg) {
-  effect.from(fn(_dispatch) { do_simmer_orb(orb_host, on) })
-}
-
-/// Runs after Lustre patches the DOM but before paint, so the cursor is back
-/// at the end of the reply in the same frame the new text appears.
-fn cursor_trail() -> Effect(Msg) {
-  effect.before_paint(fn(_dispatch, _root) { do_trail_cursor(streaming_reply) })
+/// Follow a scheme pinned or unpinned in another tab.
+fn scheme_watch() -> Effect(Msg) {
+  effect.from(fn(_dispatch) { do_scheme_watch() })
 }
 
 /// Abort the request in flight, if any; it reports nothing more.
@@ -557,97 +517,114 @@ fn speech_stop() -> Effect(Msg) {
   effect.from(fn(_dispatch) { do_speech_stop() })
 }
 
-/// The reply is over (done, error or cleared): stop the cursor and simmer.
-fn settle() -> Effect(Msg) {
-  effect.batch([
-    scroll_to_bottom(),
-    orb_simmer(False),
-    effect.from(fn(_dispatch) { do_stop_cursor() }),
-  ])
-}
-
 // ---------------------------------------------------------------------------
 // View
 // ---------------------------------------------------------------------------
 
+/// One column (see `--ix-max` in style.css): the bar, the conversation, the
+/// composer, the footer. The shell is pinned to the viewport and only the
+/// conversation scrolls, so the input is always within reach.
 pub fn view(model: Model) -> Element(Msg) {
   let s = i18n.strings(model.language)
 
-  html.div([attribute.id("app")], [
-    header(model, s),
+  html.div([attribute.class("shell")], [
+    bar(model.language, s),
     html.main([attribute.id("chat-area")], [
-      construct(model, s),
       messages_container(model, s),
+      composer(model, s),
     ]),
-    input_footer(model, s),
+    footer(s),
   ])
 }
 
-fn header(model: Model, s: Strings) -> Element(Msg) {
-  html.header([attribute.id("header"), attribute.class("bar")], [
-    html.span([attribute.class("site")], [
-      html.i([attribute.attribute("aria-hidden", "true")], []),
-      html.text("ai.arda.tr"),
+/// The family bar: the wordmark and `/ ask` at left; the sibling sites, the
+/// language switch and the scheme switch at right. The link labels are the
+/// family's own names for its sites, the same in every language.
+fn bar(language: Language, s: Strings) -> Element(Msg) {
+  html.header([attribute.class("ix-bar")], [
+    html.div([attribute.class("ix-wrap ix-bar__in")], [
+      html.div([attribute.class("ix-bar__brand")], [
+        html.a([attribute.href("https://arda.tr")], [wordmark.view()]),
+        html.span([attribute.class("ix-label")], [html.text("/ ask")]),
+      ]),
+      html.div([attribute.class("ix-bar__nav")], [
+        html.nav(
+          [attribute.class("bar-sites"), attribute.aria_label(s.nav_label)],
+          [
+            html.a([attribute.href("https://arda.tr")], [html.text("index")]),
+            html.a([attribute.href("https://blog.arda.tr")], [
+              html.text("blog"),
+            ]),
+            html.a([attribute.href("https://resume.arda.tr")], [
+              html.text("résumé"),
+            ]),
+          ],
+        ),
+        language_toggle(language, s),
+        scheme_toggle(s),
+      ]),
     ]),
-    html.span([attribute.class("bar-title")], [html.text(s.header_title)]),
-    html.span([attribute.class("sp")], []),
-    language_toggle(model.language, s),
-    voice_toggle(model.voice_on, s),
-    theme_toggle(model.theme, s),
   ])
 }
 
-fn theme_toggle(theme: Theme, s: Strings) -> Element(Msg) {
-  // Starts with the visible rendition name's context; contains it (WCAG 2.5.3).
-  let label =
-    s.rendition
-    <> theme_name(theme)
-    <> s.rendition_next
-    <> theme_name(next_theme(theme))
+/// Light or dark. Both labels are in the markup, each naming the scheme the
+/// switch would go to, and brand.css (`.ix-scheme [data-when]`) shows the one
+/// that fits the scheme on <html>: the label is right before any script runs
+/// and needs no state here. The hidden words complete the accessible name
+/// around the visible one (WCAG 2.5.3).
+fn scheme_toggle(s: Strings) -> Element(Msg) {
   html.button(
     [
       attribute.type_("button"),
-      attribute.class("theme-toggle"),
-      attribute.attribute("aria-label", label),
-      attribute.title(label),
-      event.on_click(UserCycledTheme),
+      attribute.class("ix-scheme ix-navlink"),
+      event.on_click(UserToggledScheme),
     ],
-    [html.text(theme_name(theme))],
+    [
+      scheme_option("light", s.scheme_dark, s),
+      scheme_option("dark", s.scheme_light, s),
+    ],
   )
 }
 
-/// Mute / unmute the construct's voice; `aria-pressed` carries the state. The
-/// accessible name comes from the content (a visually hidden label plus the
-/// visible state word), so it contains what is shown (WCAG 2.5.3).
+/// `when`: the scheme on screen while this label shows; `target`: the other one.
+fn scheme_option(when: String, target: String, s: Strings) -> Element(Msg) {
+  html.span([attribute.data("when", when)], [
+    hidden_text(s.scheme_before),
+    html.text(target),
+    hidden_text(s.scheme_after),
+  ])
+}
+
+/// Text for screen readers only (`.ix-sr` in brand.css).
+fn hidden_text(text: String) -> Element(Msg) {
+  case text {
+    "" -> element.none()
+    _ -> html.span([attribute.class("ix-sr")], [html.text(text)])
+  }
+}
+
+/// Mute / unmute the spoken replies. `aria-pressed` carries the state (the
+/// chip fills when it is on), and the label says it in words too.
 fn voice_toggle(on: Bool, s: Strings) -> Element(Msg) {
   html.button(
     [
       attribute.type_("button"),
-      attribute.class("voice-toggle"),
-      attribute.title(s.voice_label),
-      attribute.attribute("aria-pressed", case on {
+      attribute.class("ix-chip voice-toggle"),
+      attribute.aria_pressed(case on {
         True -> "true"
         False -> "false"
       }),
       event.on_click(UserToggledVoice),
     ],
     [
-      html.span([attribute.class("sr-only")], [html.text(s.voice_label)]),
-      html.span(
-        [
-          attribute.class("voice-glyph"),
-          attribute.attribute("aria-hidden", "true"),
-        ],
-        [html.text("♪")],
+      html.text(
+        s.voice_label
+        <> ": "
+        <> case on {
+          True -> s.voice_on
+          False -> s.voice_off
+        },
       ),
-      // The state word is dropped on phones, where the struck-through ♪
-      // alone shows "muted".
-      html.span([attribute.class("voice-word")], [
-        html.text(case on {
-          True -> " " <> s.voice_on
-          False -> " " <> s.voice_off
-        }),
-      ]),
     ],
   )
 }
@@ -656,14 +633,17 @@ fn language_toggle(language: Language, s: Strings) -> Element(Msg) {
   html.div(
     [
       attribute.class("language-toggle"),
-      attribute.attribute("role", "group"),
-      attribute.attribute("aria-label", s.language_label),
+      attribute.role("group"),
+      attribute.aria_label(s.language_label),
     ],
-    [
-      language_button(En, "EN", s.switch_to_en, language),
-      language_button(Jp, "JP", s.switch_to_jp, language),
-      language_button(Tr, "TR", s.switch_to_tr, language),
-    ],
+    list.intersperse(
+      [
+        language_button(En, "EN", s.switch_to_en, language),
+        language_button(Jp, "JP", s.switch_to_jp, language),
+        language_button(Tr, "TR", s.switch_to_tr, language),
+      ],
+      html.span([attribute.aria_hidden(True)], [html.text("/")]),
+    ),
   )
 }
 
@@ -673,18 +653,13 @@ fn language_button(
   aria_label: String,
   current: Language,
 ) -> Element(Msg) {
-  let is_active = lang == current
-  let class = case is_active {
-    True -> "lang-btn active"
-    False -> "lang-btn"
-  }
   html.button(
     [
       attribute.type_("button"),
-      attribute.class(class),
+      attribute.class("ix-navlink"),
       // Starts with the visible code, so the name contains it (WCAG 2.5.3).
-      attribute.attribute("aria-label", label <> ", " <> aria_label),
-      attribute.attribute("aria-pressed", case is_active {
+      attribute.aria_label(label <> ", " <> aria_label),
+      attribute.aria_pressed(case lang == current {
         True -> "true"
         False -> "false"
       }),
@@ -694,41 +669,27 @@ fn language_button(
   )
 }
 
-/// The orb, the heading, and a live status line. The orb host has no Lustre
-/// children, so the canvas `ffi.mjs` puts in it survives every re-render.
-fn construct(model: Model, s: Strings) -> Element(Msg) {
-  let #(status, busy) = case model.speech, model.stream_state {
-    Speaking(shown: n, ..), _ if n > 0 -> #(s.status_speaking, True)
-    Speaking(..), _ -> #(s.status_thinking, True)
-    Silent, Idle -> #(s.status_ready, False)
-    Silent, Thinking -> #(s.status_thinking, True)
+/// What the assistant is doing, in words.
+fn status(model: Model, s: Strings) -> String {
+  case model.speech, model.stream_state {
+    Speaking(shown: n, ..), _ if n > 0 -> s.status_speaking
+    Speaking(..), _ -> s.status_thinking
+    Silent, Idle -> s.status_ready
+    Silent, Thinking -> s.status_thinking
     Silent, Streaming(id) ->
       case list.any(model.history, fn(m) { m.id == id && m.text != "" }) {
-        True -> #(s.status_writing, True)
-        False -> #(s.status_thinking, True)
+        True -> s.status_writing
+        False -> s.status_thinking
       }
   }
-  html.div([attribute.class("ai-id")], [
-    html.div(
-      [
-        attribute.id("construct-orb"),
-        attribute.class("orb"),
-        attribute.attribute("aria-hidden", "true"),
-      ],
-      [],
-    ),
-    html.div([attribute.class("ai-id-text")], [
-      html.h1([], [html.text(s.construct_title)]),
-      html.p([attribute.class("sub")], [html.text(s.construct_subline)]),
-      html.p(
-        [
-          attribute.class("state"),
-          attribute.classes([#("is-busy", busy)]),
-          attribute.attribute("role", "status"),
-          attribute.attribute("aria-live", "polite"),
-        ],
-        [html.text(status)],
-      ),
+}
+
+/// The page's one heading. It scrolls away with the conversation.
+fn intro(s: Strings) -> Element(Msg) {
+  html.header([attribute.class("intro")], [
+    html.h1([], [html.text(s.construct_title)]),
+    html.p([attribute.class("ix-small ix-muted")], [
+      html.text(s.construct_subline),
     ]),
   ])
 }
@@ -743,34 +704,39 @@ fn messages_container(model: Model, s: Strings) -> Element(Msg) {
     [
       attribute.id("messages-container"),
       attribute.attribute("tabindex", "0"),
-      attribute.attribute("role", "region"),
-      attribute.attribute("aria-label", s.conversation_label),
+      attribute.role("region"),
+      attribute.aria_label(s.conversation_label),
     ],
     [
-      // The transcript is a log, but it does not announce itself: it changes on
-      // every chunk. The finished reply goes to `#reply-announcer` instead.
-      html.div(
-        [
-          attribute.id("messages"),
-          attribute.attribute("role", "log"),
-          attribute.attribute("aria-live", "off"),
-        ],
-        list.append(
-          list.map(model.history, fn(msg) {
-            view_message(msg, model.stream_state, model.speech, s)
-          }),
-          tail,
+      html.div([attribute.class("ix-wrap")], [
+        intro(s),
+        // The transcript is a log, but it does not announce itself: it
+        // changes on every chunk. The finished reply goes to
+        // `#reply-announcer` instead.
+        html.div(
+          [
+            attribute.id("messages"),
+            attribute.class("ix-thread"),
+            attribute.role("log"),
+            attribute.aria_live("off"),
+          ],
+          list.append(
+            list.map(model.history, fn(msg) {
+              view_message(msg, model.stream_state, model.speech, s)
+            }),
+            tail,
+          ),
         ),
-      ),
-      html.div(
-        [
-          attribute.id("reply-announcer"),
-          attribute.class("sr-only"),
-          attribute.attribute("aria-live", "polite"),
-          attribute.attribute("aria-atomic", "true"),
-        ],
-        [html.text(plain_text(model.announcement))],
-      ),
+        html.div(
+          [
+            attribute.id("reply-announcer"),
+            attribute.class("ix-sr"),
+            attribute.aria_live("polite"),
+            attribute.aria_atomic(True),
+          ],
+          [html.text(plain_text(model.announcement))],
+        ),
+      ]),
     ],
   )
 }
@@ -792,150 +758,213 @@ fn view_message(
     _, Speaking(msg_id: id, ..) if id == msg.id -> True
     _, _ -> False
   }
-  let is_error = msg.is_error
-  let text = case shown {
-    // Waiting for the first chunk: an empty column for the crackle cursor.
-    "" -> html.div([attribute.class("txt")], [])
-    _ ->
+  // Once the voice has started on a reply, the square follows its loudness
+  // instead of blinking.
+  let is_voiced = case speech {
+    Speaking(msg_id: id, shown: n) if id == msg.id -> n > 0
+    _ -> False
+  }
+  let text = case shown, is_streaming_this {
+    // Waiting for the first chunk, or for the voice to start.
+    "", True -> thinking(s)
+    "", False -> html.div([attribute.class("txt ix-prose")], [])
+    _, _ ->
       element.unsafe_raw_html(
         "",
         "div",
-        [attribute.class("txt")],
+        [attribute.class("txt ix-prose")],
         render_markdown(shown),
       )
   }
-  html.div(
+  let attributes = fn(class: String) {
     [
-      attribute.class("msg " <> sender_class(msg.sender)),
-      attribute.classes([
-        #("is-streaming", is_streaming_this),
-        #("is-error", is_error),
-      ]),
-      attribute.attribute("data-msg-id", int.to_string(msg.id)),
-    ],
-    [who(msg.sender, s), text],
-  )
+      attribute.class(case is_streaming_this {
+        True -> class <> " is-streaming"
+        False -> class
+      }),
+      attribute.data("msg-id", int.to_string(msg.id)),
+      ..message_lang(msg.text)
+    ]
+  }
+  case msg.sender, msg.is_error {
+    // The visitor's words: right-aligned, in a sunken box.
+    User, _ ->
+      html.div(attributes("ix-msg ix-msg--you msg user"), [
+        hidden_text(s.who_you),
+        text,
+      ])
+    // An error is not the assistant's words, so it has no square. It is told
+    // by its label, not by its colour alone.
+    Bot, True ->
+      html.div(attributes("ix-msg msg bot is-error"), [
+        html.div([attribute.class("ix-msg__body")], [
+          html.p([attribute.class("ix-label")], [html.text(s.error_label)]),
+          text,
+        ]),
+      ])
+    Bot, False ->
+      html.div(attributes("ix-msg msg bot"), [
+        mark(is_streaming_this && !is_voiced),
+        html.div([attribute.class("ix-msg__body")], [
+          hidden_text(s.who_construct),
+          text,
+        ]),
+      ])
+  }
 }
 
 /// Sent, but the server has not said `thinking` yet.
 fn view_pending(s: Strings) -> Element(Msg) {
-  html.div([attribute.class("msg bot is-streaming")], [
-    who(Bot, s),
-    html.div([attribute.class("txt")], []),
+  html.div([attribute.class("ix-msg msg bot is-streaming")], [
+    mark(True),
+    html.div([attribute.class("ix-msg__body")], [
+      hidden_text(s.who_construct),
+      thinking(s),
+    ]),
   ])
 }
 
-fn sender_class(sender: Sender) -> String {
-  case sender {
-    User -> "user"
-    Bot -> "bot"
-  }
-}
-
-fn who(sender: Sender, s: Strings) -> Element(Msg) {
-  let label = case sender {
-    User -> s.who_you
-    Bot -> s.who_construct
-  }
-  html.div([attribute.class("who")], [html.text(label)])
-}
-
-fn quick_topics(s: Strings) -> Element(Msg) {
-  html.div([attribute.id("quick-topics")], [
-    topic_button("1", s.btn_experience, s.prompt_experience),
-    topic_button("2", s.btn_education, s.prompt_education),
-    topic_button("3", s.btn_skills, s.prompt_skills),
-    topic_button("4", s.btn_visa, s.prompt_visa),
-    topic_button("5", s.btn_about_bot, s.prompt_about_bot),
+/// "Thinking…" beside the blinking square, so the wait is said in words too
+/// (the square does not blink under reduced motion). Screen readers hear it
+/// from the status line instead.
+fn thinking(s: Strings) -> Element(Msg) {
+  html.p([attribute.class("txt ix-muted"), attribute.aria_hidden(True)], [
+    html.text(s.status_thinking),
   ])
 }
 
-fn topic_button(number: String, label: String, prompt: String) -> Element(Msg) {
-  html.button(
-    [
-      attribute.type_("button"),
-      attribute.class("topic-btn"),
-      event.on_click(UserPickedPrompt(prompt)),
-    ],
-    [
-      html.em([attribute.attribute("aria-hidden", "true")], [
-        html.text(number),
-      ]),
-      html.text(label),
-    ],
+/// A message in Japanese is marked as such when the page is in another
+/// language, so it gets the Japanese face and size (brand.css `:lang(ja)`)
+/// and a screen reader's Japanese voice. Told by its kana: kanji alone could
+/// be Chinese.
+fn message_lang(text: String) -> List(attribute.Attribute(Msg)) {
+  let has_kana =
+    string.to_utf_codepoints(text)
+    |> list.any(fn(codepoint) {
+      let n = string.utf_codepoint_to_int(codepoint)
+      n >= 0x3040 && n <= 0x30FF
+    })
+  case has_kana {
+    True -> [attribute.lang("ja")]
+    False -> []
+  }
+}
+
+/// The assistant: the square dot of the wordmark, and nothing else. `busy`
+/// (a reply is awaited or being written) makes it blink; see brand.css.
+fn mark(busy: Bool) -> Element(Msg) {
+  let attributes = [attribute.class("ix-mark"), attribute.aria_hidden(True)]
+  html.span(
+    case busy {
+      True -> [attribute.data("busy", "true"), ..attributes]
+      False -> attributes
+    },
+    [],
   )
 }
 
-fn input_footer(model: Model, s: Strings) -> Element(Msg) {
-  html.footer([attribute.id("input-footer")], [
-    quick_topics(s),
-    html.div([attribute.id("input-wrapper")], [
-      html.span(
-        [attribute.class("prompt"), attribute.attribute("aria-hidden", "true")],
-        [
-          html.text("▸"),
-        ],
-      ),
-      html.span(
-        [attribute.class("cur"), attribute.attribute("aria-hidden", "true")],
-        [],
-      ),
-      html.input([
-        attribute.type_("text"),
-        attribute.id("user-input"),
-        attribute.placeholder(s.input_placeholder),
-        attribute.attribute("aria-label", s.input_placeholder),
-        attribute.attribute("autocomplete", "off"),
-        // The server rejects longer messages with a 400.
-        attribute.attribute(
-          "maxlength",
-          int.to_string(shared.max_message_chars),
-        ),
-        attribute.attribute("enterkeyhint", "send"),
-        attribute.value(model.input),
-        attribute.autofocus(True),
-        event.on_input(UserTypedInput),
-        event.on("keydown", enter_decoder()),
-      ]),
-      html.button(
-        [
-          attribute.type_("button"),
-          attribute.id("send-btn"),
-          // Contains the visible label (WCAG 2.5.3).
-          attribute.attribute("aria-label", s.send_label),
-          attribute.disabled(model.stream_state != Idle),
-          event.on_click(UserClickedSend),
-        ],
-        [html.text(s.send)],
-      ),
-    ]),
-    html.p([attribute.class("input-hint")], [
-      html.text(s.disclaimer),
-    ]),
-    // The arda.tr family, linked from every site's chrome. Link texts are
-    // hostnames in every language.
-    html.nav(
-      [
-        attribute.class("input-hint family"),
-        attribute.attribute("aria-label", s.family_label),
-      ],
-      [
-        html.a([attribute.href("https://arda.tr")], [html.text("arda.tr")]),
-        html.text(" · "),
-        html.a([attribute.href("https://blog.arda.tr")], [
-          html.text("blog.arda.tr"),
-        ]),
-        html.text(" · "),
-        html.a([attribute.href("https://resume.arda.tr")], [
-          html.text("resume.arda.tr"),
-        ]),
-        html.text(" · "),
-        html.a([attribute.href("https://lind.arda.tr")], [
-          html.text("lind.arda.tr"),
-        ]),
-      ],
-    ),
+fn quick_topics(s: Strings) -> Element(Msg) {
+  html.div([attribute.id("quick-topics"), attribute.class("ix-chips")], [
+    topic_button(s.btn_experience, s.prompt_experience),
+    topic_button(s.btn_education, s.prompt_education),
+    topic_button(s.btn_skills, s.prompt_skills),
+    topic_button(s.btn_visa, s.prompt_visa),
+    topic_button(s.btn_about_bot, s.prompt_about_bot),
   ])
+}
+
+fn topic_button(label: String, prompt: String) -> Element(Msg) {
+  html.button(
+    [
+      attribute.type_("button"),
+      attribute.class("ix-chip"),
+      event.on_click(UserPickedPrompt(prompt)),
+    ],
+    [html.text(label)],
+  )
+}
+
+/// Quick prompts, the question field and its button, then the voice toggle
+/// beside the disclaimer. The status line is for screen readers: on screen the
+/// square and the reply itself show what is happening.
+fn composer(model: Model, s: Strings) -> Element(Msg) {
+  html.div([attribute.class("composer")], [
+    html.div([attribute.class("ix-wrap")], [
+      quick_topics(s),
+      html.div([attribute.id("input-wrapper")], [
+        html.input([
+          attribute.type_("text"),
+          attribute.id("user-input"),
+          attribute.class("ix-input"),
+          attribute.placeholder(s.input_placeholder),
+          attribute.aria_label(s.input_placeholder),
+          attribute.attribute("autocomplete", "off"),
+          // The server rejects longer messages with a 400.
+          attribute.attribute(
+            "maxlength",
+            int.to_string(shared.max_message_chars),
+          ),
+          attribute.attribute("enterkeyhint", "send"),
+          attribute.value(model.input),
+          attribute.autofocus(True),
+          event.on_input(UserTypedInput),
+          event.on("keydown", enter_decoder()),
+        ]),
+        html.button(
+          [
+            attribute.type_("button"),
+            attribute.id("send-btn"),
+            attribute.class("ix-btn ix-btn--primary"),
+            // Contains the visible label (WCAG 2.5.3).
+            attribute.aria_label(s.send_label),
+            attribute.disabled(model.stream_state != Idle),
+            event.on_click(UserClickedSend),
+          ],
+          [html.text(s.send)],
+        ),
+      ]),
+      html.div([attribute.class("composer-meta")], [
+        voice_toggle(model.voice_on, s),
+        html.p([attribute.class("ix-small ix-muted")], [html.text(s.disclaimer)]),
+      ]),
+      html.p(
+        [
+          attribute.class("ix-sr"),
+          attribute.role("status"),
+          attribute.aria_live("polite"),
+        ],
+        [html.text(status(model, s))],
+      ),
+    ]),
+  ])
+}
+
+/// The arda.tr family, linked from every site's chrome. Link texts are
+/// hostnames in every language.
+fn footer(s: Strings) -> Element(Msg) {
+  html.footer([attribute.class("ix-foot")], [
+    html.div([attribute.class("ix-wrap ix-foot__in")], [
+      html.nav(
+        [
+          attribute.class("family ix-small ix-muted"),
+          attribute.aria_label(s.family_label),
+        ],
+        list.intersperse(
+          [
+            family_link("arda.tr"),
+            family_link("blog.arda.tr"),
+            family_link("resume.arda.tr"),
+            family_link("lind.arda.tr"),
+          ],
+          html.span([attribute.aria_hidden(True)], [html.text(" · ")]),
+        ),
+      ),
+    ]),
+  ])
+}
+
+fn family_link(host: String) -> Element(Msg) {
+  html.a([attribute.href("https://" <> host)], [html.text(host)])
 }
 
 /// Enter sends, except while an IME is composing: confirming a Japanese
@@ -951,55 +980,7 @@ fn enter_decoder() -> decode.Decoder(Msg) {
 }
 
 // ---------------------------------------------------------------------------
-// Theme persistence (localStorage via FFI)
-// ---------------------------------------------------------------------------
-
-fn load_theme() -> Theme {
-  case do_storage_get("theme") {
-    Ok(id) -> theme_from_string(id)
-    Error(_) -> Night
-  }
-}
-
-/// Night is the default. Ids stored by the pre-2026-09 UI migrate by role;
-/// the pre-hydration script in gleam.toml applies the same mapping.
-fn theme_from_string(id: String) -> Theme {
-  case id {
-    "night-hc" | "carbon" -> NightHc
-    "xerox" | "light" -> Xerox
-    "xerox-hc" | "paper" -> XeroxHc
-    _ -> Night
-  }
-}
-
-fn save_theme(theme: Theme) -> Nil {
-  do_storage_set("theme", theme_to_string(theme))
-}
-
-fn apply_theme(theme: Theme) -> Nil {
-  do_set_body_theme(theme_to_string(theme))
-}
-
-fn theme_to_string(theme: Theme) -> String {
-  case theme {
-    Night -> "night"
-    NightHc -> "night-hc"
-    Xerox -> "xerox"
-    XeroxHc -> "xerox-hc"
-  }
-}
-
-fn theme_name(theme: Theme) -> String {
-  case theme {
-    Night -> "night"
-    NightHc -> "night hc"
-    Xerox -> "xerox"
-    XeroxHc -> "xerox hc"
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Language persistence (localStorage via FFI, mirroring the theme)
+// Language persistence (localStorage via FFI)
 // ---------------------------------------------------------------------------
 
 fn load_language() -> Language {
@@ -1049,8 +1030,11 @@ fn do_storage_get(key: String) -> Result(String, Nil)
 @external(javascript, "./ffi.mjs", "storage_set")
 fn do_storage_set(key: String, value: String) -> Nil
 
-@external(javascript, "./ffi.mjs", "set_body_theme")
-fn do_set_body_theme(theme: String) -> Nil
+@external(javascript, "./ffi.mjs", "scheme_toggle")
+fn do_scheme_toggle() -> Nil
+
+@external(javascript, "./ffi.mjs", "scheme_watch")
+fn do_scheme_watch() -> Nil
 
 @external(javascript, "./ffi.mjs", "set_document_lang")
 fn do_set_document_lang(lang: String) -> Nil
@@ -1073,21 +1057,6 @@ fn do_stream_chat(url: String, body: String, on_event: fn(String) -> Nil) -> Nil
 @external(javascript, "./ffi.mjs", "abort_stream")
 fn do_stream_abort() -> Nil
 
-@external(javascript, "./ffi.mjs", "mount_orb")
-fn do_mount_orb(selector: String) -> Nil
-
-@external(javascript, "./ffi.mjs", "sizzle_orb")
-fn do_sizzle_orb(selector: String) -> Nil
-
-@external(javascript, "./ffi.mjs", "simmer_orb")
-fn do_simmer_orb(selector: String, on: Bool) -> Nil
-
-@external(javascript, "./ffi.mjs", "trail_cursor")
-fn do_trail_cursor(selector: String) -> Nil
-
-@external(javascript, "./ffi.mjs", "stop_cursor")
-fn do_stop_cursor() -> Nil
-
 @external(javascript, "./ffi.mjs", "voice_enabled")
 fn do_voice_enabled() -> Bool
 
@@ -1099,7 +1068,7 @@ fn do_unlock_audio() -> Nil
 
 @external(javascript, "./ffi.mjs", "speech_begin")
 fn do_speech_begin(
-  orb_selector: String,
+  mark_selector: String,
   on_reveal: fn(Int) -> Nil,
   on_end: fn() -> Nil,
 ) -> Nil

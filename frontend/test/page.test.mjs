@@ -27,6 +27,7 @@ function generatedIndexHtml() {
 }
 
 const html = generatedIndexHtml();
+const publicDir = new URL('../../public/', import.meta.url);
 
 const decode = (s) => s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 const attrs = (tag) => Object.fromEntries([...tag.matchAll(/([a-z:-]+)="([^"]*)"/g)].map((m) => [m[1], decode(m[2])]));
@@ -99,6 +100,122 @@ test('the page never links coze.org', () => {
   assert.doesNotMatch(html, /coze\.org/);
 });
 
+// ---------------------------------------------------------------------------
+// The scheme and the theme are on <html> before first paint. ai.arda.tr is
+// dark unless the visitor pins light; the pin lives under "theme", the key
+// the earlier designs used, so a returning visitor keeps their choice.
+// ---------------------------------------------------------------------------
+
+const head = html.match(/<head>(.*)<\/head>/s)[1];
+const scheme = await import('../../public/brand/scheme.js');
+const BOOT = scheme.bootSnippet('theme', 'dark') + 'document.documentElement.setAttribute("data-astryx-theme","arda");';
+// Classic inline scripts: they run as the parser meets them, before any paint.
+const inlineScripts = [...head.matchAll(/<script>(.*?)<\/script>/gs)].map((m) => m[1]);
+
+test('the boot script is scheme.js\'s own snippet for this site, then the theme scope', () => {
+  // Pasted into gleam.toml; when public/brand/scheme.js changes, paste again.
+  assert.deepEqual(inlineScripts, [BOOT]);
+  // It rewrites the color-scheme meta, which must already be parsed.
+  const metaAt = head.indexOf('name="color-scheme"');
+  assert.ok(metaAt >= 0 && metaAt < head.indexOf('<script>'), 'the color-scheme meta comes before the script');
+  assert.equal(meta('name', 'color-scheme'), 'dark');
+});
+
+// Runs the page's own inline script against a stand-in for the browser.
+function boot(stored, { blocked = false } = {}) {
+  const store = new Map(stored === null ? [] : [['theme', stored]]);
+  const root = new Map();
+  const colorScheme = new Map([['content', 'dark']]);
+  const localStorage = {
+    getItem: (k) => { if (blocked) throw new Error('blocked'); return store.has(k) ? store.get(k) : null; },
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const document = {
+    documentElement: { setAttribute: (k, v) => root.set(k, v) },
+    querySelector: (selector) => (selector === 'meta[name="color-scheme"]'
+      ? { setAttribute: (k, v) => colorScheme.set(k, v) } : null),
+  };
+  new Function('localStorage', 'document', inlineScripts[0])(localStorage, document);
+  return { theme: root.get('data-theme'), scope: root.get('data-astryx-theme'), meta: colorScheme.get('content'), stored: store.get('theme') };
+}
+
+test('a first visit is dark, and nothing is stored', () => {
+  assert.deepEqual(boot(null), { theme: 'dark', scope: 'arda', meta: 'dark', stored: undefined });
+});
+
+test('a pinned light scheme is applied before first paint', () => {
+  assert.deepEqual(boot('light'), { theme: 'light', scope: 'arda', meta: 'light', stored: 'light' });
+});
+
+test('a rendition stored by the earlier designs becomes light or dark by its role', () => {
+  for (const [old, now] of [['xerox', 'light'], ['xerox-hc', 'light'], ['paper', 'light'],
+    ['night', 'dark'], ['night-hc', 'dark'], ['carbon', 'dark']]) {
+    assert.deepEqual(boot(old), { theme: now, scope: 'arda', meta: now, stored: now }, old);
+  }
+  // An id nobody knows is dropped, and the page is dark.
+  assert.deepEqual(boot('purple'), { theme: 'dark', scope: 'arda', meta: 'dark', stored: undefined });
+});
+
+test('with storage blocked the page is still dark and themed', () => {
+  assert.deepEqual(boot(null, { blocked: true }), { theme: 'dark', scope: 'arda', meta: 'dark', stored: undefined });
+});
+
+test('scheme.js is loaded for the switch before the app starts', () => {
+  // ffi.mjs reads window.ardaScheme. Module scripts run in document order, so
+  // this one must come before the app's.
+  const modules = [...head.matchAll(/<script([^>]*)>(.*?)<\/script>/gs)].filter((m) => /type="module"/.test(m[1]));
+  assert.equal(modules.length, 2);
+  assert.match(modules[0][2], /^import \* as scheme from '\/brand\/scheme\.js\?v=\d+';window\.ardaScheme=scheme;$/);
+  assert.match(modules[1][1], /src="\/frontend\.js"/);
+});
+
+// ---------------------------------------------------------------------------
+// The stylesheets: the layer order first, then the fonts, the theme's tokens,
+// the family patterns, and last this site's own rules.
+// ---------------------------------------------------------------------------
+
+const styleTags = [...head.matchAll(/<style>(.*?)<\/style>|<link [^>]*rel="stylesheet"[^>]*>/gs)];
+const sheetHrefs = styleTags.filter((m) => m[0].startsWith('<link')).map((m) => attrs(m[0]).href);
+
+test('the layer order is declared before any stylesheet', () => {
+  // Otherwise the first stylesheet to mention a layer decides the order.
+  assert.equal(styleTags[0][1], '@layer reset, astryx-base, astryx-theme, brand;');
+  assert.equal(styleTags.filter((m) => m[0].startsWith('<style')).length, 1);
+});
+
+test('the theme, the family patterns and the site styles load in that order', () => {
+  assert.deepEqual(sheetHrefs.slice(1).map((href) => href.replace(/\?v=\d+$/, '')),
+    ['/brand/arda.css', '/brand/brand.css', '/style.css']);
+  // Each carries a cache-busting number to bump when the file changes.
+  for (const href of sheetHrefs.slice(1)) assert.match(href, /\?v=\d+$/);
+});
+
+test('the fonts are the family\'s four faces, swapped in, from a preconnected host', () => {
+  const fonts = new URL(sheetHrefs[0]);
+  assert.equal(fonts.origin + fonts.pathname, 'https://fonts.googleapis.com/css2');
+  assert.deepEqual(fonts.searchParams.getAll('family'), [
+    'Archivo:wght@700;800',
+    'IBM Plex Mono:wght@400;500',
+    'IBM Plex Sans:ital,wght@0,400;0,500;0,600;1,400',
+    'Noto Sans JP:wght@400;500;700', // the UI has Japanese
+  ]);
+  assert.equal(fonts.searchParams.get('display'), 'swap');
+  const preconnect = [...html.matchAll(/<link [^>]*>/g)].map((m) => attrs(m[0]).href === undefined ? null : m[0])
+    .filter((tag) => tag && /rel="preconnect"/.test(tag));
+  assert.deepEqual(preconnect.map((tag) => attrs(tag).href), ['https://fonts.googleapis.com', 'https://fonts.gstatic.com']);
+  // Font files are fetched without credentials.
+  assert.match(preconnect[1], /\bcrossorigin\b/);
+});
+
+test('style.css is written on the theme\'s tokens: no colour and no font size of its own', () => {
+  const css = readFileSync(new URL('style.css', publicDir), 'utf8').replace(/\/\*.*?\*\//gs, '');
+  assert.deepEqual(css.match(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab)\(/gi) ?? [], [], 'a colour that is not a token');
+  assert.deepEqual(css.match(/font(?:-size)?\s*:[^;]*\d(?:px|pt)\b[^;]*/gi) ?? [], [], 'a font size in px');
+  // The few tokens it defines are the ones the theme leaves to the Astryx base.
+  assert.match(css, /@layer astryx-base\s*\{/);
+});
+
 // After a Lustre build (deploy-ui.yml builds before it tests), the file that
 // is published must be exactly what these tests checked.
 const built = new URL('../../public/index.html', import.meta.url);
@@ -114,7 +231,6 @@ test('the built public/index.html is the page checked above', { skip: !existsSyn
 // checkout where there is one (CI has none).
 // ---------------------------------------------------------------------------
 
-const publicDir = new URL('../../public/', import.meta.url);
 const brandSource = new URL('../../../arda.tr/brand/', import.meta.url);
 const BRAND_COPIES = [
   ['brand/arda.css', 'arda.css'],

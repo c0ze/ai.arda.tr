@@ -25,6 +25,9 @@ title = "Arda's AI Construct - Ask about Arda Karaduman"
 # lustre_dev_tools already writes <meta name="viewport"> itself, so it is not
 # repeated here.
 meta = [
+  # Dark unless the visitor pins light. The boot script below rewrites this
+  # from the stored choice; it must come after this tag.
+  { name = "color-scheme", content = "dark" },
   { name = "description", content = "AI assistant for Arda Karaduman. Answers questions about his work, projects, and music." },
   { property = "og:type", content = "website" },
   { property = "og:site_name", content = "Arda's AI Construct" },
@@ -43,21 +46,37 @@ meta = [
 ]
 links = [
   { rel = "canonical", href = "https://ai.arda.tr/" },
-  { rel = "icon", type = "image/svg+xml", href = "/favicon.svg" },
+  { rel = "icon", type = "image/svg+xml", href = "/favicon.svg?v=2" },
+  { rel = "preconnect", href = "https://fonts.googleapis.com" },
+  { rel = "preconnect", href = "https://fonts.gstatic.com", crossorigin = true },
 ]
+# The family brand, "The Index" (../DESIGN-SYSTEM.md, DESIGN.md). The layer
+# order comes first, before any stylesheet. /brand/arda.css (the Astryx `arda`
+# theme: every token) and /brand/brand.css (the family patterns) are verbatim
+# copies from the arda.tr repository; site styles are in /style.css. Bump a
+# file's ?v= when it changes (GitHub Pages caches for ten minutes).
 stylesheets = [
-  { href = "https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@400;500;700&display=swap" },
-  { href = "/style.css?v=21" },
+  { content = "@layer reset, astryx-base, astryx-theme, brand;" },
+  { href = "https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Noto+Sans+JP:wght@400;500;700&display=swap" },
+  { href = "/brand/arda.css?v=1" },
+  { href = "/brand/brand.css?v=1" },
+  { href = "/style.css?v=22" },
 ]
 scripts = [
+  # Before first paint: the scheme (the stored pin, else dark; ids stored by the
+  # older designs migrate by role) and the theme scope on <html>, which Lustre's
+  # html config cannot set. This is scheme.js's own `bootSnippet("theme", "dark")`
+  # followed by the data-astryx-theme line; test/page.test.mjs compares it with
+  # public/brand/scheme.js, so paste the new output here when that file changes.
+  { content = "(function(){var s=null;try{s=localStorage.getItem(\"theme\");if(s!==\"light\"&&s!==\"dark\"){var n=[\"xerox\",\"xerox-hc\",\"stock\",\"stock-hc\",\"alucard\",\"paper\"].indexOf(s)>=0?\"light\":[\"night\",\"night-hc\",\"microfiche\",\"microfiche-hc\",\"dracula\",\"dracula-pro\",\"blade\",\"buffy\",\"lincoln\",\"morbius\",\"van-helsing\",\"carbon\"].indexOf(s)>=0?\"dark\":null;if(s!==null){if(n)localStorage.setItem(\"theme\",n);else localStorage.removeItem(\"theme\");}s=n;}}catch(e){}s=s||\"dark\";if(s){document.documentElement.setAttribute(\"data-theme\",s);var m=document.querySelector('meta[name=\"color-scheme\"]');if(m)m.setAttribute(\"content\",s);}})();document.documentElement.setAttribute(\"data-astryx-theme\",\"arda\");" },
   # Vendored under public/vendor/ (marked 18.0.5, DOMPurify 3.4.8) — pinned and
   # served same-origin, so there is no CDN supply-chain/availability risk and
   # no need for SRI (which Lustre's html config can't express on scripts anyway).
   { src = "/vendor/marked.min.js" },
   { src = "/vendor/purify.min.js" },
-  # Pre-hydration rendition: legacy ids (light/paper/dark/carbon) migrate by
-  # role, exactly like `theme_from_string` in frontend.gleam; night is default.
-  { content = "document.addEventListener('DOMContentLoaded',function(){var t=null;try{t=localStorage.getItem('theme');}catch(e){}t={light:'xerox',paper:'xerox-hc',dark:'night',carbon:'night-hc'}[t]||t;if(['night','night-hc','xerox','xerox-hc'].indexOf(t)<0)t='night';document.body.setAttribute('data-theme',t);});" },
+  # The scheme switch after load (ffi.mjs: scheme_toggle, scheme_watch). A
+  # module script runs before the app's own, which follows it in <head>.
+  { type = "module", content = "import * as scheme from '/brand/scheme.js?v=1';window.ardaScheme=scheme;" },
 ]
 # The CF Web Analytics beacon lives in `body` (raw HTML) because Lustre's
 # `scripts` config can't express the required data-cf-beacon attribute.

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { init, update, UserTypedInput, UserClickedSend, UserPickedLanguage, StreamEventReceived } from '../build/dev/javascript/frontend/frontend.mjs';
+import {
+  init, update, UserTypedInput, UserClickedSend, UserPickedLanguage, UserToggledVoice, StreamEventReceived,
+  SpeechRevealed, SpeechEnded,
+} from '../build/dev/javascript/frontend/frontend.mjs';
 import { Jp, Tr } from '../build/dev/javascript/frontend/frontend/i18n.mjs';
 
 // The app's update function, driven without a DOM. Effects are returned, not
@@ -141,21 +145,168 @@ test('the send and voice buttons are named by what they show', () => {
     assert.ok(attr(send[0], 'aria-label').toLowerCase().includes(send[1].toLowerCase()),
       `"${attr(send[0], 'aria-label')}" contains "${send[1]}"`);
   }
-  const html = to_string(view(start()));
-  // The voice toggle is named by its content: a hidden label plus the visible word.
-  const voice = html.match(/<button[^>]*class="voice-toggle"[^>]*>(.*?)<\/button>/);
-  assert.equal(attr(voice[0], 'aria-label'), undefined);
-  assert.match(voice[1], /Read replies aloud/);
-  assert.match(voice[1], /<span class="voice-word"> On<\/span>/);
+  // The voice toggle is a plain labelled button: its text is its name, and it
+  // says the state in words as well as in aria-pressed (and a filled chip).
+  const voiceToggle = (model) => to_string(view(model)).match(/<button[^>]*class="ix-chip voice-toggle"[^>]*>(.*?)<\/button>/);
+  const on = voiceToggle(start());
+  assert.equal(attr(on[0], 'aria-label'), undefined);
+  assert.equal(on[1], 'Read replies aloud: On');
+  assert.equal(attr(on[0], 'aria-pressed'), 'true');
+  const off = voiceToggle(step(start(), new UserToggledVoice()));
+  assert.equal(off[1], 'Read replies aloud: Off');
+  assert.equal(attr(off[0], 'aria-pressed'), 'false');
 });
 
 test('labels follow the UI language', () => {
   const html = to_string(view(step(start(), new UserPickedLanguage(new Jp()))));
   assert.equal(attr(tagWith(html, 'class="language-toggle"'), 'aria-label'), '言語');
-  assert.match(attr(tagWith(html, 'class="lang-btn active"'), 'aria-label'), /^JP/);
-  assert.match(attr(tagWith(html, 'class="lang-btn active"'), 'aria-label'), /日本語/);
-  assert.match(attr(tagWith(html, 'class="theme-toggle"'), 'aria-label'), /^テーマ/);
+  // Exactly one language is marked as the one in use.
+  const pressed = [...html.matchAll(/<button[^>]*aria-pressed="true"[^>]*class="ix-navlink"[^>]*>/g)];
+  assert.equal(pressed.length, 1);
+  assert.match(attr(pressed[0][0], 'aria-label'), /^JP/);
+  assert.match(attr(pressed[0][0], 'aria-label'), /日本語/);
   assert.match(attr(tagWith(html, 'id="send-btn"'), 'aria-label'), /送信/);
+});
+
+// ---------------------------------------------------------------------------
+// The scheme switch. Both labels are in the markup and brand.css shows the one
+// that fits <html data-theme>, so the label is right before the app starts and
+// the app keeps no scheme state. A label under the wrong `data-when` would
+// offer "Dark" on a page that is already dark.
+// ---------------------------------------------------------------------------
+
+test('the scheme switch offers the other scheme, by name, in every language', () => {
+  for (const [lang, light, dark, lightName] of [
+    [null, 'Light', 'Dark', 'Switch to Light scheme'],
+    [new Jp(), 'ライト', 'ダーク', 'ライトテーマに切り替える'],
+    [new Tr(), 'Açık', 'Koyu', 'Açık temaya geç'],
+  ]) {
+    const html = to_string(view(lang ? step(start(), new UserPickedLanguage(lang)) : start()));
+    const button = html.match(/<button[^>]*class="ix-scheme ix-navlink"[^>]*>(.*)<\/span><\/button>/);
+    // Named by its content, since CSS decides which label there is.
+    assert.equal(attr(button[0], 'aria-label'), undefined);
+    const labels = Object.fromEntries(button[1].split('<span data-when="').slice(1).map((part) => {
+      const [when, rest] = [part.slice(0, part.indexOf('"')), part.slice(part.indexOf('>') + 1)];
+      return [when, {
+        visible: rest.replace(/<span class="ix-sr">[^<]*<\/span>/g, '').replace(/<[^>]*>/g, ''),
+        name: rest.replace(/<[^>]*>/g, ''),
+      }];
+    }));
+    assert.deepEqual(Object.keys(labels).sort(), ['dark', 'light']);
+    assert.equal(labels.dark.visible, light, 'a dark page offers light');
+    assert.equal(labels.light.visible, dark, 'a light page offers dark');
+    assert.equal(labels.dark.name, lightName);
+    // The accessible name contains what is shown (WCAG 2.5.3).
+    for (const label of Object.values(labels)) assert.ok(label.name.includes(label.visible));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The assistant is the square dot of the wordmark (`.ix-mark`), nothing else.
+// It blinks (`data-busy`) while a reply is awaited or written; while the voice
+// speaks, `ffi.mjs` sets the loudness on the square of the `.is-streaming`
+// reply instead, so that reply must be findable and must not also blink.
+// ---------------------------------------------------------------------------
+
+const marks = (model) => [...to_string(view(model)).matchAll(/<span[^>]*class="ix-mark"[^>]*>/g)].map((m) => m[0]);
+const busy = (model) => marks(model).map((tag) => attr(tag, 'data-busy') === 'true');
+const event = (model, obj) => step(model, new StreamEventReceived(model.generation, JSON.stringify(obj)));
+
+test('the square is busy while a reply is awaited or written, and at rest once it is complete', () => {
+  let model = start();
+  assert.deepEqual(busy(model), [false], 'the welcome is a finished message');
+  model = ask(model, 'Hi');
+  assert.deepEqual(busy(model), [false, true], 'sent, nothing back yet');
+  // The wait is said in words beside the square too: it does not blink under
+  // reduced motion.
+  assert.match(to_string(view(model)), /<p[^>]*class="txt ix-muted"[^>]*>Thinking…<\/p>/);
+  model = event(model, { type: 'thinking' });
+  assert.deepEqual(busy(model), [false, true], 'the model is thinking');
+  model = event(model, { type: 'chunk', text: 'Hello' });
+  assert.deepEqual(busy(model), [false, true], 'the reply is being written');
+  assert.doesNotMatch(to_string(view(model)), /Thinking…<\/p>/);
+  model = event(model, { type: 'done', text: 'Hello.' });
+  assert.deepEqual(busy(model), [false, false]);
+});
+
+test('while the voice speaks a reply, its square stops blinking and can be found by the voice', () => {
+  const spoken = /<div[^>]*class="ix-msg msg bot is-streaming"[^>]*><span[^>]*class="ix-mark"/;
+  let model = ask(start(), 'Hi');
+  model = event(model, { type: 'thinking' });
+  model = step(model, new SpeechRevealed(0)); // the server said voice on; nothing spoken yet
+  model = event(model, { type: 'chunk', text: 'Hello there.' });
+  assert.deepEqual(busy(model), [false, true], 'the audio has not started');
+  model = step(model, new SpeechRevealed(5));
+  assert.deepEqual(busy(model), [false, false], 'speaking: the loudness drives the square');
+  assert.match(to_string(view(model)), spoken);
+  // The reply shows only as far as the voice has got.
+  assert.match(to_string(view(model)), /<p>Hello<\/p>/);
+  assert.doesNotMatch(to_string(view(model)), /there/);
+  model = event(model, { type: 'done', text: 'Hello there.' });
+  assert.match(to_string(view(model)), spoken, 'the text is done, the voice is not');
+  model = step(model, new SpeechRevealed(-1));
+  model = step(model, new SpeechEnded());
+  assert.doesNotMatch(to_string(view(model)), /is-streaming/);
+  assert.match(to_string(view(model)), /<p>Hello there\.<\/p>/);
+});
+
+test('what the assistant is doing is said in a status line for screen readers', () => {
+  const status = (model) => to_string(view(model)).match(/<p[^>]*role="status"[^>]*>([^<]*)<\/p>/);
+  let model = start();
+  assert.equal(status(model)[1], 'Ready');
+  assert.equal(attr(status(model)[0], 'aria-live'), 'polite');
+  model = ask(model, 'Hi');
+  assert.equal(status(model)[1], 'Thinking…');
+  model = event(model, { type: 'thinking' });
+  model = event(model, { type: 'chunk', text: 'Hello' });
+  assert.equal(status(model)[1], 'Writing…');
+});
+
+// ---------------------------------------------------------------------------
+// Who said what does not depend on seeing the layout: the visitor's words are
+// in the family's sunken box, each message names its speaker for screen
+// readers, and an error is told by a label in words, not by its colour alone.
+// ---------------------------------------------------------------------------
+
+const messageTags = (model) => to_string(view(model)).match(/<div[^>]*id="messages"[^>]*>(.*)<div[^>]*id="reply-announcer"/s)[1]
+  .split(/(?=<div[^>]*data-msg-id=")/).filter((part) => part.includes('data-msg-id='));
+
+test('each message names its speaker; the visitor\'s is the boxed one', () => {
+  let model = ask(start(), 'Hi');
+  model = event(model, { type: 'thinking' });
+  model = event(model, { type: 'done', text: 'Hello.' });
+  const [welcome, question, reply] = messageTags(model);
+  assert.match(welcome, /^<div[^>]*class="ix-msg msg bot/);
+  assert.match(welcome, /<span class="ix-sr">Construct<\/span>/);
+  assert.match(question, /^<div[^>]*class="ix-msg ix-msg--you msg user/);
+  assert.match(question, /<span class="ix-sr">You<\/span>/);
+  assert.doesNotMatch(question, /ix-mark/, 'the square is the assistant');
+  assert.match(reply, /<span class="ix-sr">Construct<\/span>/);
+});
+
+test('an error carries the word "Error", in the UI language, and no square', () => {
+  for (const [lang, label] of [[null, 'Error'], [new Jp(), 'エラー'], [new Tr(), 'Hata']]) {
+    let model = ask(lang ? step(start(), new UserPickedLanguage(lang)) : start(), 'Hi');
+    model = event(model, { type: 'error', message: 'HTTP 500' });
+    const line = messageTags(model).at(-1);
+    assert.match(line, /^<div[^>]*class="ix-msg msg bot is-error/);
+    assert.ok(line.includes(`<p class="ix-label">${label}</p>`), label);
+    assert.match(line, /HTTP 500/);
+    // An error is not the assistant's words.
+    assert.doesNotMatch(line, /ix-mark/);
+    // Heard as it is seen: the label, then the line.
+    assert.equal(model.announcement, `${label}: HTTP 500`);
+  }
+});
+
+test('a Japanese message is marked as Japanese when the page is in another language', () => {
+  // brand.css gives `:lang(ja)` text the Japanese face and size; a screen
+  // reader picks its Japanese voice the same way.
+  let model = ask(start(), 'Ardaはどこで働いてきましたか？');
+  model = event(model, { type: 'thinking' });
+  model = event(model, { type: 'done', text: 'はい、Ardaは東京で働いています。' });
+  const [welcome, question, reply] = messageTags(model).map((tag) => attr(tag.match(/^<div[^>]*>/)[0], 'lang'));
+  assert.deepEqual([welcome, question, reply], [undefined, 'ja', 'ja']);
 });
 
 test('the scrolling transcript is focusable and labelled', () => {
@@ -186,7 +337,7 @@ for (const [name, lang, label] of [
   test(`the footer links the four family sites under a ${name} label`, () => {
     const model = lang ? step(start(), new UserPickedLanguage(lang)) : start();
     const html = to_string(view(model));
-    const nav = html.match(/<nav[^>]*class="input-hint family"[^>]*>(.*?)<\/nav>/);
+    const nav = html.match(/<nav[^>]*class="family ix-small ix-muted"[^>]*>(.*?)<\/nav>/);
     assert.ok(nav, 'a family nav is rendered');
     assert.equal(decode(attr(nav[0], 'aria-label')), label);
     const links = [...nav[1].matchAll(/<a href="([^"]*)">([^<]*)<\/a>/g)].map((m) => [m[1], m[2]]);
@@ -200,4 +351,40 @@ test('the rendered app has no link to coze.org', () => {
     const model = lang ? step(start(), new UserPickedLanguage(lang)) : start();
     assert.doesNotMatch(to_string(view(model)), /coze\.org/);
   }
+});
+
+// ---------------------------------------------------------------------------
+// The bar is the family's: the arda.tr wordmark, then the sibling sites. On
+// this site the wordmark is the only display type, so the one heading is the
+// assistant's modest title.
+// ---------------------------------------------------------------------------
+
+test('the bar links arda.tr from the wordmark, then the index, the blog and the résumé', () => {
+  for (const lang of [null, new Jp(), new Tr()]) {
+    const html = to_string(view(lang ? step(start(), new UserPickedLanguage(lang)) : start()));
+    const bar = html.match(/<header class="ix-bar">(.*?)<\/header>/)[1];
+    assert.match(bar, /<a href="https:\/\/arda\.tr"><svg[^>]*aria-label="arda\.tr"/, 'the wordmark is a link named arda.tr');
+    assert.match(bar, /<span class="ix-label">\/ ask<\/span>/);
+    const links = [...bar.matchAll(/<a href="([^"]*)">([^<]*)<\/a>/g)].map((m) => [m[1], m[2]]);
+    assert.deepEqual(links, [['https://arda.tr', 'index'], ['https://blog.arda.tr', 'blog'], ['https://resume.arda.tr', 'résumé']]);
+  }
+});
+
+test('the inline wordmark is the family logo, with the full stop in the theme\'s vermilion', () => {
+  // The outlines are pasted into frontend/wordmark.gleam; they must stay the
+  // ones of the vendored logo file.
+  const logo = readFileSync(new URL('../../public/brand/logo/wordmark.svg', import.meta.url), 'utf8');
+  const inline = to_string(view(start())).match(/<svg[^>]*class="ix-wordmark"[^>]*>.*?<\/svg>/)[0];
+  const paths = (svg) => [...svg.matchAll(/<path[^>]*>/g)].map((m) => m[0]);
+  assert.equal(attr(inline, 'viewBox'), attr(logo, 'viewBox'));
+  assert.equal(attr(inline, 'transform'), attr(logo, 'transform'));
+  assert.deepEqual(paths(inline).map((tag) => attr(tag, ' d')), paths(logo).map((tag) => attr(tag, ' d')));
+  const [letters, dot] = paths(inline);
+  assert.equal(attr(letters, 'fill'), 'currentColor');
+  assert.match(dot, /fill:\s*var\(--color-accent\)/);
+});
+
+test('the page has one heading: the assistant\'s title', () => {
+  const html = to_string(view(start()));
+  assert.deepEqual([...html.matchAll(/<h1[^>]*>([^<]*)<\/h1>/g)].map((m) => m[1]), ['Ask Construct']);
 });

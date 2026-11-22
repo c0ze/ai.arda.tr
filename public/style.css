@@ -1,718 +1,344 @@
-/* =============================================
-   Arda's AI Construct: One Bit Forest (ai.arda.tr)
-   Tokens and renditions: DESIGN-SYSTEM.md. Reference: design-previews/sketch-1bit.html §04.
-   ============================================= */
+/*
+  ai.arda.tr: "The index, asked."
+  ------------------------------------------------------------------------
+  What is particular to this site, on the family brand "The Index"
+  (../DESIGN-SYSTEM.md; applied here: DESIGN.md).
 
-/* ─── Renditions ──────────────────────────────── */
-/* night (default, cold tint) — also the fallback before the boot script sets body[data-theme] */
-:root,
-[data-theme="night"] {
-    color-scheme: dark;
-    --bg:        #05080a;
-    --surface:   #0c151a;
-    --fg:        #dfe9ec;
-    --fg-hi:     #ffffff;
-    --fg-2:      #7d9299;
-    --fg-3:      #5b737c;   /* decorative only (chip numbers): 4.0:1 on --bg, too low for text */
-    --rule:      #16232a;
-    --rule-2:    #263840;   /* control outlines */
-    --well-rule: transparent;
-    --sig:       #58e8ff;
+  Loaded after, and never instead of:
+    /brand/arda.css    the Astryx `arda` theme: every colour, size and font
+    /brand/brand.css   the family patterns, classes prefixed ix-
+  Both are verbatim copies from the arda.tr repository. Change them there,
+  not here. Every colour and font size below is one of the theme's tokens.
+
+  The layer order (reset, astryx-base, astryx-theme, brand) is declared
+  inline in <head> (frontend/gleam.toml) before any stylesheet. The rules
+  here are unlayered, so they win over all four layers.
+*/
+
+/* -- Tokens --------------------------------------------------------------
+   brand.css reads the spacing scale and the focus ring's width from the
+   Astryx base stylesheet (@astryxdesign/core), which the React sites load
+   with their components. This site has no Astryx components, so the ones
+   brand.css uses are defined here, with Astryx's own values. */
+@layer astryx-base {
+  :root {
+    --spacing-1: 0.25rem;
+    --spacing-2: 0.5rem;
+    --spacing-3: 0.75rem;
+    --spacing-4: 1rem;
+    --spacing-5: 1.25rem;
+    --spacing-6: 1.5rem;
+    --spacing-8: 2rem;
+    --focus-outline-width: 2px;
+  }
 }
 
-[data-theme="night-hc"] {
-    color-scheme: dark;
-    --bg:        #000000;
-    --surface:   #000000;
-    --fg:        #ffffff;
-    --fg-hi:     #ffffff;
-    --fg-2:      #d0cdc4;
-    --fg-3:      #d0cdc4;
-    --rule:      #8a8a8a;
-    --rule-2:    #8a8a8a;
-    --well-rule: #8a8a8a;
-    --sig:       #7ff0ff;
+:root {
+  --ix-max: 45rem; /* one column, 720px wide */
+  --ix-section-gap: 0rem; /* the footer sits right under the composer */
 }
 
-[data-theme="xerox"] {
-    color-scheme: light;
-    --bg:        #efede6;
-    --surface:   #e4e1d7;
-    --fg:        #111210;
-    --fg-hi:     #000000;
-    --fg-2:      #5d5b55;
-    --fg-3:      #6c6962;
-    --rule:      #cfccc2;
-    --rule-2:    #b3afa3;
-    --well-rule: transparent;
-    --sig:       #006373;
+/* Japanese labels: brand.css gives Japanese text Noto Sans JP through the body
+   and heading faces (`:lang(ja)`), but labels, chips and nav are set in the
+   mono face, and IBM Plex Mono has no kana or kanji. */
+:lang(ja) {
+  --ix-mono: "IBM Plex Mono", "Noto Sans JP", ui-monospace, monospace;
 }
 
-[data-theme="xerox-hc"] {
-    color-scheme: light;
-    --bg:        #ffffff;
-    --surface:   #ffffff;
-    --fg:        #000000;
-    --fg-hi:     #000000;
-    --fg-2:      #2e2e2e;
-    --fg-3:      #2e2e2e;
-    --rule:      #1a1a1a;
-    --rule-2:    #1a1a1a;
-    --well-rule: #1a1a1a;
-    --sig:       #004a57;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-:root,
-[data-theme] {
-    /* Canvas palette read by onebit.mjs: ai inks its orb in signal, sparks in fg. */
-    --ob-ink:    var(--sig);
-    --ob-ground: var(--bg);
-    --ob-signal: var(--fg);
-
-    --display: "Big Shoulders Display", "IBM Plex Sans JP", "Arial Narrow", sans-serif;
-    --sans:    "IBM Plex Sans", "IBM Plex Sans JP", system-ui, sans-serif;
-    --mono:    "IBM Plex Mono", "IBM Plex Sans JP", ui-monospace, monospace;
-    --col:     min(760px, 100% - 48px);
-}
-
-:root:has(body[data-theme="xerox"])    { background: #efede6; }
-:root:has(body[data-theme="xerox-hc"]) { background: #ffffff; }
-:root:has(body[data-theme="night-hc"]) { background: #000000; }
-
-/* ─── Reset ───────────────────────────────────── */
-*, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-html {
-    height: 100%;
-    background: var(--bg);
-}
-
+/* -- The shell -----------------------------------------------------------
+   Pinned to the viewport: the bar, the conversation (the only part that
+   scrolls), the composer, the footer. The input never leaves the screen. */
+html,
 body {
-    height: 100%;
-    background: var(--bg);
-    color: var(--fg);
-    font: 16px/1.62 var(--sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-button {
-    font: inherit;
-    color: inherit;
-    background: none;
-    border: 0;
-    border-radius: 0;
-    cursor: pointer;
-}
-
-::selection {
-    background: var(--sig);
-    color: var(--bg);
-}
-
-:focus-visible {
-    outline: 2px solid var(--sig);
-    outline-offset: 2px;
-}
-
-canvas.px {
-    display: block;
-    image-rendering: crisp-edges;
-    image-rendering: pixelated;
+  height: 100%;
 }
 
 #app {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    height: 100dvh;
+  height: 100%;
+  height: 100dvh;
 }
 
-/* ─── Status bar ──────────────────────────────── */
-.bar {
-    display: flex;
-    align-items: center;
-    gap: 22px;
-    height: 34px;
-    flex-shrink: 0;
-    padding: 0 20px;
-    border-bottom: 1px solid var(--rule);
-    font: 12px/1 var(--mono);
-    letter-spacing: 0.02em;
-    color: var(--fg-2);
-    white-space: nowrap;
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.bar .site {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--fg);
+.ix-bar,
+.composer,
+.ix-foot {
+  flex: none;
 }
 
-.bar .site i {
-    display: inline-block;
-    width: 8px;
-    height: 14px;
-    background: var(--sig);
+/* -- The bar ------------------------------------------------------------- */
+
+.ix-bar__brand a {
+  display: block;
+  color: inherit;
 }
 
-.bar .sp { flex: 1; }
+.bar-sites,
+.language-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.bar-sites {
+  gap: var(--spacing-5);
+}
 
 .language-toggle {
-    display: flex;
-    border: 1px solid var(--rule-2);
+  gap: var(--spacing-1);
 }
 
-.lang-btn {
-    padding: 4px 8px;
-    color: var(--fg-2);
-    letter-spacing: 0.04em;
+/* The slashes between the language codes echo "/ ask". */
+.language-toggle > span {
+  font-family: var(--ix-mono);
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-leading);
+  color: var(--color-text-secondary);
 }
 
-.lang-btn:hover { color: var(--sig); }
-
-.lang-btn.active {
-    background: var(--sig);
-    color: var(--bg);
+/* The languages and the scheme switch are buttons set as nav links
+   (brand.css `button.ix-navlink`); a little width makes them easier to hit. */
+button.ix-navlink {
+  margin: 0;
+  padding-inline: var(--spacing-1);
 }
 
-.theme-toggle,
-.voice-toggle {
-    min-width: 10ch;
-    padding: 4px 7px;
-    border: 1px solid currentColor;
-    text-align: center;
+/* The language in use, marked like the bar's current page. */
+button.ix-navlink[aria-pressed="true"] {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 
-.voice-toggle { min-width: 7ch; }
+/* Targets in the bar are at least 24px high, 44px for a finger. */
+.ix-bar__nav :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 1.5rem;
+  min-inline-size: 1.5rem;
+}
 
-.theme-toggle:hover,
-.voice-toggle:hover { color: var(--sig); }
+@media (pointer: coarse) {
+  .ix-bar__nav :is(a, button) {
+    min-block-size: 2.75rem;
+  }
+}
 
-/* Muted: dimmed, like an inactive language. */
-.voice-toggle[aria-pressed="false"] { border-color: var(--rule-2); }
+/* -- The conversation ---------------------------------------------------- */
 
-/* ─── The construct ───────────────────────────── */
 #chat-area {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.ai-id {
-    flex-shrink: 0;
-    width: var(--col);
-    margin: 0 auto;
-    padding: 34px 0 22px;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    border-bottom: 1px solid var(--rule);
-}
-
-.orb {
-    flex-shrink: 0;
-    width: 88px;
-    height: 88px;
-}
-
-.orb canvas {
-    width: 100%;
-    height: 100%;
-}
-
-.ai-id-text { min-width: 0; }
-
-.ai-id h1 {
-    font: 900 44px/0.9 var(--display);
-    text-transform: uppercase;
-    letter-spacing: 0.005em;
-    color: var(--fg);
-}
-
-/* Plex Sans JP stands in for Big Shoulders in Japanese and runs far wider */
-.ai-id h1:lang(ja) { font-size: 38px; font-weight: 700; }
-
-.ai-id .sub {
-    margin-top: 8px;
-    font: 12px/1.5 var(--mono);
-    color: var(--fg-2);
-}
-
-.ai-id .state {
-    margin-top: 2px;
-    font: 12px/1.5 var(--mono);
-    color: var(--fg-2);
-}
-
-.ai-id .state::before { content: "○ "; }
-
-.ai-id .state.is-busy { color: var(--sig); }
-.ai-id .state.is-busy::before { content: "● "; }
-
-/* Read by screen readers, not shown (the finished reply, see #reply-announcer). */
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-}
-
-/* ─── Messages ────────────────────────────────── */
+/* The scroller is as wide as the page, so its scrollbar is at the edge of the
+   window; the column inside is the .ix-wrap. */
 #messages-container {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--rule-2) transparent;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  outline-offset: calc(-1 * var(--focus-outline-width));
 }
 
+/* The column's left edge is worked out from the window, not from the scroller
+   (which a scrollbar makes narrower), so it stays in line with the bar and
+   the composer whether or not a scrollbar shows. */
+#messages-container > .ix-wrap {
+  width: auto;
+  margin-inline: max(0px, (100vw - var(--ix-max) - 2 * var(--ix-gutter)) / 2) 0;
+}
+
+/* The page's one heading is modest: on this site the only display type is
+   the wordmark. */
+.intro {
+  padding-block: var(--spacing-8) var(--spacing-6);
+}
+
+.intro h1 {
+  font-family: var(--font-family-body);
+  font-size: var(--text-heading-3-size);
+  line-height: var(--text-heading-3-leading);
+  font-weight: var(--text-heading-3-weight);
+  letter-spacing: 0;
+}
+
+.intro p {
+  max-width: var(--ix-measure);
+  margin-block-start: var(--spacing-1);
+}
+
+/* A 2px ink rule opens the list, as it does every list in the family. */
 #messages {
-    width: var(--col);
-    margin: 0 auto;
-    padding: 28px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 26px;
+  padding-block: var(--spacing-6) var(--spacing-8);
+  border-block-start: var(--ix-rule-section);
 }
 
-.msg {
-    display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
-    gap: 16px;
-    font: 16px/26px var(--sans);
+/* The square sits on the first line of the reply. */
+.ix-msg > .ix-mark {
+  margin-block-start: calc((1lh - 1.5rem) / 2);
 }
 
-.msg .who {
-    font: 12px/26px var(--mono);
-    color: var(--fg-2);
-    white-space: nowrap;
+/* The visitor's words wrap inside their box, however long the word. */
+.ix-msg--you {
+  overflow-wrap: anywhere;
 }
 
-.msg.bot .who { color: var(--sig); }
-
-.txt {
-    min-width: 0;
-    overflow-wrap: anywhere;
+/* An error: no square, the theme's error colour, and a label in words. */
+.msg.is-error > .ix-msg__body {
+  grid-column: 2;
 }
 
-/* the crackle cursor (a canvas from onebit.mjs) trailing a streaming reply;
-   `canvas.px` would otherwise make it a block on its own line */
-canvas.px.cursor {
-    display: inline-block;
-    width: 10px;
-    height: 18px;
-    margin-left: 2px;
-    vertical-align: -3px;
+.msg.is-error :is(.ix-label, .txt, .txt p) {
+  color: var(--color-text-error);
 }
 
-.msg.is-error .who { color: var(--fg-2); }
-
-.msg.is-error .txt {
-    font: 13px/26px var(--mono);
-    color: var(--fg-2);
+/* Replies are markdown, set as .ix-prose, a little tighter than an article
+   (as in arda.tr's chat). Their headings stay in the body face and near the
+   body size: a reply is not a page. */
+.txt > * + * {
+  margin-block-start: 0.75em;
 }
 
-/* markdown */
-.txt > * + * { margin-top: 0.75em; }
-
-.txt ul,
-.txt ol { padding-left: 1.3em; }
-.txt ul { list-style: square; }
-.txt li + li,
-.txt li > ul,
-.txt li > ol { margin-top: 0.25em; }
-.txt li::marker { color: var(--sig); }
-.txt ol > li::marker { font: 13px var(--mono); }
-
-.txt strong,
-.txt b {
-    font-weight: 600;
-    color: var(--fg-hi);
+.txt :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-family-body);
+  font-size: var(--text-heading-4-size);
+  line-height: var(--text-heading-4-leading);
+  font-weight: var(--text-heading-4-weight);
+  letter-spacing: 0;
 }
 
-.txt a {
-    color: var(--sig);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
+.txt :is(h1, h2) {
+  font-size: var(--text-heading-3-size);
+  line-height: var(--text-heading-3-leading);
 }
 
-.txt a:hover {
-    background: var(--sig);
-    color: var(--bg);
-    text-decoration: none;
+.txt > :is(h1, h2, h3, h4, h5, h6):not(:first-child) {
+  margin-block-start: 1.25em;
 }
 
-.txt code {
-    font: 0.85em/1 var(--mono);
-    padding: 1px 5px;
-    background: var(--surface);
-    border: 1px solid var(--well-rule);
-    color: var(--sig);
-}
-
-.txt pre {
-    padding: 12px 14px;
-    overflow-x: auto;
-    background: var(--surface);
-    border: 1px solid var(--rule);
-    border-left: 2px solid var(--sig);
-    font: 13px/1.6 var(--mono);
-}
-
-.txt pre code {
-    padding: 0;
-    background: none;
-    border: 0;
-    font: inherit;
-    color: var(--fg);
-}
-
-.txt h1,
-.txt h2,
-.txt h3 {
-    font-family: var(--display);
-    font-weight: 700;
-    line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.01em;
-    color: var(--fg-hi);
-}
-
-.txt h1 { font-size: 30px; }
-.txt h2 { font-size: 25px; }
-.txt h3 { font-size: 21px; }
-
-.txt h4,
-.txt h5,
-.txt h6 {
-    font: 500 12px/1.5 var(--mono);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-2);
-}
-
-.txt * + h1,
-.txt * + h2,
-.txt * + h3,
-.txt * + h4 { margin-top: 1.1em; }
-
-.txt blockquote {
-    padding-left: 14px;
-    border-left: 2px solid var(--sig);
-    color: var(--fg-2);
-}
-
-.txt hr {
-    border: 0;
-    border-top: 1px dashed var(--rule-2);
-}
-
+/* A wide table scrolls inside the reply, never the page. */
 .txt table {
-    display: block;
-    max-width: 100%;
-    overflow-x: auto;
-    border-collapse: collapse;
-    font-size: 14px;
-    line-height: 1.5;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
-.txt th,
-.txt td {
-    padding: 6px 10px;
-    border: 1px solid var(--rule-2);
-    text-align: left;
-    vertical-align: top;
+/* -- The composer -------------------------------------------------------- */
+
+.composer {
+  padding-block: var(--spacing-4);
+  border-block-start: var(--ix-rule);
 }
 
-.txt th {
-    font: 500 11.5px/1.4 var(--mono);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--fg-2);
-    background: var(--surface);
+.composer > .ix-wrap {
+  display: grid;
+  gap: var(--spacing-3);
 }
-
-.txt img { max-width: 100%; }
-
-/* ─── Footer: quick prompts, terminal line, hint ─ */
-#input-footer {
-    flex-shrink: 0;
-    width: var(--col);
-    margin: 0 auto;
-    padding: 14px 0 22px;
-    border-top: 1px solid var(--rule);
-}
-
-#quick-topics {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.topic-btn {
-    padding: 8px 10px;
-    border: 1px solid var(--rule-2);
-    font: 12px/1 var(--mono);
-    color: var(--fg-2);
-    text-transform: lowercase;
-    white-space: nowrap;
-}
-
-.topic-btn em {
-    margin-right: 6px;
-    font-style: normal;
-    color: var(--fg-3);
-}
-
-.topic-btn:hover {
-    border-color: var(--sig);
-    color: var(--sig);
-}
-
-.topic-btn:hover em { color: var(--sig); }
 
 #input-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 6px 0 16px;
-    border: 1px solid var(--rule-2);
-    font: 15px/1 var(--mono);
+  display: flex;
+  gap: var(--spacing-2);
 }
-
-#input-wrapper:focus-within { border-color: var(--sig); }
-
-#input-wrapper .prompt { color: var(--sig); }
-
-/* The block cursor stands in for the caret while the line is empty; the first
-   keystroke replaces it with the real caret (in signal). */
-#input-wrapper .cur {
-    display: none;
-    flex-shrink: 0;
-    width: 9px;
-    height: 18px;
-    background: var(--sig);
-    animation: blink 1.1s steps(1) infinite;
-}
-
-#input-wrapper:has(#user-input:placeholder-shown) .cur { display: block; }
-#input-wrapper:has(#user-input:placeholder-shown) #user-input { caret-color: transparent; }
 
 #user-input {
-    flex: 1;
-    min-width: 0;
-    padding: 15px 0;
-    background: none;
-    border: 0;
-    border-radius: 0;
-    outline: none;
-    font: inherit;
-    color: var(--fg);
-    caret-color: var(--sig);
-    caret-shape: block;
+  flex: 1;
+  min-width: 0;
 }
-
-#user-input::placeholder { color: var(--fg-2); opacity: 1; }
 
 #send-btn {
-    flex-shrink: 0;
-    padding: 10px;
-    font: 12px/1 var(--mono);
-    color: var(--fg-2);
-    white-space: nowrap;
+  flex: none;
+  min-height: 2.75rem;
 }
 
-#send-btn:hover:not(:disabled) { color: var(--sig); }
-
-#send-btn:disabled {
-    cursor: default;
-    opacity: 0.45;
+/* The voice toggle, then the disclaimer. */
+.composer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2) var(--spacing-4);
 }
 
-.input-hint {
-    margin-top: 8px;
-    font: 11px/1.5 var(--mono);
-    color: var(--fg-2);
+@media (pointer: coarse) {
+  .ix-chip {
+    min-height: 2.75rem;
+  }
 }
 
-/* The arda.tr family under the disclaimer: a second hint line, in its colour.
-   Focus keeps the page's ring (:focus-visible above). */
-.input-hint.family { margin-top: 2px; }
+/* -- The footer ---------------------------------------------------------- */
 
-.family a {
-    color: inherit;
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
+.ix-foot {
+  padding-block: var(--spacing-3) max(var(--spacing-4), env(safe-area-inset-bottom, 0px));
 }
 
-.family a:hover,
-.family a:focus-visible { color: var(--sig); }
 
-@keyframes blink { 50% { opacity: 0; } }
+/* -- Narrow screens ------------------------------------------------------
+   One column, 24px side margins (the .ix-wrap gutter). The bar keeps the
+   wordmark, the languages and the scheme switch on one line; the sibling
+   sites are in the footer's family line. */
+@media (max-width: 40em) {
+  .bar-sites {
+    display: none;
+  }
 
-@media (prefers-reduced-motion: reduce) {
-    #input-wrapper .cur { animation: none; }
+  .intro {
+    padding-block: var(--spacing-6) var(--spacing-5);
+  }
+
+  .composer {
+    padding-block: var(--spacing-3);
+  }
 }
 
-/* ─── Mobile ──────────────────────────────────── */
-@media (max-width: 640px) {
-    :root,
-    [data-theme] { --col: calc(100% - 32px); }
+/* -- Short screens (phone landscape, a zoomed desktop) -------------------
+   The shell is pinned to the viewport, so what is not needed to ask a
+   question gives its room to the conversation: first the footer (its family
+   line wraps to two lines on a small phone), then the quick prompts. */
+@media (max-height: 40em) {
+  .ix-foot {
+    display: none;
+  }
 
-    .bar {
-        gap: 10px;
-        padding: 0 12px;
-    }
-
-    .bar-title { display: none; }
-
-    .voice-toggle { min-width: 0; padding: 4px 8px; }
-    .voice-toggle .voice-word { display: none; }
-    .voice-toggle[aria-pressed="false"] .voice-glyph { text-decoration: line-through; }
-
-    .ai-id {
-        padding: 16px 0 14px;
-        gap: 14px;
-    }
-
-    .orb {
-        width: 66px;
-        height: 66px;
-    }
-
-    .ai-id h1 { font-size: 32px; }
-    .ai-id h1:lang(ja) { font-size: 24px; line-height: 1.1; }
-
-    .ai-id .sub {
-        margin-top: 6px;
-        font-size: 11px;
-        line-height: 1.45;
-    }
-
-    .ai-id .state { font-size: 11px; }
-
-    #messages {
-        padding: 20px 0;
-        gap: 20px;
-    }
-
-    .msg {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 2px;
-        font-size: 15px;
-        line-height: 24px;
-    }
-
-    .msg .who {
-        font-size: 11px;
-        line-height: 18px;
-    }
-
-    .msg.is-error .txt { line-height: 22px; }
-
-    #input-footer { padding: 10px 0 14px; }
-
-    /* one swipeable row of prompts instead of three wrapped ones */
-    #quick-topics {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        margin-bottom: 10px;
-        scrollbar-width: none;
-    }
-
-    #quick-topics::-webkit-scrollbar { display: none; }
-
-    #input-wrapper { padding-left: 12px; gap: 10px; }
-
-    #user-input {
-        padding: 13px 0;
-        font-size: 16px; /* no zoom-on-focus in iOS Safari */
-    }
-
-    .input-hint { font-size: 10.5px; }
+  .composer {
+    padding-block-end: max(var(--spacing-3), env(safe-area-inset-bottom, 0px));
+  }
 }
 
-/* The bar fits a 320px screen in every language and rendition. */
-@media (max-width: 360px) {
-    .bar {
-        gap: 6px;
-        padding: 0 8px;
-    }
+@media (max-height: 36em) {
+  #quick-topics {
+    display: none;
+  }
 
-    .lang-btn { padding: 4px 6px; }
+  .ix-bar__in {
+    min-height: 2.75rem;
+  }
 
-    .theme-toggle,
-    .voice-toggle {
-        min-width: 0;
-        padding: 4px 5px;
-    }
-}
+  .intro {
+    padding-block: var(--spacing-4);
+  }
 
-/* ─── Short screens (phone landscape, zoomed desktop) ─
-   #app is pinned to the viewport, so the identity block and the footer would
-   leave the conversation no room: the block collapses to the orb, the title
-   and the status line, and the quick prompts go. */
-@media (max-height: 560px) {
-    .ai-id {
-        padding: 8px 0;
-        gap: 12px;
-    }
+  #messages {
+    padding-block: var(--spacing-4);
+  }
 
-    .orb {
-        width: 34px;
-        height: 34px;
-    }
+  .composer {
+    padding-block: var(--spacing-2) max(var(--spacing-2), env(safe-area-inset-bottom, 0px));
+  }
 
-    .ai-id h1 { font-size: 24px; }
-    .ai-id h1:lang(ja) { font-size: 19px; line-height: 1.1; }
-
-    .ai-id .sub,
-    #quick-topics { display: none; }
-
-    .ai-id .state {
-        margin-top: 2px;
-        font-size: 11px;
-    }
-
-    #messages {
-        padding: 14px 0;
-        gap: 16px;
-    }
-
-    #input-footer { padding: 8px 0 10px; }
-
-    #user-input { padding: 10px 0; }
-
-    .input-hint {
-        margin-top: 4px;
-        font-size: 10.5px;
-    }
-}
-
-/* The family line is hidden to keep the conversation's space: on short
-   screens, and at 320x568, where it wraps to two lines. */
-@media (max-height: 600px) {
-    .input-hint.family { display: none; }
-}
-
-@media (max-height: 300px) {
-    .ai-id { padding: 4px 0; }
-    .ai-id h1 { font-size: 20px; }
-    #input-footer { padding: 6px 0; }
-    #user-input { padding: 8px 0; }
+  .composer > .ix-wrap {
+    gap: var(--spacing-2);
+  }
 }

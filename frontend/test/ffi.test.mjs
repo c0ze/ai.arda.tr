@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { stream_chat, reveal_prefix, abort_stream, render_markdown } from '../build/dev/javascript/frontend/ffi.mjs';
+import {
+  stream_chat, reveal_prefix, abort_stream, render_markdown, set_mark_level, speech_begin, speech_stop,
+  scheme_toggle, scheme_watch,
+} from '../build/dev/javascript/frontend/ffi.mjs';
 import { createSpeaker, requestFields, setVoiceEnabled, voiceEnabled } from '../build/dev/javascript/frontend/voice.mjs';
 
 async function collect(t, chunks, { delayed = false } = {}) {
@@ -200,6 +203,85 @@ test('voice:false from the server means no gating at all', (t) => {
 });
 
 // ---------------------------------------------------------------------------
+// The voice's loudness shows on the square of the reply being spoken, as the
+// custom property --ix-level (0 to 1) that brand.css turns into its size. It
+// must not outlive the voice, or a square stays swollen.
+// ---------------------------------------------------------------------------
+
+// A `document` whose querySelector finds the squares given by selector.
+function fakeMarks(t, marks) {
+  const mark = () => {
+    const props = new Map();
+    return { props, style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k) } };
+  };
+  const found = Object.fromEntries(marks.map((selector) => [selector, mark()]));
+  globalThis.document = { querySelector: (selector) => found[selector] ?? null };
+  t.after(() => { set_mark_level('', 0); delete globalThis.document; });
+  return found;
+}
+
+test('the loudness is set on the speaking reply\'s square, between 0 and 1', (t) => {
+  const { '.speaking': mark } = fakeMarks(t, ['.speaking']);
+  set_mark_level('.speaking', 0.5);
+  assert.equal(mark.props.get('--ix-level'), '0.50');
+  set_mark_level('.speaking', 3);
+  assert.equal(mark.props.get('--ix-level'), '1.00');
+});
+
+test('silence takes the loudness off the square again', (t) => {
+  const { '.speaking': mark } = fakeMarks(t, ['.speaking']);
+  set_mark_level('.speaking', 0.7);
+  set_mark_level('.speaking', 0);
+  assert.equal(mark.props.has('--ix-level'), false);
+});
+
+test('when another reply starts speaking, the previous square is released', (t) => {
+  const marks = fakeMarks(t, ['.first', '.second']);
+  set_mark_level('.first', 0.7);
+  set_mark_level('.second', 0.4);
+  assert.equal(marks['.first'].props.has('--ix-level'), false);
+  assert.equal(marks['.second'].props.get('--ix-level'), '0.40');
+});
+
+test('stopping the voice (a new question, a language switch) releases the square', (t) => {
+  fakeWindow(t);
+  const { '.speaking': mark } = fakeMarks(t, ['.speaking']);
+  speech_begin('.speaking', () => {}, () => {});
+  set_mark_level('.speaking', 0.6); // as the speaker's onLevel would, mid-sentence
+  speech_stop();
+  assert.equal(mark.props.has('--ix-level'), false);
+});
+
+// ---------------------------------------------------------------------------
+// The colour scheme belongs to the family's scheme.js (public/brand/, loaded
+// by index.html as window.ardaScheme). ai.arda.tr is dark unless the visitor
+// pins light, under the key the earlier designs used ("theme"), which is how
+// a returning visitor's choice survives: the same key and default as the boot
+// script in frontend/gleam.toml.
+// ---------------------------------------------------------------------------
+
+test('the scheme switch asks scheme.js to toggle "theme", dark by default', (t) => {
+  const calls = [];
+  globalThis.window = { ardaScheme: {
+    toggleScheme: (...args) => calls.push(['toggle', ...args]),
+    watchScheme: (...args) => calls.push(['watch', ...args]),
+  } };
+  t.after(() => { delete globalThis.window; });
+  scheme_toggle();
+  scheme_watch();
+  assert.deepEqual(calls, [['toggle', 'theme', 'dark'], ['watch', 'theme', 'dark']]);
+});
+
+test('without scheme.js the switch does nothing, and nothing breaks', (t) => {
+  globalThis.window = {};
+  t.after(() => { delete globalThis.window; });
+  scheme_toggle();
+  scheme_watch();
+  delete globalThis.window;
+  scheme_toggle(); // outside a browser (these tests, the app tests)
+});
+
+// ---------------------------------------------------------------------------
 // One request at a time: a new send or a reset aborts the one in flight.
 // ---------------------------------------------------------------------------
 
@@ -317,7 +399,7 @@ test('sanitiser config: the allowlist admits no tag or attribute of the beacon a
     '<img src="https://beacon.example/8">',
     '<form action="https://evil.example"><input name="q"><button>go</button></form>',
     '<style>body{display:none}</style>',
-    '<a href="https://x.y" class="theme-toggle" style="position:fixed">x</a>',
+    '<a href="https://x.y" class="ix-btn ix-btn--primary" style="position:fixed">x</a>',
   ];
   for (const payload of payloads) {
     for (const el of elements(payload)) {

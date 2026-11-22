@@ -10,7 +10,6 @@ pub type Language {
 
 pub type Strings {
   Strings(
-    header_title: String,
     construct_title: String,
     construct_subline: String,
     status_ready: String,
@@ -26,8 +25,13 @@ pub type Strings {
     switch_to_en: String,
     switch_to_jp: String,
     switch_to_tr: String,
-    rendition: String,
-    rendition_next: String,
+    nav_label: String,
+    // The scheme switch reads `scheme_before` + the scheme it switches to +
+    // `scheme_after`; only the scheme's name is visible.
+    scheme_before: String,
+    scheme_after: String,
+    scheme_light: String,
+    scheme_dark: String,
     conversation_label: String,
     welcome_msg: String,
     input_placeholder: String,
@@ -36,7 +40,8 @@ pub type Strings {
     error_rate_limited: String,
     error_offline: String,
     error_timeout: String,
-    error_prefix: String,
+    // Shown above every error line, so an error is never told by colour alone.
+    error_label: String,
     who_you: String,
     who_construct: String,
     btn_experience: String,
@@ -56,7 +61,6 @@ pub fn strings(language: Language) -> Strings {
   case language {
     En ->
       Strings(
-        header_title: "Arda's AI Construct",
         construct_title: "Ask Construct",
         construct_subline: "Answers questions about Arda's work, projects, and music, and forwards messages to him.",
         status_ready: "Ready",
@@ -72,8 +76,11 @@ pub fn strings(language: Language) -> Strings {
         switch_to_en: "Switch to English",
         switch_to_jp: "Switch to Japanese",
         switch_to_tr: "Switch to Turkish",
-        rendition: "Theme: ",
-        rendition_next: ". Next: ",
+        nav_label: "Site navigation",
+        scheme_before: "Switch to ",
+        scheme_after: " scheme",
+        scheme_light: "Light",
+        scheme_dark: "Dark",
         conversation_label: "Conversation",
         welcome_msg: "Ask about Arda's work, projects, education, or music. If you have a role for him, send the details here and I will pass them on.",
         input_placeholder: "Ask about Arda",
@@ -82,7 +89,7 @@ pub fn strings(language: Language) -> Strings {
         error_rate_limited: "Too many questions in a short time. Wait a minute and try again.",
         error_offline: "Cannot reach the network. Check your connection and try again.",
         error_timeout: "The request timed out. Try asking again.",
-        error_prefix: "Error: ",
+        error_label: "Error",
         who_you: "You",
         who_construct: "Construct",
         btn_experience: "Experience",
@@ -98,7 +105,6 @@ pub fn strings(language: Language) -> Strings {
       )
     Jp ->
       Strings(
-        header_title: "ArdaのAIコンストラクト",
         construct_title: "Constructに質問する",
         construct_subline: "Ardaの仕事、プロジェクト、音楽についての質問に答え、本人への連絡も取り次ぎます。",
         status_ready: "待機中",
@@ -114,8 +120,11 @@ pub fn strings(language: Language) -> Strings {
         switch_to_en: "英語に切り替える",
         switch_to_jp: "日本語に切り替える",
         switch_to_tr: "トルコ語に切り替える",
-        rendition: "テーマ: ",
-        rendition_next: "。次: ",
+        nav_label: "サイトナビゲーション",
+        scheme_before: "",
+        scheme_after: "テーマに切り替える",
+        scheme_light: "ライト",
+        scheme_dark: "ダーク",
         conversation_label: "会話",
         welcome_msg: "Ardaの仕事、プロジェクト、学歴、音楽についてお答えします。仕事の相談があれば、詳細を送ってください。本人に伝えます。",
         input_placeholder: "Ardaについて質問する",
@@ -124,7 +133,7 @@ pub fn strings(language: Language) -> Strings {
         error_rate_limited: "短時間に質問が集中しました。1分ほど待ってからもう一度お試しください。",
         error_offline: "ネットワークに接続できません。接続を確認してもう一度お試しください。",
         error_timeout: "応答がタイムアウトしました。もう一度お試しください。",
-        error_prefix: "エラー: ",
+        error_label: "エラー",
         who_you: "あなた",
         who_construct: "Construct",
         btn_experience: "経歴",
@@ -140,7 +149,6 @@ pub fn strings(language: Language) -> Strings {
       )
     Tr ->
       Strings(
-        header_title: "Arda'nın AI Konstrüktü",
         construct_title: "Construct'a sor",
         construct_subline: "Arda'nın işi, projeleri ve müziği hakkındaki soruları yanıtlar, mesajlarınızı ona iletir.",
         status_ready: "Hazır",
@@ -156,8 +164,11 @@ pub fn strings(language: Language) -> Strings {
         switch_to_en: "İngilizceye geç",
         switch_to_jp: "Japoncaya geç",
         switch_to_tr: "Türkçeye geç",
-        rendition: "Tema: ",
-        rendition_next: ". Sonraki: ",
+        nav_label: "Site gezintisi",
+        scheme_before: "",
+        scheme_after: " temaya geç",
+        scheme_light: "Açık",
+        scheme_dark: "Koyu",
         conversation_label: "Sohbet",
         welcome_msg: "Arda'nın işi, projeleri, eğitimi veya müziği hakkında sorabilirsiniz. İş teklifiniz varsa ayrıntıları yazın, kendisine iletirim.",
         input_placeholder: "Arda hakkında sorun",
@@ -166,7 +177,7 @@ pub fn strings(language: Language) -> Strings {
         error_rate_limited: "Kısa sürede çok fazla soru gönderildi. Bir dakika bekleyip tekrar deneyin.",
         error_offline: "Ağa ulaşılamıyor. Bağlantınızı kontrol edip tekrar deneyin.",
         error_timeout: "İstek zaman aşımına uğradı. Tekrar sormayı deneyin.",
-        error_prefix: "Hata: ",
+        error_label: "Hata",
         who_you: "Siz",
         who_construct: "Construct",
         btn_experience: "Deneyim",

@@ -1,14 +1,14 @@
 // JavaScript FFI for the Lustre frontend.
 //
-// Keeps browser-only concerns (localStorage, system theme preference,
-// markdown rendering, and DOMPurify sanitisation) out of Gleam.
+// Keeps browser-only concerns (localStorage, the colour scheme, markdown
+// rendering, and DOMPurify sanitisation) out of Gleam.
 //
 // `marked` and `DOMPurify` are loaded globally from vendored <script> tags in
 // index.html (pinned copies under public/vendor/). If either is unavailable we
-// fall back to escaped plain text — never unsanitised HTML.
+// fall back to escaped plain text — never unsanitised HTML. The family's
+// `scheme.js` (public/brand/) is loaded by index.html too, as `window.ardaScheme`.
 
 import { Ok, Error } from "./gleam.mjs";
-import { orb, crackle, reducedMotion } from "./onebit.mjs";
 import { unlockAudio, voiceEnabled, setVoiceEnabled, createSpeaker } from "./voice.mjs";
 
 export function storage_get(key) {
@@ -28,10 +28,27 @@ export function storage_set(key, value) {
   }
 }
 
-export function set_body_theme(theme) {
-  if (typeof document !== "undefined" && document.body) {
-    document.body.setAttribute("data-theme", theme);
-  }
+// The colour scheme: light or dark, kept by the family's scheme.js (a verbatim
+// copy of arda.tr's brand/scheme.js, loaded by index.html). ai.arda.tr is dark
+// unless the visitor pins light. The inline script in index.html (see
+// frontend/gleam.toml) is scheme.js's own boot snippet for the same key and
+// fallback, so the scheme is on <html> before first paint; these only change
+// it afterwards. Without scheme.js (it failed to load) the switch does nothing.
+const SCHEME_KEY = "theme";
+const SCHEME_FALLBACK = "dark";
+
+function scheme() {
+  return (typeof window !== "undefined" && window.ardaScheme) || null;
+}
+
+// Switch to the scheme that is not on screen. Going back to dark clears the pin.
+export function scheme_toggle() {
+  scheme()?.toggleScheme(SCHEME_KEY, SCHEME_FALLBACK);
+}
+
+// Follow a pin set or cleared in another tab.
+export function scheme_watch() {
+  scheme()?.watchScheme(SCHEME_KEY, SCHEME_FALLBACK);
 }
 
 // Keep <html lang="..."> in sync with the selected UI locale so screen
@@ -258,100 +275,10 @@ export function stream_chat(url, body_json, on_event) {
 }
 
 // ---------------------------------------------------------------------------
-// The construct: a 1-bit orb that revolves constantly and sizzles on every
-// streamed chunk, plus a crackling block cursor that trails the streaming
-// reply. Both canvases are created here, inside elements whose Lustre vnodes
-// have no children (the orb host) or whose inner HTML Lustre only replaces
-// when the markdown changes (the reply). Lustre never diffs these canvases,
-// so re-renders do not recreate them.
-// ---------------------------------------------------------------------------
-
-let construct = null; // { canvas, orb }
-
-function ensureOrb(selector) {
-  if (typeof document === "undefined") return null;
-  if (construct && construct.canvas.isConnected) return construct;
-  const host = document.querySelector(selector);
-  if (!host) return null;
-  if (construct) construct.orb.destroy();
-  const canvas = document.createElement("canvas");
-  canvas.className = "px";
-  host.replaceChildren(canvas);
-  construct = { canvas, orb: orb(canvas, { size: 44, speed: 0.6 }) };
-  return construct;
-}
-
-export function mount_orb(selector) {
-  ensureOrb(selector);
-}
-
-// One crackle of the orb, sized like the reference sketch. Skipped under
-// prefers-reduced-motion: there the orb draws still frames, and the last
-// sizzle would otherwise stay frozen on it after the reply ends.
-export function sizzle_orb(selector) {
-  const c = ensureOrb(selector);
-  if (c && !reducedMotion()) c.orb.sizzle(0.5 + Math.random() * 0.5);
-}
-
-// While the model is thinking no chunks arrive, so keep the orb simmering
-// until the first chunk (or the end) turns it off.
-let simmer = 0;
-export function simmer_orb(selector, on) {
-  clearInterval(simmer);
-  simmer = 0;
-  if (!on || reducedMotion()) return;
-  const c = ensureOrb(selector);
-  if (c) simmer = setInterval(() => c.orb.sizzle(0.3), 320);
-}
-
-let cursor = null; // { canvas, anim }
-
-// Descend into the last block of the rendered reply so the cursor sits right
-// after the final word rather than on a line of its own.
-const TRAIL = /^(P|UL|OL|LI|BLOCKQUOTE|H[1-6])$/;
-function trailTarget(el, skip) {
-  for (;;) {
-    let last = el.lastChild;
-    while (last && (last === skip || (last.nodeType === 3 && !last.textContent.trim()))) {
-      last = last.previousSibling;
-    }
-    if (last && last.nodeType === 1 && TRAIL.test(last.tagName)) el = last;
-    else return el;
-  }
-}
-
-// Put the crackle cursor at the end of the element matched by `selector`.
-// Call it after every render of the streaming reply (Lustre replaces the
-// reply's inner HTML when the markdown changes, which detaches the cursor).
-export function trail_cursor(selector) {
-  if (typeof document === "undefined") return;
-  const host = document.querySelector(selector);
-  if (!host) return stop_cursor();
-  if (!cursor) {
-    const canvas = document.createElement("canvas");
-    canvas.className = "px cursor";
-    canvas.setAttribute("aria-hidden", "true");
-    cursor = { canvas, anim: null };
-  }
-  const target = trailTarget(host, cursor.canvas);
-  if (cursor.canvas.parentNode !== target || target.lastChild !== cursor.canvas) {
-    target.appendChild(cursor.canvas);
-  }
-  if (!cursor.anim) cursor.anim = crackle(cursor.canvas);
-}
-
-export function stop_cursor() {
-  if (!cursor) return;
-  cursor.anim?.destroy();
-  cursor.canvas.remove();
-  cursor = null;
-}
-
-// ---------------------------------------------------------------------------
-// Voice: the construct reads its replies aloud through voice.mjs (a verbatim
+// Voice: the assistant reads its replies aloud through voice.mjs (a verbatim
 // copy of design-previews/onebit/voice.js; do not fork). One speaker per
 // reply; it gates how much of the reply is visible so the text appears as it
-// is spoken, and its loudness makes the orb sizzle.
+// is spoken, and its loudness is shown by the reply's square (set_mark_level).
 // ---------------------------------------------------------------------------
 
 export function voice_enabled() {
@@ -368,22 +295,32 @@ export function unlock_audio() {
 }
 
 let speaker = null;
-let lastLevelAt = 0;
+
+// The element that carries the voice's loudness, if any.
+let leveled = null;
+
+// Show the voice's loudness (0 to 1) on the element matched by `selector`: the
+// square of the reply being spoken. It is set as the custom property
+// `--ix-level`; brand.css (`.ix-mark`) makes the square swell with it, and not
+// at all under prefers-reduced-motion. Silence removes the property, and so
+// does a reply that is no longer the one speaking, so no square stays swollen.
+export function set_mark_level(selector, level) {
+  if (typeof document === "undefined") return;
+  const quiet = !(level > 0);
+  const el = quiet ? null : document.querySelector(selector);
+  if (leveled && leveled !== el) leveled.style.removeProperty("--ix-level");
+  leveled = el;
+  if (el) el.style.setProperty("--ix-level", Math.min(1, level).toFixed(2));
+}
 
 // `on_reveal(n)`: show the first n UTF-16 units of the raw reply; -1 = all.
 // Callbacks from a speaker that has since been replaced are dropped.
-export function speech_begin(orb_selector, on_reveal, on_end) {
+export function speech_begin(mark_selector, on_reveal, on_end) {
   speech_stop();
   const s = createSpeaker({
     onReveal: (n) => { if (speaker === s) on_reveal(n === Infinity ? -1 : n); },
-    onLevel: (level) => {
-      // Sizzle at ~9 Hz scaled by loudness: the orb's heat then tracks the voice.
-      const now = performance.now();
-      if (level < 0.03 || now - lastLevelAt < 110 || reducedMotion()) return;
-      lastLevelAt = now;
-      const c = ensureOrb(orb_selector);
-      if (c) c.orb.sizzle(level * 0.6);
-    },
+    // Each animation frame while speaking, and 0 when the voice stops.
+    onLevel: (level) => { if (speaker === s) set_mark_level(mark_selector, level); },
     onEnd: () => { if (speaker === s) { speaker = null; on_end(); } },
   });
   speaker = s;
@@ -398,6 +335,8 @@ export function speech_stop() {
   const s = speaker;
   speaker = null;
   if (s) s.stop();
+  // The stopped speaker's own "level 0" is dropped above, so clear it here.
+  set_mark_level("", 0);
 }
 
 // The part of a reply the voice has reached, safe to render as markdown:
