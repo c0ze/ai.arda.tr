@@ -25,12 +25,12 @@ title = "Arda's AI Construct - Ask about Arda Karaduman"
 # lustre_dev_tools already writes <meta name="viewport"> itself, so it is not
 # repeated here.
 meta = [
-  { name = "description", content = "An AI chat that answers questions about Arda Karaduman's work, projects and music." },
+  { name = "description", content = "AI assistant for Arda Karaduman. Answers questions about his work, projects, and music." },
   { property = "og:type", content = "website" },
   { property = "og:site_name", content = "Arda's AI Construct" },
   { property = "og:url", content = "https://ai.arda.tr/" },
   { property = "og:title", content = "Arda's AI Construct - Ask about Arda Karaduman" },
-  { property = "og:description", content = "An AI chat that answers questions about Arda Karaduman's work, projects and music." },
+  { property = "og:description", content = "AI assistant for Arda Karaduman. Answers questions about his work, projects, and music." },
   { property = "og:image", content = "https://ai.arda.tr/og-image.png" },
   { property = "og:image:width", content = "1200" },
   { property = "og:image:height", content = "630" },
@@ -38,7 +38,7 @@ meta = [
   { property = "og:image:alt", content = "Arda's AI Construct: an AI assistant that answers questions about Arda." },
   { name = "twitter:card", content = "summary_large_image" },
   { name = "twitter:title", content = "Arda's AI Construct - Ask about Arda Karaduman" },
-  { name = "twitter:description", content = "An AI chat that answers questions about Arda Karaduman's work, projects and music." },
+  { name = "twitter:description", content = "AI assistant for Arda Karaduman. Answers questions about his work, projects, and music." },
   { name = "twitter:image", content = "https://ai.arda.tr/og-image.png" },
 ]
 links = [

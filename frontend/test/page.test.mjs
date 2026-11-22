@@ -39,7 +39,7 @@ const meta = (kind, name) => {
 const body = () => html.match(/<body>(.*)<\/body>/s)[1];
 
 const TITLE = "Arda's AI Construct - Ask about Arda Karaduman";
-const DESCRIPTION = "An AI chat that answers questions about Arda Karaduman's work, projects and music.";
+const DESCRIPTION = 'AI assistant for Arda Karaduman. Answers questions about his work, projects, and music.';
 
 test('the title says whose construct it is, with the surname, everywhere it is shared', () => {
   const titles = [...html.matchAll(/<title>(.*?)<\/title>/g)].map((m) => decode(m[1]));
@@ -56,6 +56,12 @@ test('one description says what the page is, and does not promise to pass messag
     assert.equal(text, DESCRIPTION, name);
     assert.doesNotMatch(text, /pass|message/i, name);
   }
+});
+
+test('the link preview image is described as what it shows: a title card', () => {
+  // og-image.png is a card with the site's name and one line about it, not a
+  // screenshot: the alt text says what is on it.
+  assert.equal(meta('property', 'og:image:alt'), "Arda's AI Construct: an AI assistant that answers questions about Arda.");
 });
 
 test('the canonical URL is the site root', () => {

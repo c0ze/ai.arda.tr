@@ -502,7 +502,7 @@ pub fn wire_history(history: List(ChatMessage)) -> List(shared.ChatMessage) {
   // turn (and we needn't spend tokens echoing our own canned greeting).
   |> list.drop_while(fn(m) { m.sender == Bot })
   // Error lines and empty replies are not the model's words; sent back, they
-  // would read as its own turns ("System Malfunction: HTTP 429").
+  // would read as its own turns ("Error: HTTP 429").
   |> list.filter(fn(m) { !m.is_error && string.trim(m.text) != "" })
   |> list.map(fn(m) {
     shared.ChatMessage(role: role_of(m.sender), content: m.text)
@@ -901,12 +901,12 @@ fn input_footer(model: Model, s: Strings) -> Element(Msg) {
         [
           attribute.type_("button"),
           attribute.id("send-btn"),
-          // Contains the visible "enter" (WCAG 2.5.3).
+          // Contains the visible label (WCAG 2.5.3).
           attribute.attribute("aria-label", s.send_label),
           attribute.disabled(model.stream_state != Idle),
           event.on_click(UserClickedSend),
         ],
-        [html.text("enter ↵")],
+        [html.text(s.send)],
       ),
     ]),
     html.p([attribute.class("input-hint")], [

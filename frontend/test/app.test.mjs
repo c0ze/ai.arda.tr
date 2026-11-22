@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { init, update, UserTypedInput, UserClickedSend, UserPickedLanguage, StreamEventReceived } from '../build/dev/javascript/frontend/frontend.mjs';
-import { Jp } from '../build/dev/javascript/frontend/frontend/i18n.mjs';
+import { Jp, Tr } from '../build/dev/javascript/frontend/frontend/i18n.mjs';
 
 // The app's update function, driven without a DOM. Effects are returned, not
 // run, so no request is ever made.
@@ -120,7 +120,7 @@ test('offline and timeout errors read in the UI language', () => {
   assert.match(model.history.toArray().at(-1).text, /ネットワーク/);
   model = ask(model, 'もう一度');
   model = step(model, new StreamEventReceived(model.generation, '{"type":"error","message":"Response timed out. Please try again."}'));
-  assert.match(model.history.toArray().at(-1).text, /時間内/);
+  assert.match(model.history.toArray().at(-1).text, /タイムアウト/);
 });
 
 // ---------------------------------------------------------------------------
@@ -132,14 +132,21 @@ const tagWith = (html, needle) => html.match(new RegExp('<[a-z]+[^>]*' + needle 
 const attr = (tag, name) => tag.match(new RegExp(name + '="([^"]*)"'))?.[1];
 
 test('the send and voice buttons are named by what they show', () => {
+  // Speech control users say what they see: in every language the send
+  // button's accessible name must contain its visible label.
+  for (const lang of [null, new Jp(), new Tr()]) {
+    const html = to_string(view(lang ? step(start(), new UserPickedLanguage(lang)) : start()));
+    const send = html.match(/<button[^>]*id="send-btn"[^>]*>([^<]*)<\/button>/);
+    assert.ok(send[1].length > 0, 'the send button shows a label');
+    assert.ok(attr(send[0], 'aria-label').toLowerCase().includes(send[1].toLowerCase()),
+      `"${attr(send[0], 'aria-label')}" contains "${send[1]}"`);
+  }
   const html = to_string(view(start()));
-  const send = tagWith(html, 'id="send-btn"');
-  assert.match(attr(send, 'aria-label'), /^enter\b/);
   // The voice toggle is named by its content: a hidden label plus the visible word.
   const voice = html.match(/<button[^>]*class="voice-toggle"[^>]*>(.*?)<\/button>/);
   assert.equal(attr(voice[0], 'aria-label'), undefined);
   assert.match(voice[1], /Read replies aloud/);
-  assert.match(voice[1], /<span class="voice-word"> on<\/span>/);
+  assert.match(voice[1], /<span class="voice-word"> On<\/span>/);
 });
 
 test('labels follow the UI language', () => {
@@ -147,7 +154,7 @@ test('labels follow the UI language', () => {
   assert.equal(attr(tagWith(html, 'class="language-toggle"'), 'aria-label'), '言語');
   assert.match(attr(tagWith(html, 'class="lang-btn active"'), 'aria-label'), /^JP/);
   assert.match(attr(tagWith(html, 'class="lang-btn active"'), 'aria-label'), /日本語/);
-  assert.match(attr(tagWith(html, 'class="theme-toggle"'), 'aria-label'), /^表示モード/);
+  assert.match(attr(tagWith(html, 'class="theme-toggle"'), 'aria-label'), /^テーマ/);
   assert.match(attr(tagWith(html, 'id="send-btn"'), 'aria-label'), /送信/);
 });
 
@@ -168,14 +175,12 @@ test('the input allows as much as the server accepts', () => {
 // and never to coze.org (the owner keeps that domain apart from this family).
 // ---------------------------------------------------------------------------
 
-import { Tr } from '../build/dev/javascript/frontend/frontend/i18n.mjs';
-
 const familyHosts = ['arda.tr', 'blog.arda.tr', 'resume.arda.tr', 'lind.arda.tr'];
 const decode = (s) => s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 
 for (const [name, lang, label] of [
-  ['EN', null, "Arda's other sites"],
-  ['JP', new Jp(), 'Ardaのほかのサイト'],
+  ['EN', null, 'Other sites by Arda'],
+  ['JP', new Jp(), 'Ardaの他のサイト'],
   ['TR', new Tr(), "Arda'nın diğer siteleri"],
 ]) {
   test(`the footer links the four family sites under a ${name} label`, () => {
