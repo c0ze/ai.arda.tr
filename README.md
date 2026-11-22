@@ -6,6 +6,7 @@ A chatbot that answers questions about Arda's career and personal interests (inc
 
 - **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist), hosted on **Google Cloud Run** (Tokyo).
 - **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript, sources in [frontend/](frontend/). The build emits a minified bundle into [public/](public/) (alongside the hand-written [public/style.css](public/style.css)), which is served by the Gleam backend locally and by **GitHub Pages** in production.
+- **Design**: the arda.tr family brand, The Index: see [DESIGN.md](DESIGN.md). The theme, the shared patterns, the scheme switch and the logo under [public/brand/](public/brand/) are verbatim copies from the arda.tr repository; site styles on their tokens are in [public/style.css](public/style.css).
 - **AI Model**: Google Gemini (`gemini-3.5-flash` by default, configurable via `GEMINI_MODEL`).
 
 ## Prerequisites
@@ -42,7 +43,7 @@ A chatbot that answers questions about Arda's career and personal interests (inc
    gleam run                # builds the Lustre bundle into ./public, then boots HTTP server on $PORT (default 8080)
    gleam run -- fetch       # just refresh resume JSON under ./data and exit
    gleam test               # backend tests: request guards, handlers and the SSE actor (never reaching Gemini), prompt, email, speech, voice
-   (cd frontend && gleam build && node --test test/*.test.mjs)   # frontend: transport, markdown sanitiser, app updates, page meta
+   (cd frontend && gleam build && node --test test/*.test.mjs)   # frontend: transport, markdown sanitiser, app updates and view, the generated page
    ```
    `gleam run` detects [frontend/gleam.toml](frontend/gleam.toml) and runs `lustre/dev build --minify --outdir=../public` as a prerequisite. In the production Docker image the `frontend/` tree is not copied into the runtime stage, so this check is a no-op there and the bundle is produced by an earlier Docker stage instead. For HMR-style dev you can still run `gleam run -m lustre/dev start` from inside [frontend/](frontend/) — it proxies `/api` to `http://localhost:8080` (see `[tools.lustre.dev]` in [frontend/gleam.toml](frontend/gleam.toml)).
 
