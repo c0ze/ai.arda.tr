@@ -24,10 +24,36 @@
   Class prefix: ix-.
 */
 
+/* The spacing scale is Astryx's (astryx.css). The blog and ai do not load
+   that stylesheet, so the steps the patterns use are stated here too, in the
+   same layer and with the same values. */
+@layer astryx-base {
+  :root {
+    --spacing-1: 0.25rem;
+    --spacing-2: 0.5rem;
+    --spacing-3: 0.75rem;
+    --spacing-4: 1rem;
+    --spacing-5: 1.25rem;
+    --spacing-6: 1.5rem;
+    --spacing-8: 2rem;
+    --spacing-10: 2.5rem;
+  }
+}
+
+/* The plate code sits on. Registered as a colour so it is resolved where it
+   is set (the prose, in the page's scheme) and not on the <pre>, which is
+   always dark: an unregistered light-dark() would only ever see dark there. */
+@property --ix-code-plate {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0d0c0a;
+}
+
 @layer brand {
   :root {
     --ix-max: 75rem; /* 1200px content */
-    --ix-margin: clamp(1.25rem, 8.33vw, 7.5rem); /* 20px on phones, 120px at 1440 */
+    --ix-margin: clamp(1.25rem, 9.52vw - 1.07rem, 7.5rem); /* 20px at 390, 120px at 1440 */
+    --ix-num-col: 3.5rem; /* the numeral column; a long list widens it */
     --ix-gutter: 1.5rem;
     --ix-measure: 45rem; /* 720px reading column */
     --ix-control: 3rem; /* 48px controls */
@@ -55,10 +81,16 @@
   }
 
   /* Japanese falls through to Zen Antique. Mark Japanese text with lang="ja";
-     a site with Japanese loads the face. Never blackletter. */
+     a site with Japanese loads the face. Grenze Gotisch has no kana or kanji,
+     so Japanese in a heading is never blackletter, while a Latin name on a
+     Japanese page still is. */
   :lang(ja) {
     --font-family-body: Spectral, "Zen Antique", Georgia, serif;
-    --font-family-heading: Spectral, "Zen Antique", Georgia, serif;
+    --font-family-heading: "Grenze Gotisch", "Zen Antique", Spectral, Georgia, serif;
+  }
+  /* The face and the looser line start where the Japanese starts (the page,
+     or an element marked lang="ja"); headings and code keep their own. */
+  :lang(ja):where(html, body, [lang]):not(h1, h2, h3, h4, h5, h6, code, pre) {
     font-family: var(--font-family-body);
     line-height: 1.8;
   }
@@ -80,9 +112,26 @@
     text-wrap: pretty;
   }
 
-  :where(h1, h2, h3, h4) {
+  :where(h1, h2, h3, h4, h5, h6) {
     margin: 0;
     text-wrap: balance;
+    font-size-adjust: none;
+  }
+  /* The theme's phone sizes apply on touch screens only; a narrow window on
+     a desktop needs them too. H1 64 down to 44, H2 40 down to 32. */
+  :where(h1) {
+    font-size: clamp(2.75rem, 1.9rem + 3.5vw, var(--text-heading-1-size));
+  }
+  :where(h2) {
+    font-size: clamp(2rem, 1.65rem + 1.4vw, var(--text-heading-2-size));
+  }
+  /* Blackletter stops at H2. */
+  :where(h3, h4, h5, h6) {
+    font-family: var(--font-family-body);
+    font-weight: 600;
+  }
+  /* body's font-size-adjust is Spectral's; it would shrink the mono face. */
+  :where(code, kbd, samp, pre) {
     font-size-adjust: none;
   }
   :where(p) {
@@ -189,6 +238,7 @@
   /* Dates and codes. */
   .ix-mono {
     font-family: var(--ix-mono);
+    font-size-adjust: none;
     font-size: var(--text-code-size);
     line-height: var(--text-code-leading);
     font-variant-numeric: tabular-nums;
@@ -322,7 +372,7 @@
   .ix-row {
     position: relative;
     display: grid;
-    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+    grid-template-columns: var(--ix-num-col) minmax(0, 1fr) auto;
     column-gap: var(--spacing-4);
     align-items: baseline;
     box-sizing: border-box;
@@ -371,7 +421,7 @@
   }
   @media (max-width: 45rem) {
     .ix-row {
-      grid-template-columns: 2.75rem minmax(0, 1fr);
+      grid-template-columns: min(var(--ix-num-col), 2.75rem) minmax(0, 1fr);
     }
     .ix-row__meta {
       grid-column: 2;
@@ -762,6 +812,14 @@
     font-size: var(--text-large-size);
     line-height: var(--text-large-leading);
   }
+  .ix-prose {
+    --ix-code-plate: light-dark(var(--ix-soot), var(--ix-surface));
+  }
+  /* The theme sizes every <p>; in prose it takes the prose's size. */
+  .ix-prose :where(p, li, dd, dt) {
+    font-size: inherit;
+    line-height: inherit;
+  }
   .ix-prose > * + * {
     margin-block-start: 1.2em;
   }
@@ -790,7 +848,7 @@
   }
   .ix-prose :where(code, kbd, samp) {
     font-family: var(--ix-mono);
-    font-size: 0.86em;
+    font-size: max(0.86em, var(--text-code-size));
   }
   .ix-prose :where(:not(pre) > code) {
     background: var(--ix-surface);
@@ -800,7 +858,7 @@
   /* Code is always set on soot, in both schemes. */
   .ix-prose :where(pre) {
     color-scheme: dark;
-    background: light-dark(var(--ix-soot), var(--ix-surface));
+    background: var(--ix-code-plate);
     color: var(--ix-bone);
     padding: var(--spacing-5);
     border-radius: 2px;

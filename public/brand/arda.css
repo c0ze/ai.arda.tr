@@ -801,6 +801,8 @@
     --text-supporting-size: calc(1.125rem * var(--_dynamic-type-footnote, 1));
     --text-label-size: calc(1.125rem * var(--_dynamic-type-body, 1));
     --text-label-weight: 600;
+    --text-code-size: calc(1.125rem * var(--_dynamic-type-body, 1));
+    --text-code-leading: 1.6;
   }
   }
 }
