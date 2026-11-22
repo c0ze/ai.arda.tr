@@ -6,7 +6,7 @@ A chatbot that answers questions about Arda's career and personal interests (inc
 
 - **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist), hosted on **Google Cloud Run** (Tokyo).
 - **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript, sources in [frontend/](frontend/). The build emits a minified bundle into [public/](public/) (alongside the hand-written [public/style.css](public/style.css)), which is served by the Gleam backend locally and by **GitHub Pages** in production.
-- **Design**: the arda.tr family brand, The Index: see [DESIGN.md](DESIGN.md). The theme, the shared patterns, the scheme switch and the logo under [public/brand/](public/brand/) are verbatim copies from the arda.tr repository; site styles on their tokens are in [public/style.css](public/style.css).
+- **Design**: the arda.tr family brand, Kara Duman: see [DESIGN.md](DESIGN.md). The theme, the shared patterns, the scheme switch, the artwork and the logo under [public/brand/](public/brand/) are verbatim copies from the arda.tr repository; site styles on their tokens are in [public/style.css](public/style.css).
 - **AI Model**: Google Gemini (`gemini-3.5-flash` by default, configurable via `GEMINI_MODEL`).
 
 ## Prerequisites
