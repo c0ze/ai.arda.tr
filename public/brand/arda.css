@@ -170,8 +170,8 @@
     --_astryx-pre-tempo-duration-slow: 700ms;
     --_astryx-pre-tempo-duration-slow-max: 935ms;
     --_astryx-motion-tempo: 1;
-    --font-family-body: 'IBM Plex Sans', 'Noto Sans JP', system-ui, sans-serif;
-    --font-family-heading: Archivo, 'IBM Plex Sans', 'Noto Sans JP', system-ui, sans-serif;
+    --font-family-body: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-family-heading: Archivo, 'IBM Plex Sans', system-ui, sans-serif;
     --font-family-code: 'IBM Plex Mono', ui-monospace, monospace;
     --color-syntax-keyword: light-dark(#6b187c, #efa8ff);
     --color-syntax-string: light-dark(#0b5615, #a4d6a3);
@@ -329,14 +329,14 @@
   }
 
   .astryx-heading[data-level="3"] {
-    font-family: 'IBM Plex Sans', 'Noto Sans JP', sans-serif;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
     font-size: var(--text-heading-3-size);
     font-weight: var(--text-heading-3-weight);
     line-height: var(--text-heading-3-leading);
   }
 
   .astryx-heading[data-level="4"] {
-    font-family: 'IBM Plex Sans', 'Noto Sans JP', sans-serif;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
     font-size: var(--text-heading-4-size);
     font-weight: var(--text-heading-4-weight);
     line-height: var(--text-heading-4-leading);

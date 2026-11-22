@@ -42,6 +42,16 @@
     text-size-adjust: 100%;
   }
 
+  /* Japanese falls through to Noto Sans JP and takes the guide's 16/29 body.
+     Mark Japanese text with lang="ja"; a site with Japanese loads the face. */
+  :lang(ja) {
+    --font-family-body: "IBM Plex Sans", "Noto Sans JP", system-ui, sans-serif;
+    --font-family-heading: Archivo, "IBM Plex Sans", "Noto Sans JP", system-ui, sans-serif;
+    --text-body-size: 1rem;
+    --text-body-leading: 1.8125;
+    font-family: var(--font-family-body);
+  }
+
   /* Hairlines and secondary text gain contrast when the visitor asks for it. */
   @media (prefers-contrast: more) {
     :root {
