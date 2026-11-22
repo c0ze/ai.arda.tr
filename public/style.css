@@ -78,9 +78,18 @@ body {
 
 /* -- The bar ------------------------------------------------------------- */
 
+/* The wordmark is 20px high: its link reaches a little above and below it,
+   without moving it off the baseline it shares with "/ ask". */
 .ix-bar__brand a {
+  position: relative;
   display: block;
   color: inherit;
+}
+
+.ix-bar__brand a::after {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--spacing-2)) 0;
 }
 
 .bar-sites,
@@ -162,7 +171,8 @@ button.ix-navlink[aria-pressed="true"] {
 }
 
 /* The page's one heading is modest: on this site the only display type is
-   the wordmark. */
+   the wordmark. Heading 3 of the guide: the body face at 600 (the theme's
+   weight token turns 800 on touch screens, a weight this face is not loaded in). */
 .intro {
   padding-block: var(--spacing-8) var(--spacing-6);
 }
@@ -171,7 +181,7 @@ button.ix-navlink[aria-pressed="true"] {
   font-family: var(--font-family-body);
   font-size: var(--text-heading-3-size);
   line-height: var(--text-heading-3-leading);
-  font-weight: var(--text-heading-3-weight);
+  font-weight: 600;
   letter-spacing: 0;
 }
 
@@ -216,7 +226,7 @@ button.ix-navlink[aria-pressed="true"] {
   font-family: var(--font-family-body);
   font-size: var(--text-heading-4-size);
   line-height: var(--text-heading-4-leading);
-  font-weight: var(--text-heading-4-weight);
+  font-weight: 600;
   letter-spacing: 0;
 }
 
@@ -272,16 +282,17 @@ button.ix-navlink[aria-pressed="true"] {
   gap: var(--spacing-2) var(--spacing-4);
 }
 
-@media (pointer: coarse) {
-  .ix-chip {
-    min-height: 2.75rem;
-  }
-}
-
 /* -- The footer ---------------------------------------------------------- */
 
 .ix-foot {
-  padding-block: var(--spacing-3) max(var(--spacing-4), env(safe-area-inset-bottom, 0px));
+  padding-block: var(--spacing-2) max(var(--spacing-3), env(safe-area-inset-bottom, 0px));
+}
+
+/* The family's links are a row of targets, not words in a sentence: each is
+   at least 24px high. */
+.family a {
+  display: inline-block;
+  padding-block: var(--spacing-1);
 }
 
 
@@ -292,6 +303,10 @@ button.ix-navlink[aria-pressed="true"] {
 @media (max-width: 40em) {
   .bar-sites {
     display: none;
+  }
+
+  button.ix-navlink {
+    padding-inline: 0;
   }
 
   .intro {
