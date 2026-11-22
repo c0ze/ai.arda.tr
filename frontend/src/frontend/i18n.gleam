@@ -19,6 +19,8 @@ pub type Strings {
     voice_on: String,
     voice_off: String,
     voice_label: String,
+    // The toggle in the bar shows `voice_short`: on or off.
+    voice_short: String,
     send: String,
     send_label: String,
     language_label: String,
@@ -35,6 +37,7 @@ pub type Strings {
     conversation_label: String,
     welcome_msg: String,
     input_placeholder: String,
+    try_asking: String,
     disclaimer: String,
     family_label: String,
     error_rate_limited: String,
@@ -61,7 +64,7 @@ pub fn strings(language: Language) -> Strings {
   case language {
     En ->
       Strings(
-        construct_title: "Ask Construct",
+        construct_title: "Ask about Arda",
         construct_subline: "Answers questions about Arda's work, projects, and music, and forwards messages to him.",
         status_ready: "Ready",
         status_thinking: "Thinking…",
@@ -70,6 +73,7 @@ pub fn strings(language: Language) -> Strings {
         voice_on: "On",
         voice_off: "Off",
         voice_label: "Read replies aloud",
+        voice_short: "Voice",
         send: "Send",
         send_label: "Send message",
         language_label: "Language",
@@ -83,7 +87,8 @@ pub fn strings(language: Language) -> Strings {
         scheme_dark: "Dark",
         conversation_label: "Conversation",
         welcome_msg: "Ask about Arda's work, projects, education, or music. If you have a role for him, send the details here and I will pass them on.",
-        input_placeholder: "Ask about Arda",
+        input_placeholder: "Ask a question",
+        try_asking: "Try asking",
         disclaimer: "Answers can be wrong. Verify important details with Arda.",
         family_label: "Other sites by Arda",
         error_rate_limited: "Too many questions in a short time. Wait a minute and try again.",
@@ -105,7 +110,7 @@ pub fn strings(language: Language) -> Strings {
       )
     Jp ->
       Strings(
-        construct_title: "Constructに質問する",
+        construct_title: "Ardaについて質問する",
         construct_subline: "Ardaの仕事、プロジェクト、音楽についての質問に答え、本人への連絡も取り次ぎます。",
         status_ready: "待機中",
         status_thinking: "考え中…",
@@ -114,6 +119,7 @@ pub fn strings(language: Language) -> Strings {
         voice_on: "オン",
         voice_off: "オフ",
         voice_label: "返答を読み上げる",
+        voice_short: "音声",
         send: "送信",
         send_label: "メッセージを送信",
         language_label: "言語",
@@ -127,7 +133,8 @@ pub fn strings(language: Language) -> Strings {
         scheme_dark: "ダーク",
         conversation_label: "会話",
         welcome_msg: "Ardaの仕事、プロジェクト、学歴、音楽についてお答えします。仕事の相談があれば、詳細を送ってください。本人に伝えます。",
-        input_placeholder: "Ardaについて質問する",
+        input_placeholder: "質問を入力",
+        try_asking: "質問の例",
         disclaimer: "回答は誤る場合があります。重要な点はArda本人に確認してください。",
         family_label: "Ardaの他のサイト",
         error_rate_limited: "短時間に質問が集中しました。1分ほど待ってからもう一度お試しください。",
@@ -149,7 +156,7 @@ pub fn strings(language: Language) -> Strings {
       )
     Tr ->
       Strings(
-        construct_title: "Construct'a sor",
+        construct_title: "Arda hakkında sorun",
         construct_subline: "Arda'nın işi, projeleri ve müziği hakkındaki soruları yanıtlar, mesajlarınızı ona iletir.",
         status_ready: "Hazır",
         status_thinking: "Düşünüyor…",
@@ -158,6 +165,7 @@ pub fn strings(language: Language) -> Strings {
         voice_on: "Açık",
         voice_off: "Kapalı",
         voice_label: "Yanıtları sesli oku",
+        voice_short: "Ses",
         send: "Gönder",
         send_label: "Mesajı gönder",
         language_label: "Dil",
@@ -171,7 +179,8 @@ pub fn strings(language: Language) -> Strings {
         scheme_dark: "Koyu",
         conversation_label: "Sohbet",
         welcome_msg: "Arda'nın işi, projeleri, eğitimi veya müziği hakkında sorabilirsiniz. İş teklifiniz varsa ayrıntıları yazın, kendisine iletirim.",
-        input_placeholder: "Arda hakkında sorun",
+        input_placeholder: "Bir soru sorun",
+        try_asking: "Örnek sorular",
         disclaimer: "Yanıtlar hatalı olabilir. Önemli bilgileri Arda ile doğrulayın.",
         family_label: "Arda'nın diğer siteleri",
         error_rate_limited: "Kısa sürede çok fazla soru gönderildi. Bir dakika bekleyip tekrar deneyin.",

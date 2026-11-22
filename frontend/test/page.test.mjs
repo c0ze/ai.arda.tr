@@ -194,11 +194,13 @@ test('the theme, the family patterns and the site styles load in that order', ()
 test('the fonts are the family\'s four faces, swapped in, from a preconnected host', () => {
   const fonts = new URL(sheetHrefs[0]);
   assert.equal(fonts.origin + fonts.pathname, 'https://fonts.googleapis.com/css2');
+  // Exactly the weights the brand sets type in: a face or weight that is not
+  // loaded is faked by the browser, and one that is not used is dead weight.
   assert.deepEqual(fonts.searchParams.getAll('family'), [
-    'Archivo:wght@700;800',
-    'IBM Plex Mono:wght@400;500',
-    'IBM Plex Sans:ital,wght@0,400;0,500;0,600;1,400',
-    'Noto Sans JP:wght@400;500;700', // the UI has Japanese
+    'Grenze Gotisch:wght@700;800;900', // blackletter: the page's heading (the wordmark is outlines)
+    'JetBrains Mono:wght@400;700', // code in replies
+    'Spectral:ital,wght@0,400;0,600;1,400', // everything else
+    'Zen Antique', // the UI has Japanese; one weight, 400
   ]);
   assert.equal(fonts.searchParams.get('display'), 'swap');
   const preconnect = [...html.matchAll(/<link [^>]*>/g)].map((m) => attrs(m[0]).href === undefined ? null : m[0])
@@ -206,6 +208,20 @@ test('the fonts are the family\'s four faces, swapped in, from a preconnected ho
   assert.deepEqual(preconnect.map((tag) => attrs(tag).href), ['https://fonts.googleapis.com', 'https://fonts.gstatic.com']);
   // Font files are fetched without credentials.
   assert.match(preconnect[1], /\bcrossorigin\b/);
+});
+
+test('the browser\'s own chrome is soot, the ground of the default scheme', () => {
+  assert.equal(meta('name', 'theme-color'), '#0D0C0A');
+});
+
+test('the assistant has its picture: style.css points brand.css at the vendored ember', () => {
+  // brand.css draws `.ix-mark` from --ix-ember-art; without it the assistant
+  // is an empty soot disc.
+  const css = readFileSync(new URL('style.css', publicDir), 'utf8');
+  const art = css.match(/:root\s*\{[^}]*--ix-ember-art:\s*url\("(\/[^"]*)"\)/);
+  assert.ok(art, '--ix-ember-art is set on :root, as a root-relative url');
+  assert.equal(art[1], '/brand/art/ember.webp');
+  assert.ok(existsSync(new URL('.' + art[1], publicDir)));
 });
 
 test('style.css is written on the theme\'s tokens: no colour and no font size of its own', () => {
@@ -224,11 +240,11 @@ test('the built public/index.html is the page checked above', { skip: !existsSyn
 });
 
 // ---------------------------------------------------------------------------
-// The family brand ("The Index"). arda.css (the theme's tokens), brand.css
-// (the shared patterns), scheme.js (the light/dark pin) and the logo files are
-// verbatim copies from the arda.tr repository's brand/ folder: a copy edited
-// here would drift from the other three sites. Checked against the sibling
-// checkout where there is one (CI has none).
+// The family brand ("Kara Duman"). arda.css (the theme's tokens), brand.css
+// (the shared patterns), scheme.js (the light/dark pin), the artwork and the
+// logo files are verbatim copies from the arda.tr repository's brand/ folder:
+// a copy edited here would drift from the other three sites. Checked against
+// the sibling checkout where there is one (CI has none).
 // ---------------------------------------------------------------------------
 
 const brandSource = new URL('../../../arda.tr/brand/', import.meta.url);
@@ -236,6 +252,9 @@ const BRAND_COPIES = [
   ['brand/arda.css', 'arda.css'],
   ['brand/brand.css', 'brand.css'],
   ['brand/scheme.js', 'scheme.js'],
+  ['brand/art/emblem.webp', 'art/emblem.webp'],
+  ['brand/art/ember.webp', 'art/ember.webp'],
+  ['brand/art/wisp.webp', 'art/wisp.webp'],
   ['brand/logo/wordmark.svg', 'logo/wordmark.svg'],
   ['favicon.svg', 'logo/favicon.svg'],
 ];

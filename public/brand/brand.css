@@ -1,12 +1,13 @@
 /*
-  arda.tr family: The Index
+  arda.tr family: Kara Duman
   ------------------------------------------------------------------------
-  "Everything he makes gets the same line in the same list." The shared
-  patterns of arda.tr, blog.arda.tr, resume.arda.tr and ai.arda.tr: the bar,
-  the numbered row, the section rule, the plate, the label, the dot.
+  "His surname means black smoke." Soot and bone, blackletter for names,
+  Spectral for everything else, one engraved plume of smoke, an ember.
+  The shared patterns of arda.tr, blog.arda.tr, resume.arda.tr and ai.arda.tr.
 
   Built on the Astryx `arda` theme (arda.css, built from themes/arda/). Every
-  colour, size and font here is one of its tokens.
+  colour, size and font here is one of its tokens, or one of the few brand
+  values the theme has no token for (declared once below).
 
   Source of truth: brand/ in the arda.tr repository. The sibling sites carry
   verbatim copies of arda.css, brand.css and scheme.js, and their CI checks the
@@ -15,24 +16,35 @@
 
   A page needs:
     <html data-astryx-theme="arda">        the theme scope
-    data-theme="light" | "dark" on <html>  only when the scheme is pinned
+    data-theme="light" | "dark" on <html>  the scheme (see scheme.js)
     arda.css loaded before this file, and the layer order
       @layer reset, astryx-base, astryx-theme, brand;
     declared before either.
+
+  Class prefix: ix-.
 */
 
 @layer brand {
   :root {
-    --ix-max: 75rem; /* 1200px: 12 columns, 24px gutters */
+    --ix-max: 75rem; /* 1200px content */
+    --ix-margin: clamp(1.25rem, 8.33vw, 7.5rem); /* 20px on phones, 120px at 1440 */
     --ix-gutter: 1.5rem;
-    --ix-measure: 68ch;
-    --ix-row: 3rem; /* 48px */
-    --ix-section-gap: 6rem; /* 96px; the résumé and ai tighten it */
-    --ix-rule: 1px solid var(--color-border);
-    --ix-rule-section: 2px solid var(--color-text-primary);
-    --ix-sunken: var(--color-background-muted);
+    --ix-measure: 45rem; /* 720px reading column */
+    --ix-control: 3rem; /* 48px controls */
+    --ix-section-gap: 6rem;
+    --ix-rule: 1px solid var(--color-border-emphasized); /* opens a section */
+    --ix-hairline: 1px solid var(--color-border); /* between rows */
+    --ix-surface: var(--color-background-surface);
     --ix-link: var(--color-text-accent);
     --ix-mono: var(--font-family-code);
+    /* Brand values the theme has no token for. Soot and bone do not swap:
+       artwork is bone lines, and it always sits on soot. */
+    --ix-soot: #0d0c0a;
+    --ix-bone: #e8e0ce;
+    --ix-ember: #e2502a;
+    --ix-moss: #56664a;
+    --ix-error: light-dark(#9b1c1c, #ffa39a);
+    --ix-success: light-dark(#44523a, #9db08b);
 
     background: var(--color-background-body);
     color: var(--color-text-primary);
@@ -42,17 +54,15 @@
     text-size-adjust: 100%;
   }
 
-  /* Japanese falls through to Noto Sans JP and takes the guide's 16/29 body.
-     Mark Japanese text with lang="ja"; a site with Japanese loads the face. */
+  /* Japanese falls through to Zen Antique. Mark Japanese text with lang="ja";
+     a site with Japanese loads the face. Never blackletter. */
   :lang(ja) {
-    --font-family-body: "IBM Plex Sans", "Noto Sans JP", system-ui, sans-serif;
-    --font-family-heading: Archivo, "IBM Plex Sans", "Noto Sans JP", system-ui, sans-serif;
-    --text-body-size: 1rem;
-    --text-body-leading: 1.8125;
+    --font-family-body: Spectral, "Zen Antique", Georgia, serif;
+    --font-family-heading: Spectral, "Zen Antique", Georgia, serif;
     font-family: var(--font-family-body);
+    line-height: 1.8;
   }
 
-  /* Hairlines and secondary text gain contrast when the visitor asks for it. */
   @media (prefers-contrast: more) {
     :root {
       --color-border: var(--color-border-emphasized);
@@ -65,7 +75,7 @@
     font-family: var(--font-family-body);
     font-size: var(--text-body-size);
     line-height: var(--text-body-leading);
-    /* A fallback face keeps the x-height of IBM Plex Sans while it loads. */
+    /* A fallback face keeps Spectral's x-height while it loads. */
     font-size-adjust: from-font;
     text-wrap: pretty;
   }
@@ -73,37 +83,32 @@
   :where(h1, h2, h3, h4) {
     margin: 0;
     text-wrap: balance;
-  }
-  :where(h1) {
-    letter-spacing: -0.03em;
-  }
-  :where(h2) {
-    letter-spacing: -0.02em;
-  }
-  :where(h3, h4) {
-    font-family: var(--font-family-body);
-    letter-spacing: 0;
+    font-size-adjust: none;
   }
   :where(p) {
     margin: 0;
   }
 
   /* Bare links only: a component's link (an Astryx Button with an href, say)
-     keeps its own colour. */
+     keeps its own colour. Ember, underlined; the underline stays on hover. */
   :where(a:not([class])) {
     color: var(--ix-link);
+    text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 0.18em;
   }
+  :where(a:not([class])):hover {
+    color: var(--color-text-primary);
+  }
 
   :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
-    outline: var(--focus-outline-width) solid var(--focus-outline-color);
-    outline-offset: var(--focus-outline-offset);
+    outline: 2px solid var(--focus-outline-color);
+    outline-offset: 3px;
   }
 
   ::selection {
-    background: var(--color-accent);
-    color: var(--color-on-accent);
+    background: var(--ix-ember);
+    color: var(--ix-soot);
   }
 
   /* -- Layout ---------------------------------------------------------- */
@@ -111,9 +116,13 @@
   .ix-wrap {
     box-sizing: border-box;
     width: 100%;
-    max-width: calc(var(--ix-max) + 2 * var(--ix-gutter));
+    max-width: calc(var(--ix-max) + 2 * var(--ix-margin));
     margin-inline: auto;
-    padding-inline: var(--ix-gutter);
+    padding-inline: var(--ix-margin);
+  }
+  /* One reading column: the blog, the chat. */
+  .ix-wrap--read {
+    max-width: calc(var(--ix-measure) + 2 * var(--ix-margin));
   }
 
   .ix-stack > * + * {
@@ -132,165 +141,199 @@
     border: 0;
   }
 
-  /* -- Type ------------------------------------------------------------ */
+  /* -- Type ------------------------------------------------------------
+     Blackletter names things: one line, six words at most, never below
+     28px, never in capitals, never in controls. Spectral says the rest. */
 
-  /* Mono label: entry numbers, kind codes, dates, nav. */
-  .ix-label {
-    font-family: var(--ix-mono);
-    font-size: var(--text-label-size);
-    line-height: var(--text-label-leading);
-    font-weight: 500;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-text-secondary);
-  }
-
-  /* The entry number: the one place vermilion always appears. */
-  .ix-num {
-    font-family: var(--ix-mono);
-    font-size: var(--text-label-size);
-    line-height: var(--text-label-leading);
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-    color: var(--color-accent);
-  }
-
-  /* Display headline: 72/76, and up to 120px on the landing page. */
   .ix-display {
     font-family: var(--font-family-heading);
-    font-weight: 800;
-    font-size: clamp(2.75rem, 1.2rem + 6.2vw, var(--ix-display-max, 4.5rem));
-    line-height: 1.05;
-    letter-spacing: -0.03em;
+    font-weight: 900;
+    font-size: clamp(4rem, 1.2rem + 9.5vw, var(--ix-display-max, 8.25rem));
+    line-height: 1;
+    font-size-adjust: none;
     text-wrap: balance;
   }
 
-  /* The full stop that closes a headline, in vermilion. */
-  .ix-dot {
-    color: var(--color-accent);
+  /* A name in blackletter at heading size, where no heading element fits
+     (a category's name inside its summary). */
+  .ix-name {
+    font-family: var(--font-family-heading);
+    font-weight: 700;
+    font-size: clamp(1.75rem, 1.4rem + 1.1vw, 2.5rem);
+    line-height: 1.1;
+    font-size-adjust: none;
+  }
+
+  /* Label: section names, table labels. Spectral 600, capitals, tracked. */
+  .ix-label {
+    font-family: var(--font-family-body);
+    font-size: var(--text-label-size);
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+  .ix-label--ember {
+    color: var(--ix-link);
+  }
+
+  /* A roman numeral, in Spectral: blackletter "IV" reads as "IU". */
+  .ix-num {
+    font-family: var(--font-family-body);
+    font-weight: 600;
+    font-variant-numeric: lining-nums;
+    color: var(--ix-link);
+  }
+
+  /* Dates and codes. */
+  .ix-mono {
+    font-family: var(--ix-mono);
+    font-size: var(--text-code-size);
+    line-height: var(--text-code-leading);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
   }
 
   .ix-lede {
     font-size: var(--text-large-size);
     line-height: var(--text-large-leading);
-    max-width: var(--ix-measure);
+    max-width: 30em;
   }
 
   .ix-muted {
     color: var(--color-text-secondary);
   }
-
+  .ix-note {
+    font-style: italic;
+    color: var(--color-text-secondary);
+  }
   .ix-small {
     font-size: var(--text-supporting-size);
     line-height: var(--text-supporting-leading);
   }
 
+  /* -- The mark ---------------------------------------------------------
+     The emblem is bone lines on soot, round: a stamped seal on bone paper. */
+
+  .ix-emblem {
+    display: block;
+    flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--ix-soot);
+  }
+  .ix-wordmark {
+    display: block;
+    height: 1.375rem;
+    width: auto;
+    color: var(--color-text-primary);
+  }
+
   /* -- The bar --------------------------------------------------------- */
 
-  .ix-bar {
-    border-block-end: var(--ix-rule);
-  }
   .ix-bar__in {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-4);
-    min-height: 3.5rem;
+    gap: var(--spacing-3) var(--spacing-8);
+    min-height: 5rem;
     flex-wrap: wrap;
   }
   .ix-bar__brand {
     display: flex;
-    align-items: baseline;
-    gap: var(--spacing-2);
+    align-items: center;
+    gap: var(--spacing-3);
     color: var(--color-text-primary);
     text-decoration: none;
   }
-  .ix-wordmark {
-    display: block;
-    height: 1.25rem;
-    width: auto;
-    color: var(--color-text-primary);
+  /* The site's name after the wordmark on the sibling sites: blog, ask. */
+  .ix-bar__site {
+    color: var(--color-text-secondary);
+    text-decoration: none;
   }
   .ix-bar__nav {
     display: flex;
     align-items: center;
-    gap: var(--spacing-5);
+    gap: var(--spacing-2) var(--spacing-6);
     flex-wrap: wrap;
+  }
+  .ix-bar__nav--end {
+    margin-inline-start: auto;
   }
   .ix-bar__nav a,
   .ix-navlink {
-    font-family: var(--ix-mono);
-    font-size: var(--text-label-size);
-    line-height: var(--text-label-leading);
-    font-weight: 500;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ix-link);
+    font: inherit;
+    color: var(--color-text-primary);
     text-decoration: none;
+    /* 44px hit area without changing the line. */
+    padding-block: 0.5rem;
   }
   .ix-bar__nav a:hover,
   .ix-navlink:hover {
     text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
   }
-  @media (max-width: 45rem) {
-    .ix-bar__in {
-      padding-block: var(--spacing-2);
-    }
-    .ix-bar__nav {
-      gap: var(--spacing-1) var(--spacing-4);
-    }
+  .ix-bar__nav a[data-accent],
+  .ix-bar__nav a[aria-current="page"] {
+    color: var(--ix-link);
   }
   button.ix-navlink {
     background: none;
     border: 0;
-    padding: 0;
+    padding-inline: 0;
     cursor: pointer;
   }
-  .ix-bar__nav a[aria-current="page"] {
-    color: var(--color-text-primary);
-    text-decoration: underline;
+  @media (max-width: 45rem) {
+    .ix-bar__in {
+      min-height: 4rem;
+      padding-block: var(--spacing-2);
+    }
+    .ix-bar__nav {
+      gap: 0 var(--spacing-5);
+    }
   }
 
-  /* -- Sections -------------------------------------------------------- */
+  /* -- Sections ---------------------------------------------------------
+     A section opens with a 1px rule across its column and a label. */
 
   .ix-section {
     margin-block-start: var(--ix-section-gap);
+    padding-block-start: var(--spacing-6);
+    border-block-start: var(--ix-rule);
   }
   .ix-section__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--spacing-4);
-    flex-wrap: wrap;
-    padding-block-end: var(--spacing-4);
+    display: grid;
+    gap: var(--spacing-2);
+    padding-block-end: var(--spacing-6);
   }
 
-  /* -- The row ---------------------------------------------------------
-     One entry, one line: number, kind, title, meta. 12 columns: 1 / 1 / 7 / 3.
-     A 2px ink rule opens the list; a 1px rule closes each row.            */
+  /* -- The row ----------------------------------------------------------
+     Roman numeral, name, a note in italics, an optional meta at the end.
+     Hairlines between rows, no boxes. */
 
   .ix-list {
     list-style: none;
     margin: 0;
     padding: 0;
-    border-block-start: var(--ix-rule-section);
+    border-block-start: var(--ix-rule);
   }
   .ix-row {
     position: relative;
     display: grid;
-    grid-template-columns: 1fr 1fr 7fr 3fr;
-    column-gap: var(--ix-gutter);
+    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+    column-gap: var(--spacing-4);
     align-items: baseline;
-    min-height: var(--ix-row);
     box-sizing: border-box;
-    padding-block: 0.6875rem;
-    border-block-end: var(--ix-rule);
+    padding-block: var(--spacing-4);
+    border-block-end: var(--ix-hairline);
   }
   .ix-row__title {
     font-family: var(--font-family-body);
     font-size: var(--text-body-size);
-    line-height: var(--text-body-leading);
-    font-weight: 500;
+    line-height: 1.3;
+    font-weight: 600;
     color: var(--color-text-primary);
     margin: 0;
   }
@@ -305,22 +348,18 @@
     inset: 0;
   }
   .ix-row:has(.ix-row__title a:hover) {
-    background: var(--ix-sunken);
+    background: var(--ix-surface);
   }
   .ix-row:has(.ix-row__title a:hover) .ix-row__title a {
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 0.18em;
+    color: var(--ix-link);
   }
   .ix-row__desc {
-    grid-column: 3;
-    font-size: var(--text-supporting-size);
-    line-height: var(--text-supporting-leading);
+    grid-column: 2;
+    font-style: italic;
     color: var(--color-text-secondary);
-    max-width: var(--ix-measure);
   }
   .ix-row__meta {
-    grid-column: 4;
+    grid-column: 3;
     grid-row: 1;
     justify-self: end;
     text-align: end;
@@ -330,45 +369,164 @@
     position: relative;
     z-index: 1;
   }
-
   @media (max-width: 45rem) {
-    /* Below 720px a row stacks to two lines: codes above, title below. */
     .ix-row {
-      grid-template-columns: auto auto 1fr;
-      column-gap: var(--spacing-3);
-      row-gap: var(--spacing-1);
+      grid-template-columns: 2.75rem minmax(0, 1fr);
     }
     .ix-row__meta {
-      grid-column: 3;
-    }
-    .ix-row__title,
-    .ix-row__desc {
-      grid-column: 1 / -1;
+      grid-column: 2;
+      grid-row: auto;
+      justify-self: start;
+      text-align: start;
     }
   }
 
-  /* -- Key and value: the résumé's table, the landing's record ---------- */
+  /* -- The category: a block that opens ---------------------------------
+     A <details>. The whole summary row is the button; it works with no
+     script. The marker sits beside the name, where the eye already is.
+     No headings inside <summary>: screen readers drop them. */
+
+  .ix-cats {
+    border-block-start: var(--ix-rule);
+  }
+  .ix-cat {
+    border-block-end: var(--ix-hairline);
+  }
+  .ix-cat > summary {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 3.5rem auto minmax(0, 1fr);
+    column-gap: var(--spacing-4);
+    align-items: baseline;
+    padding-block: var(--spacing-3);
+    cursor: pointer;
+  }
+  .ix-cat > summary::-webkit-details-marker {
+    display: none;
+  }
+  .ix-cat > summary:hover {
+    background: var(--ix-surface);
+  }
+  .ix-cat > summary:hover .ix-name {
+    color: var(--ix-link);
+  }
+  .ix-cat__name {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--spacing-3);
+  }
+  /* Plus when closed, minus when open: one bar turns. */
+  .ix-cat__name::after {
+    content: "";
+    align-self: center;
+    flex: none;
+    inline-size: 0.875rem;
+    block-size: 0.875rem;
+    background:
+      linear-gradient(currentColor 0 0) center / 100% 1px no-repeat,
+      linear-gradient(currentColor 0 0) center / 1px 100% no-repeat;
+    color: var(--color-text-secondary);
+  }
+  .ix-cat[open] > summary .ix-cat__name::after {
+    background: linear-gradient(currentColor 0 0) center / 100% 1px no-repeat;
+  }
+  .ix-cat__preview {
+    font-style: italic;
+    color: var(--color-text-secondary);
+    min-width: 0;
+  }
+  .ix-cat__body {
+    padding: 0 0 var(--spacing-5) calc(3.5rem + var(--spacing-4));
+  }
+  .ix-cat::details-content {
+    interpolate-size: allow-keywords;
+    overflow: clip;
+    contain: layout;
+  }
+  .ix-cat:not([open])::details-content {
+    block-size: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ix-cat::details-content {
+      transition: block-size, content-visibility, display;
+      transition-duration: 0.3s;
+      transition-timing-function: ease-in-out;
+      transition-behavior: allow-discrete;
+    }
+  }
+  @media (max-width: 45rem) {
+    .ix-cat > summary {
+      grid-template-columns: 2.75rem minmax(0, 1fr);
+    }
+    .ix-cat__preview {
+      grid-column: 2;
+    }
+    .ix-cat__body {
+      padding-inline-start: calc(2.75rem + var(--spacing-4));
+    }
+  }
+
+  /* An entry inside an open category: its name, then what it is. */
+  .ix-entries {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--spacing-3);
+    font-size: var(--text-supporting-size);
+    line-height: var(--text-supporting-leading);
+  }
+  .ix-entry {
+    display: grid;
+    grid-template-columns: minmax(7rem, 10.5rem) minmax(0, 1fr);
+    column-gap: var(--spacing-5);
+    align-items: baseline;
+  }
+  .ix-entry__name {
+    font-weight: 600;
+    margin: 0;
+    font-size: inherit;
+    line-height: inherit;
+    font-family: var(--font-family-body);
+  }
+  .ix-entry__name a {
+    color: var(--color-text-primary);
+    text-decoration: none;
+  }
+  .ix-entry__name a:hover {
+    color: var(--ix-link);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+  }
+  .ix-entry__desc {
+    color: var(--color-text-secondary);
+  }
+  @media (max-width: 45rem) {
+    .ix-entry {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* -- Key and value: facts, the résumé's sections ----------------------- */
 
   .ix-kv {
     margin: 0;
-    border-block-start: var(--ix-rule-section);
+    border-block-start: var(--ix-hairline);
   }
   .ix-kv > div {
     display: grid;
-    grid-template-columns: 2fr 10fr;
+    grid-template-columns: minmax(10rem, 3fr) 9fr;
     column-gap: var(--ix-gutter);
     align-items: baseline;
-    min-height: var(--ix-row);
-    box-sizing: border-box;
-    padding-block: 0.6875rem;
-    border-block-end: var(--ix-rule);
+    padding-block: var(--spacing-3);
+    border-block-end: var(--ix-hairline);
   }
   .ix-kv dt {
-    font-family: var(--ix-mono);
     font-size: var(--text-label-size);
-    line-height: var(--text-label-leading);
-    font-weight: 500;
-    letter-spacing: 0.06em;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--color-text-secondary);
   }
@@ -382,109 +540,8 @@
     }
   }
 
-  /* -- The plate: a flat tile, the entry number, one artefact ----------- */
-
-  .ix-plates {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
-    gap: var(--ix-gutter);
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .ix-plate {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    background: var(--ix-sunken);
-    color: var(--color-text-primary);
-  }
-  .ix-plate--ink {
-    background: var(--color-background-inverted);
-    color: var(--color-background-body);
-  }
-  .ix-plate__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    padding: var(--spacing-3) var(--spacing-4) 0;
-  }
-  .ix-plate--ink .ix-label {
-    color: inherit;
-    opacity: 0.72;
-  }
-  .ix-plate__num {
-    font-family: var(--font-family-heading);
-    font-weight: 800;
-    font-size: 2.5rem;
-    line-height: 1;
-    letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
-  }
-  .ix-plate__art {
-    display: block;
-    width: 100%;
-    aspect-ratio: 16 / 10;
-    object-fit: contain; /* screenshots stay uncropped */
-    margin-block-start: var(--spacing-3);
-  }
-  .ix-plate__body {
-    padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
-  }
-  .ix-plate__title {
-    font-size: var(--text-heading-3-size);
-    line-height: var(--text-heading-3-leading);
-    font-weight: 600;
-    margin: 0;
-  }
-  .ix-plate__title a {
-    color: inherit;
-    text-decoration: none;
-  }
-  .ix-plate__title a::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-  }
-  .ix-plate:has(.ix-plate__title a:hover) .ix-plate__title a {
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 0.18em;
-  }
-
-  /* -- Controls for pages without Astryx components --------------------- */
-
-  .ix-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-2);
-  }
-  .ix-chip {
-    font-family: var(--ix-mono);
-    font-size: var(--text-label-size);
-    line-height: var(--text-label-leading);
-    font-weight: 500;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-text-primary);
-    background: transparent;
-    border: 1px solid var(--color-border-emphasized);
-    border-radius: 0;
-    padding: 0.3125rem 0.75rem;
-    min-height: 2rem;
-    cursor: pointer;
-    text-decoration: none;
-  }
-  .ix-chip:hover {
-    background: var(--ix-sunken);
-  }
-  .ix-chip[aria-pressed="true"],
-  .ix-chip[aria-current="true"],
-  .ix-chip[aria-current="page"] {
-    background: var(--color-background-inverted);
-    border-color: var(--color-background-inverted);
-    color: var(--color-background-body);
-  }
+  /* -- Controls for pages without Astryx components ----------------------
+     48px tall, 2px corners, Spectral. Never blackletter. */
 
   .ix-btn {
     display: inline-flex;
@@ -492,19 +549,20 @@
     justify-content: center;
     gap: var(--spacing-2);
     box-sizing: border-box;
-    min-height: 2.5rem;
-    padding: 0 var(--spacing-4);
+    min-height: var(--ix-control);
+    padding: 0 var(--spacing-6);
     font: inherit;
-    font-weight: 500;
+    font-size: var(--text-supporting-size);
+    font-weight: 600;
     color: var(--color-text-primary);
     background: transparent;
-    border: 1px solid var(--color-border-emphasized);
+    border: 1px solid var(--color-text-primary);
     border-radius: 2px;
     cursor: pointer;
     text-decoration: none;
   }
   .ix-btn:hover {
-    background: var(--ix-sunken);
+    background: var(--ix-surface);
   }
   .ix-btn--primary {
     color: var(--color-on-accent);
@@ -512,7 +570,7 @@
     border-color: var(--color-accent);
   }
   .ix-btn--primary:hover {
-    background: color-mix(in oklab, var(--color-accent) 88%, var(--color-text-primary));
+    background: color-mix(in oklab, var(--color-accent) 86%, var(--color-text-primary));
   }
   .ix-btn:disabled,
   .ix-btn[aria-disabled="true"] {
@@ -520,23 +578,69 @@
     cursor: not-allowed;
   }
 
+  .ix-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+  }
+  .ix-chip {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 2.75rem;
+    padding: 0 var(--spacing-4);
+    font: inherit;
+    font-size: var(--text-supporting-size);
+    color: var(--color-text-primary);
+    background: transparent;
+    border: 1px solid var(--color-border-emphasized);
+    border-radius: 2px;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: start;
+  }
+  .ix-chip:hover {
+    background: var(--ix-surface);
+  }
+  /* Pressed, current: filled. */
+  .ix-chip[aria-pressed="true"],
+  .ix-chip[aria-current="true"],
+  .ix-chip[aria-current="page"] {
+    background: var(--color-background-inverted);
+    border-color: var(--color-background-inverted);
+    color: var(--color-background-body);
+  }
+  /* A tag: bone on moss. */
+  .ix-chip--tag {
+    background: var(--ix-moss);
+    border-color: var(--ix-moss);
+    color: var(--ix-bone);
+  }
+
   .ix-input {
     box-sizing: border-box;
     width: 100%;
-    min-height: 2.75rem;
+    min-height: var(--ix-control);
     padding: var(--spacing-2) var(--spacing-3);
     font: inherit;
     color: var(--color-text-primary);
-    background: var(--color-background-surface);
+    background: var(--ix-surface);
     border: 1px solid var(--color-border-emphasized);
     border-radius: 2px;
   }
   .ix-input::placeholder {
     color: var(--color-text-secondary);
   }
+  .ix-input[aria-invalid="true"] {
+    border-color: var(--ix-error);
+  }
+  .ix-error {
+    color: var(--ix-error);
+  }
 
   /* The scheme switch shows the scheme it would switch to. Both labels are in
-     the markup; CSS shows one, so it is right before any script runs. */
+     the markup; CSS shows one, so it is right before any script runs. A page
+     that is dark unless pinned sets data-theme="dark" in its head script. */
   .ix-scheme [data-when] {
     display: none;
   }
@@ -554,92 +658,122 @@
     }
   }
 
-  /* -- The assistant: the square dot, nothing else ---------------------- */
+  /* -- The artwork -------------------------------------------------------
+     Bone lines with a transparent ground (brand/art/). On soot it sits on
+     the page; on bone paper it always sits on a soot plate. It never covers
+     text, the nav, controls or code. */
+
+  .ix-art {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    user-select: none;
+    pointer-events: none;
+  }
+  .ix-plate {
+    background: var(--ix-soot);
+    border-radius: 2px;
+  }
+  /* The plume drifts, slowly, and not at all for reduced motion. */
+  @keyframes ix-drift {
+    50% {
+      transform: translate3d(0, -0.75%, 0) scale(1.012);
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ix-art--drift {
+      animation: ix-drift 16s ease-in-out infinite;
+      transform-origin: 50% 100%;
+    }
+  }
+
+  /* -- The assistant: the ember ------------------------------------------
+     The smoke is Arda; what answers is an ember. It glows while a reply is
+     on its way and with the voice's loudness (--ix-level, 0 to 1). */
 
   .ix-mark {
     display: inline-block;
     flex: none;
-    width: 1.5rem;
-    height: 1.5rem;
-    background: var(--color-accent);
-    /* --ix-level (0 to 1) is the voice's loudness; the dot swells with it. */
-    transform: scale(calc(1 + 0.35 * var(--ix-level, 0)));
-    transition: transform 80ms linear;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: var(--ix-soot) var(--ix-ember-art, none) center / cover no-repeat;
+    filter: brightness(calc(1 + 0.6 * var(--ix-level, 0)));
+    transition: filter 80ms linear;
+  }
+  .ix-mark--lg {
+    width: 4rem;
+    height: 4rem;
   }
   .ix-mark--sm {
-    width: 0.75rem;
-    height: 0.75rem;
+    width: 1.25rem;
+    height: 1.25rem;
   }
-  @keyframes ix-think {
+  @keyframes ix-glow {
     50% {
-      opacity: 0.35;
+      filter: brightness(1.7);
     }
   }
   .ix-mark[data-busy="true"] {
-    animation: ix-think 1.2s steps(2, jump-none) infinite;
+    animation: ix-glow 1.6s ease-in-out infinite;
   }
   @media (prefers-reduced-motion: reduce) {
     .ix-mark {
-      transform: none;
       transition: none;
     }
     .ix-mark[data-busy="true"] {
       animation: none;
-      opacity: 0.6;
+      filter: brightness(1.4);
     }
   }
 
   .ix-thread {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-5);
+    gap: var(--spacing-6);
   }
   .ix-msg {
     display: grid;
-    grid-template-columns: 1.5rem minmax(0, 1fr);
+    grid-template-columns: 1.75rem minmax(0, 1fr);
     column-gap: var(--spacing-3);
     align-items: start;
   }
   .ix-msg__body {
     min-width: 0;
-    max-width: var(--ix-measure);
     overflow-wrap: anywhere;
   }
   .ix-msg--you {
     display: block;
     align-self: flex-end;
-    max-width: min(100%, 34rem);
-    padding: var(--spacing-3) var(--spacing-4);
-    background: var(--ix-sunken);
+    max-width: min(100%, 30rem);
+    padding: var(--spacing-3) var(--spacing-5);
+    background: var(--ix-surface);
+    border-radius: 2px;
   }
   .ix-cites {
-    margin-block-start: var(--spacing-2);
-    font-family: var(--ix-mono);
-    font-size: var(--text-label-size);
-    line-height: var(--text-label-leading);
-    font-weight: 500;
-    color: var(--color-text-secondary);
+    margin-block-start: var(--spacing-3);
+    font-size: var(--text-supporting-size);
   }
 
-  /* -- Long-form text: one 68-character column -------------------------- */
+  /* -- Long-form text: one 720px column ---------------------------------- */
 
   .ix-prose {
     max-width: var(--ix-measure);
+    font-size: var(--text-large-size);
+    line-height: var(--text-large-leading);
   }
   .ix-prose > * + * {
-    margin-block-start: 1.25em;
+    margin-block-start: 1.2em;
   }
   .ix-prose :where(h2) {
-    margin-block-start: 2em;
+    margin-block-start: 1.8em;
   }
   .ix-prose :where(h3) {
-    margin-block-start: 1.75em;
+    margin-block-start: 1.6em;
+    font-family: var(--font-family-body);
     font-size: var(--text-heading-3-size);
     line-height: var(--text-heading-3-leading);
     font-weight: 600;
-  }
-  .ix-prose :where(a) {
-    text-decoration: underline;
   }
   .ix-prose :where(ul, ol) {
     padding-inline-start: 1.25em;
@@ -647,27 +781,32 @@
   .ix-prose :where(li + li) {
     margin-block-start: 0.4em;
   }
+  /* A quotation sits between two rules, in italics. */
   .ix-prose :where(blockquote) {
     margin-inline: 0;
-    padding-inline-start: var(--spacing-4);
-    border-inline-start: 2px solid var(--color-text-primary);
-    color: var(--color-text-secondary);
+    padding-block: var(--spacing-5);
+    border-block: var(--ix-rule);
+    font-style: italic;
   }
   .ix-prose :where(code, kbd, samp) {
     font-family: var(--ix-mono);
-    font-size: 0.875em;
+    font-size: 0.86em;
   }
   .ix-prose :where(:not(pre) > code) {
-    background: var(--ix-sunken);
+    background: var(--ix-surface);
     padding: 0.1em 0.3em;
+    border-radius: 2px;
   }
+  /* Code is always set on soot, in both schemes. */
   .ix-prose :where(pre) {
-    background: var(--ix-sunken);
-    padding: var(--spacing-4);
+    color-scheme: dark;
+    background: light-dark(var(--ix-soot), var(--ix-surface));
+    color: var(--ix-bone);
+    padding: var(--spacing-5);
+    border-radius: 2px;
     overflow-x: auto;
-    font-size: var(--text-supporting-size);
-    line-height: 1.6;
-    max-width: calc(var(--ix-measure) + 12ch);
+    font-size: var(--text-code-size);
+    line-height: var(--text-code-leading);
   }
   .ix-prose :where(img, video, svg) {
     max-width: 100%;
@@ -682,19 +821,17 @@
     border-collapse: collapse;
     width: 100%;
     font-size: var(--text-supporting-size);
-    border-block-start: var(--ix-rule-section);
+    border-block-start: var(--ix-rule);
   }
   .ix-prose :where(th, td) {
     text-align: start;
     padding: var(--spacing-2) var(--spacing-3) var(--spacing-2) 0;
-    border-block-end: var(--ix-rule);
+    border-block-end: var(--ix-hairline);
     vertical-align: baseline;
   }
   .ix-prose :where(th) {
-    font-family: var(--ix-mono);
-    font-size: var(--text-label-size);
-    font-weight: 500;
-    letter-spacing: 0.06em;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--color-text-secondary);
   }
@@ -702,15 +839,25 @@
   /* -- Footer ----------------------------------------------------------- */
 
   .ix-foot {
-    margin-block-start: var(--ix-section-gap);
-    border-block-start: var(--ix-rule);
+    margin-block-start: var(--spacing-6);
     padding-block: var(--spacing-5) var(--spacing-8);
   }
   .ix-foot__in {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    gap: var(--spacing-3) var(--spacing-5);
+    gap: var(--spacing-3) var(--spacing-6);
+    padding-block-start: var(--spacing-5);
+    border-block-start: var(--ix-rule);
+    font-size: var(--text-supporting-size);
+    color: var(--color-text-secondary);
+  }
+
+  @media print {
+    .ix-art,
+    .ix-scheme {
+      display: none;
+    }
   }
 }

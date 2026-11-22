@@ -28,6 +28,8 @@ meta = [
   # Dark unless the visitor pins light. The boot script below rewrites this
   # from the stored choice; it must come after this tag.
   { name = "color-scheme", content = "dark" },
+  # Soot, the page's ground in the default (dark) scheme.
+  { name = "theme-color", content = "#0D0C0A" },
   { name = "description", content = "AI assistant for Arda Karaduman. Answers questions about his work, projects, and music." },
   { property = "og:type", content = "website" },
   { property = "og:site_name", content = "Arda's AI Construct" },
@@ -46,21 +48,23 @@ meta = [
 ]
 links = [
   { rel = "canonical", href = "https://ai.arda.tr/" },
-  { rel = "icon", type = "image/svg+xml", href = "/favicon.svg?v=2" },
+  { rel = "icon", type = "image/svg+xml", href = "/favicon.svg?v=3" },
   { rel = "preconnect", href = "https://fonts.googleapis.com" },
   { rel = "preconnect", href = "https://fonts.gstatic.com", crossorigin = true },
 ]
-# The family brand, "The Index" (../DESIGN-SYSTEM.md, DESIGN.md). The layer
+# The family brand, "Kara Duman" (../DESIGN-SYSTEM.md, DESIGN.md). The layer
 # order comes first, before any stylesheet. /brand/arda.css (the Astryx `arda`
 # theme: every token) and /brand/brand.css (the family patterns) are verbatim
 # copies from the arda.tr repository; site styles are in /style.css. Bump a
-# file's ?v= when it changes (GitHub Pages caches for ten minutes).
+# file's ?v= when it changes (GitHub Pages caches for ten minutes). The fonts:
+# Grenze Gotisch (the wordmark's face; here the h1 only), Spectral (everything
+# else), JetBrains Mono (code in replies), Zen Antique (Japanese).
 stylesheets = [
   { content = "@layer reset, astryx-base, astryx-theme, brand;" },
-  { href = "https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Noto+Sans+JP:wght@400;500;700&display=swap" },
-  { href = "/brand/arda.css?v=1" },
-  { href = "/brand/brand.css?v=1" },
-  { href = "/style.css?v=22" },
+  { href = "https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@700;800;900&family=JetBrains+Mono:wght@400;700&family=Spectral:ital,wght@0,400;0,600;1,400&family=Zen+Antique&display=swap" },
+  { href = "/brand/arda.css?v=2" },
+  { href = "/brand/brand.css?v=2" },
+  { href = "/style.css?v=23" },
 ]
 scripts = [
   # Before first paint: the scheme (the stored pin, else dark; ids stored by the

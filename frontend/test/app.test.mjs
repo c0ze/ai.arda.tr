@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   init, update, UserTypedInput, UserClickedSend, UserPickedLanguage, UserToggledVoice, StreamEventReceived,
@@ -147,14 +147,21 @@ test('the send and voice buttons are named by what they show', () => {
   }
   // The voice toggle is a plain labelled button: its text is its name, and it
   // says the state in words as well as in aria-pressed (and a filled chip).
+  // The bar has room for one word, so what the voice does is in the title.
   const voiceToggle = (model) => to_string(view(model)).match(/<button[^>]*class="ix-chip voice-toggle"[^>]*>(.*?)<\/button>/);
   const on = voiceToggle(start());
   assert.equal(attr(on[0], 'aria-label'), undefined);
-  assert.equal(on[1], 'Read replies aloud: On');
+  assert.equal(on[1], 'Voice: On');
+  assert.equal(attr(on[0], 'title'), 'Read replies aloud');
   assert.equal(attr(on[0], 'aria-pressed'), 'true');
   const off = voiceToggle(step(start(), new UserToggledVoice()));
-  assert.equal(off[1], 'Read replies aloud: Off');
+  assert.equal(off[1], 'Voice: Off');
   assert.equal(attr(off[0], 'aria-pressed'), 'false');
+  for (const [lang, shown, title] of [[new Jp(), '音声: オン', '返答を読み上げる'], [new Tr(), 'Ses: Açık', 'Yanıtları sesli oku']]) {
+    const toggle = voiceToggle(step(start(), new UserPickedLanguage(lang)));
+    assert.equal(toggle[1], shown);
+    assert.equal(attr(toggle[0], 'title'), title);
+  }
 });
 
 test('labels follow the UI language', () => {
@@ -202,22 +209,22 @@ test('the scheme switch offers the other scheme, by name, in every language', ()
 });
 
 // ---------------------------------------------------------------------------
-// The assistant is the square dot of the wordmark (`.ix-mark`), nothing else.
-// It blinks (`data-busy`) while a reply is awaited or written; while the voice
-// speaks, `ffi.mjs` sets the loudness on the square of the `.is-streaming`
-// reply instead, so that reply must be findable and must not also blink.
+// The assistant is the ember (`.ix-mark`), nothing else. It glows (`data-busy`)
+// while a reply is awaited or written; while the voice speaks, `ffi.mjs` sets
+// the loudness on the ember of the `.is-streaming` reply instead, so that
+// reply must be findable and must not also pulse.
 // ---------------------------------------------------------------------------
 
 const marks = (model) => [...to_string(view(model)).matchAll(/<span[^>]*class="ix-mark"[^>]*>/g)].map((m) => m[0]);
 const busy = (model) => marks(model).map((tag) => attr(tag, 'data-busy') === 'true');
 const event = (model, obj) => step(model, new StreamEventReceived(model.generation, JSON.stringify(obj)));
 
-test('the square is busy while a reply is awaited or written, and at rest once it is complete', () => {
+test('the ember is busy while a reply is awaited or written, and at rest once it is complete', () => {
   let model = start();
   assert.deepEqual(busy(model), [false], 'the welcome is a finished message');
   model = ask(model, 'Hi');
   assert.deepEqual(busy(model), [false, true], 'sent, nothing back yet');
-  // The wait is said in words beside the square too: it does not blink under
+  // The wait is said in words beside the ember too: it does not pulse under
   // reduced motion.
   assert.match(to_string(view(model)), /<p[^>]*class="txt ix-muted"[^>]*>Thinking…<\/p>/);
   model = event(model, { type: 'thinking' });
@@ -229,7 +236,7 @@ test('the square is busy while a reply is awaited or written, and at rest once i
   assert.deepEqual(busy(model), [false, false]);
 });
 
-test('while the voice speaks a reply, its square stops blinking and can be found by the voice', () => {
+test('while the voice speaks a reply, its ember stops pulsing and can be found by the voice', () => {
   const spoken = /<div[^>]*class="ix-msg msg bot is-streaming"[^>]*><span[^>]*class="ix-mark"/;
   let model = ask(start(), 'Hi');
   model = event(model, { type: 'thinking' });
@@ -237,7 +244,7 @@ test('while the voice speaks a reply, its square stops blinking and can be found
   model = event(model, { type: 'chunk', text: 'Hello there.' });
   assert.deepEqual(busy(model), [false, true], 'the audio has not started');
   model = step(model, new SpeechRevealed(5));
-  assert.deepEqual(busy(model), [false, false], 'speaking: the loudness drives the square');
+  assert.deepEqual(busy(model), [false, false], 'speaking: the loudness drives the ember');
   assert.match(to_string(view(model)), spoken);
   // The reply shows only as far as the voice has got.
   assert.match(to_string(view(model)), /<p>Hello<\/p>/);
@@ -264,8 +271,9 @@ test('what the assistant is doing is said in a status line for screen readers', 
 
 // ---------------------------------------------------------------------------
 // Who said what does not depend on seeing the layout: the visitor's words are
-// in the family's sunken box, each message names its speaker for screen
-// readers, and an error is told by a label in words, not by its colour alone.
+// in the family's box on the surface colour, each message names its speaker
+// for screen readers, and an error is told by a label and a written message,
+// not by its colour alone.
 // ---------------------------------------------------------------------------
 
 const messageTags = (model) => to_string(view(model)).match(/<div[^>]*id="messages"[^>]*>(.*)<div[^>]*id="reply-announcer"/s)[1]
@@ -280,18 +288,22 @@ test('each message names its speaker; the visitor\'s is the boxed one', () => {
   assert.match(welcome, /<span class="ix-sr">Construct<\/span>/);
   assert.match(question, /^<div[^>]*class="ix-msg ix-msg--you msg user/);
   assert.match(question, /<span class="ix-sr">You<\/span>/);
-  assert.doesNotMatch(question, /ix-mark/, 'the square is the assistant');
+  assert.doesNotMatch(question, /ix-mark/, 'the ember is the assistant');
   assert.match(reply, /<span class="ix-sr">Construct<\/span>/);
 });
 
-test('an error carries the word "Error", in the UI language, and no square', () => {
+test('an error carries the word "Error", in the UI language, and no ember', () => {
   for (const [lang, label] of [[null, 'Error'], [new Jp(), 'エラー'], [new Tr(), 'Hata']]) {
     let model = ask(lang ? step(start(), new UserPickedLanguage(lang)) : start(), 'Hi');
     model = event(model, { type: 'error', message: 'HTTP 500' });
     const line = messageTags(model).at(-1);
     assert.match(line, /^<div[^>]*class="ix-msg msg bot is-error/);
-    assert.ok(line.includes(`<p class="ix-label">${label}</p>`), label);
-    assert.match(line, /HTTP 500/);
+    // The family's error colour (brand.css `.ix-error`) is on the whole line:
+    // the label and the message it carries.
+    const body = line.match(/<div class="ix-msg__body ix-error">(.*)$/s);
+    assert.ok(body, 'the line is an .ix-error');
+    assert.ok(body[1].includes(`<p class="ix-label">${label}</p>`), label);
+    assert.match(body[1], /HTTP 500/);
     // An error is not the assistant's words.
     assert.doesNotMatch(line, /ix-mark/);
     // Heard as it is seen: the label, then the line.
@@ -354,37 +366,104 @@ test('the rendered app has no link to coze.org', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The bar is the family's: the arda.tr wordmark, then the sibling sites. On
-// this site the wordmark is the only display type, so the one heading is the
-// assistant's modest title.
+// The bar is the family's (Kara Duman): the emblem and the arda.tr wordmark,
+// this site's name, then the sibling sites and this site's own switches.
 // ---------------------------------------------------------------------------
 
-test('the bar links arda.tr from the wordmark, then the index, the blog and the résumé', () => {
-  for (const lang of [null, new Jp(), new Tr()]) {
-    const html = to_string(view(lang ? step(start(), new UserPickedLanguage(lang)) : start()));
-    const bar = html.match(/<header class="ix-bar">(.*?)<\/header>/)[1];
-    assert.match(bar, /<a href="https:\/\/arda\.tr"><svg[^>]*aria-label="arda\.tr"/, 'the wordmark is a link named arda.tr');
-    assert.match(bar, /<span class="ix-label">\/ ask<\/span>/);
+const eachLanguage = (check) => {
+  for (const lang of [null, new Jp(), new Tr()]) check(to_string(view(lang ? step(start(), new UserPickedLanguage(lang)) : start())));
+};
+const barOf = (html) => html.match(/<header class="ix-bar">(.*?)<\/header>/)[1];
+
+test('the bar links arda.tr from the emblem and wordmark, then the works, the blog and the résumé', () => {
+  eachLanguage((html) => {
+    const bar = barOf(html);
+    // One link, named by the wordmark; the emblem beside it is decoration.
+    const brand = bar.match(/<a class="ix-bar__brand" href="https:\/\/arda\.tr">(.*?)<\/a>/)[1];
+    assert.match(brand, /^<img alt class="ix-emblem"[^>]*><svg[^>]*aria-label="arda\.tr"/);
+    assert.match(bar, /<span class="ix-bar__site">ask<\/span>/);
+    // The family's names for its sites, the same in every language.
     const links = [...bar.matchAll(/<a href="([^"]*)">([^<]*)<\/a>/g)].map((m) => [m[1], m[2]]);
-    assert.deepEqual(links, [['https://arda.tr', 'index'], ['https://blog.arda.tr', 'blog'], ['https://resume.arda.tr', 'résumé']]);
-  }
+    assert.deepEqual(links, [['https://arda.tr', 'works'], ['https://blog.arda.tr', 'blog'], ['https://resume.arda.tr', 'résumé']]);
+  });
 });
 
-test('the inline wordmark is the family logo, with the full stop in the theme\'s vermilion', () => {
-  // The outlines are pasted into frontend/wordmark.gleam; they must stay the
-  // ones of the vendored logo file.
+test('after the sites, pushed to the right: the voice toggle, the languages, the scheme switch', () => {
+  eachLanguage((html) => {
+    const nav = barOf(html).match(/<div class="ix-bar__nav ix-bar__nav--end">(.*)$/s)[1];
+    const order = ['class="bar-sites"', 'class="ix-chip voice-toggle"', 'class="language-toggle"', 'class="ix-scheme ix-navlink"'].map((part) => nav.indexOf(part));
+    assert.ok(order.every((at) => at >= 0), 'all four are in the bar');
+    assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  });
+});
+
+test('the inline wordmark is the family logo, in one colour: the text\'s', () => {
+  // The outline is pasted into frontend/wordmark.gleam; it must stay the one
+  // of the vendored logo file (Grenze Gotisch, outlined).
   const logo = readFileSync(new URL('../../public/brand/logo/wordmark.svg', import.meta.url), 'utf8');
   const inline = to_string(view(start())).match(/<svg[^>]*class="ix-wordmark"[^>]*>.*?<\/svg>/)[0];
   const paths = (svg) => [...svg.matchAll(/<path[^>]*>/g)].map((m) => m[0]);
   assert.equal(attr(inline, 'viewBox'), attr(logo, 'viewBox'));
-  assert.equal(attr(inline, 'transform'), attr(logo, 'transform'));
-  assert.deepEqual(paths(inline).map((tag) => attr(tag, ' d')), paths(logo).map((tag) => attr(tag, ' d')));
-  const [letters, dot] = paths(inline);
-  assert.equal(attr(letters, 'fill'), 'currentColor');
-  assert.match(dot, /fill:\s*var\(--color-accent\)/);
+  assert.equal(paths(inline).length, 1);
+  assert.deepEqual(paths(inline).map((tag) => [attr(tag, ' d'), attr(tag, 'transform')]),
+    paths(logo).map((tag) => [attr(tag, ' d'), attr(tag, 'transform')]));
+  // It follows the page's text colour, on soot and on bone paper.
+  assert.equal(attr(paths(inline)[0], 'fill'), 'currentColor');
+  assert.doesNotMatch(inline, /--color-accent|#[0-9a-f]{3,8}\b/i);
 });
 
-test('the page has one heading: the assistant\'s title', () => {
-  const html = to_string(view(start()));
-  assert.deepEqual([...html.matchAll(/<h1[^>]*>([^<]*)<\/h1>/g)].map((m) => m[1]), ['Ask Construct']);
+// ---------------------------------------------------------------------------
+// The page: one heading (the theme sets an h1 in blackletter, and it is the
+// only blackletter here) beside the large ember; the quick prompts; a wisp of
+// smoke in the margin. Pictures are the vendored brand artwork.
+// ---------------------------------------------------------------------------
+
+test('the page has one heading, in every language, beside the large ember', () => {
+  const headings = (html) => [...html.matchAll(/<h1[^>]*>([^<]*)<\/h1>/g)].map((m) => m[1]);
+  assert.deepEqual(headings(to_string(view(start()))), ['Ask about Arda']);
+  eachLanguage((html) => {
+    assert.equal(headings(html).length, 1);
+    const intro = html.match(/<header class="intro">(.*?)<\/header>/)[1];
+    // The ember is the assistant's picture, not content: screen readers skip it.
+    assert.match(intro, /^<span aria-hidden="true" class="ix-mark ix-mark--lg"><\/span><div><h1>/);
+    // One secondary line under the heading.
+    assert.equal([...intro.matchAll(/<p class="ix-muted">[^<]+<\/p>/g)].length, 1);
+  });
+});
+
+test('a reply\'s own headings are not page headings in blackletter', () => {
+  // Blackletter names the page; a reply's markdown heading stays in the body
+  // face (style.css), or every "# Title" from the model would be set like one.
+  const css = readFileSync(new URL('../../public/style.css', import.meta.url), 'utf8');
+  assert.match(css, /\.txt :is\(h1, h2, h3, h4, h5, h6\) \{[^}]*font-family: var\(--font-family-body\);/);
+});
+
+test('the quick prompts are a group named "Try asking", at the end of the conversation', () => {
+  for (const [lang, label] of [[null, 'Try asking'], [new Jp(), '質問の例'], [new Tr(), 'Örnek sorular']]) {
+    const html = to_string(view(lang ? step(start(), new UserPickedLanguage(lang)) : start()));
+    // Inside the scrolling region, after the transcript: the pinned composer
+    // keeps only the input, so a phone has room for the conversation.
+    const scroller = html.match(/<div[^>]*id="messages-container"[^>]*>(.*)<div class="composer">/s)[1];
+    const group = scroller.match(/<div id="quick-topics"><p class="ix-label" id="([^"]*)">([^<]*)<\/p><div aria-labelledby="([^"]*)" class="ix-chips" role="group">(.*?)<\/div>/);
+    assert.ok(group, 'a labelled group of chips');
+    assert.equal(group[2], label);
+    assert.equal(group[3], group[1], 'the label names the group');
+    assert.ok(scroller.indexOf('id="quick-topics"') > scroller.indexOf('id="messages"'));
+    assert.equal([...group[4].matchAll(/<button class="ix-chip" type="button">[^<]+<\/button>/g)].length, 5);
+  }
+});
+
+test('the wisp is decoration, on a soot plate', () => {
+  // Bone lines: on bone paper they need the plate's soot ground. It says
+  // nothing, so it is hidden from screen readers and has an empty alt.
+  const wisp = to_string(view(start())).match(/<div aria-hidden="true" class="wisp ix-plate"><img([^>]*)><\/div>/);
+  assert.ok(wisp, 'a plate with one picture');
+  assert.match(wisp[1], /^ alt class="ix-art"/);
+  assert.match(wisp[1], /src="\/brand\/art\/wisp\.webp"/);
+});
+
+test('every picture the page shows is a file in public/', () => {
+  const srcs = [...to_string(view(start())).matchAll(/<img[^>]*src="([^"]*)"/g)].map((m) => m[1]);
+  assert.deepEqual(srcs, ['/brand/art/emblem.webp', '/brand/art/wisp.webp']);
+  for (const src of srcs) assert.ok(existsSync(new URL('../../public' + src, import.meta.url)), src);
 });

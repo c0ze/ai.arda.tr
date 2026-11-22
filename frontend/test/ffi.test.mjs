@@ -203,12 +203,12 @@ test('voice:false from the server means no gating at all', (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// The voice's loudness shows on the square of the reply being spoken, as the
-// custom property --ix-level (0 to 1) that brand.css turns into its size. It
-// must not outlive the voice, or a square stays swollen.
+// The voice's loudness shows on the ember of the reply being spoken, as the
+// custom property --ix-level (0 to 1) that brand.css turns into its glow. It
+// must not outlive the voice, or an ember stays lit.
 // ---------------------------------------------------------------------------
 
-// A `document` whose querySelector finds the squares given by selector.
+// A `document` whose querySelector finds the embers given by selector.
 function fakeMarks(t, marks) {
   const mark = () => {
     const props = new Map();
@@ -220,7 +220,7 @@ function fakeMarks(t, marks) {
   return found;
 }
 
-test('the loudness is set on the speaking reply\'s square, between 0 and 1', (t) => {
+test('the loudness is set on the speaking reply\'s ember, between 0 and 1', (t) => {
   const { '.speaking': mark } = fakeMarks(t, ['.speaking']);
   set_mark_level('.speaking', 0.5);
   assert.equal(mark.props.get('--ix-level'), '0.50');
@@ -228,14 +228,14 @@ test('the loudness is set on the speaking reply\'s square, between 0 and 1', (t)
   assert.equal(mark.props.get('--ix-level'), '1.00');
 });
 
-test('silence takes the loudness off the square again', (t) => {
+test('silence takes the loudness off the ember again', (t) => {
   const { '.speaking': mark } = fakeMarks(t, ['.speaking']);
   set_mark_level('.speaking', 0.7);
   set_mark_level('.speaking', 0);
   assert.equal(mark.props.has('--ix-level'), false);
 });
 
-test('when another reply starts speaking, the previous square is released', (t) => {
+test('when another reply starts speaking, the previous ember is released', (t) => {
   const marks = fakeMarks(t, ['.first', '.second']);
   set_mark_level('.first', 0.7);
   set_mark_level('.second', 0.4);
@@ -243,7 +243,7 @@ test('when another reply starts speaking, the previous square is released', (t) 
   assert.equal(marks['.second'].props.get('--ix-level'), '0.40');
 });
 
-test('stopping the voice (a new question, a language switch) releases the square', (t) => {
+test('stopping the voice (a new question, a language switch) releases the ember', (t) => {
   fakeWindow(t);
   const { '.speaking': mark } = fakeMarks(t, ['.speaking']);
   speech_begin('.speaking', () => {}, () => {});
@@ -472,4 +472,26 @@ test('sanitiser hook: on fake nodes, links get target and rel; registered once p
   window.DOMPurify.addHook = () => { added += 1; };
   render_markdown('again');
   assert.equal(added, 0);
+});
+
+// ---------------------------------------------------------------------------
+// A fresh conversation (first load, a language switch) is shown from its top:
+// the page's heading and the welcome. A reply scrolls to its end instead.
+// ---------------------------------------------------------------------------
+
+test('a fresh conversation is scrolled to its top, a reply to its end', async (t) => {
+  const { scroll_to_top, scroll_to_bottom } = await import('../build/dev/javascript/frontend/ffi.mjs');
+  const scroller = { scrollTop: 240, scrollHeight: 900 };
+  const frames = [];
+  globalThis.document = { querySelector: (selector) => (selector === '#messages-container' ? scroller : null) };
+  globalThis.requestAnimationFrame = (run) => frames.push(run);
+  t.after(() => { delete globalThis.document; delete globalThis.requestAnimationFrame; });
+  const settle = () => { while (frames.length) frames.shift()(); };
+  scroll_to_bottom('#messages-container');
+  settle();
+  assert.equal(scroller.scrollTop, 900);
+  scroll_to_top('#messages-container');
+  assert.equal(scroller.scrollTop, 900, 'after the render, not before it');
+  settle();
+  assert.equal(scroller.scrollTop, 0);
 });

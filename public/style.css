@@ -1,7 +1,7 @@
 /*
-  ai.arda.tr: "The index, asked."
+  ai.arda.tr: the chat. The assistant is the ember; the smoke is Arda.
   ------------------------------------------------------------------------
-  What is particular to this site, on the family brand "The Index"
+  What is particular to this site, on the family brand "Kara Duman"
   (../DESIGN-SYSTEM.md; applied here: DESIGN.md).
 
   Loaded after, and never instead of:
@@ -16,10 +16,10 @@
 */
 
 /* -- Tokens --------------------------------------------------------------
-   brand.css reads the spacing scale and the focus ring's width from the
-   Astryx base stylesheet (@astryxdesign/core), which the React sites load
-   with their components. This site has no Astryx components, so the ones
-   brand.css uses are defined here, with Astryx's own values. */
+   brand.css reads the spacing scale from the Astryx base stylesheet
+   (@astryxdesign/core), which the React sites load with their components.
+   This site has no Astryx components, so the steps brand.css uses are
+   defined here, with Astryx's own values. */
 @layer astryx-base {
   :root {
     --spacing-1: 0.25rem;
@@ -29,20 +29,12 @@
     --spacing-5: 1.25rem;
     --spacing-6: 1.5rem;
     --spacing-8: 2rem;
-    --focus-outline-width: 2px;
   }
 }
 
+/* The assistant: brand.css draws `.ix-mark` from this picture. */
 :root {
-  --ix-max: 45rem; /* one column, 720px wide */
-  --ix-section-gap: 0rem; /* the footer sits right under the composer */
-}
-
-/* Japanese labels: brand.css gives Japanese text Noto Sans JP through the body
-   and heading faces (`:lang(ja)`), but labels, chips and nav are set in the
-   mono face, and IBM Plex Mono has no kana or kanji. */
-:lang(ja) {
-  --ix-mono: "IBM Plex Mono", "Noto Sans JP", ui-monospace, monospace;
+  --ix-ember-art: url("/brand/art/ember.webp");
 }
 
 *,
@@ -76,21 +68,9 @@ body {
   flex: none;
 }
 
-/* -- The bar ------------------------------------------------------------- */
-
-/* The wordmark is 20px high: its link reaches a little above and below it,
-   without moving it off the baseline it shares with "/ ask". */
-.ix-bar__brand a {
-  position: relative;
-  display: block;
-  color: inherit;
-}
-
-.ix-bar__brand a::after {
-  content: "";
-  position: absolute;
-  inset: calc(-1 * var(--spacing-2)) 0;
-}
+/* -- The bar -------------------------------------------------------------
+   As wide as the family's pages (brand.css `.ix-wrap`); the column under it
+   is the 720px reading column (`.ix-wrap--read`). */
 
 .bar-sites,
 .language-toggle {
@@ -99,18 +79,10 @@ body {
 }
 
 .bar-sites {
-  gap: var(--spacing-5);
+  gap: var(--spacing-6);
 }
 
-.language-toggle {
-  gap: var(--spacing-1);
-}
-
-/* The slashes between the language codes echo "/ ask". */
 .language-toggle > span {
-  font-family: var(--ix-mono);
-  font-size: var(--text-label-size);
-  line-height: var(--text-label-leading);
   color: var(--color-text-secondary);
 }
 
@@ -118,34 +90,22 @@ body {
    (brand.css `button.ix-navlink`); a little width makes them easier to hit. */
 button.ix-navlink {
   margin: 0;
-  padding-inline: var(--spacing-1);
+  padding-inline: var(--spacing-2);
 }
 
-/* The language in use, marked like the bar's current page. */
+/* The language in use, marked like the bar's current page, and underlined:
+   it is not told by its colour alone. */
 button.ix-navlink[aria-pressed="true"] {
-  color: var(--color-text-primary);
+  color: var(--ix-link);
   text-decoration: underline;
+  text-decoration-thickness: 1px;
   text-underline-offset: 0.18em;
-}
-
-/* Targets in the bar are at least 24px high, 44px for a finger. */
-.ix-bar__nav :is(a, button) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-block-size: 1.5rem;
-  min-inline-size: 1.5rem;
-}
-
-@media (pointer: coarse) {
-  .ix-bar__nav :is(a, button) {
-    min-block-size: 2.75rem;
-  }
 }
 
 /* -- The conversation ---------------------------------------------------- */
 
 #chat-area {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -153,52 +113,68 @@ button.ix-navlink[aria-pressed="true"] {
 }
 
 /* The scroller is as wide as the page, so its scrollbar is at the edge of the
-   window; the column inside is the .ix-wrap. */
+   window; the column inside is the .ix-wrap. The focus ring is drawn inside
+   it, by the ring's own width. */
 #messages-container {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  outline-offset: calc(-1 * var(--focus-outline-width));
+  outline-offset: -2px;
 }
 
 /* The column's left edge is worked out from the window, not from the scroller
-   (which a scrollbar makes narrower), so it stays in line with the bar and
-   the composer whether or not a scrollbar shows. */
+   (which a scrollbar makes narrower), so it stays in line with the composer
+   whether or not a scrollbar shows. */
 #messages-container > .ix-wrap {
   width: auto;
-  margin-inline: max(0px, (100vw - var(--ix-max) - 2 * var(--ix-gutter)) / 2) 0;
+  margin-inline: max(0px, (100vw - var(--ix-measure) - 2 * var(--ix-margin)) / 2) 0;
+  /* At least as tall as the scroller, so the quick prompts can sit at its
+     foot while the conversation is short. */
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
-/* The page's one heading is modest: on this site the only display type is
-   the wordmark. Heading 3 of the guide: the body face at 600 (the theme's
-   weight token turns 800 on touch screens, a weight this face is not loaded in). */
+/* The page's one heading, beside the large ember. The theme sets it in
+   blackletter (Heading 1); nothing else on this site is. */
 .intro {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-5);
   padding-block: var(--spacing-8) var(--spacing-6);
 }
 
-.intro h1 {
-  font-family: var(--font-family-body);
-  font-size: var(--text-heading-3-size);
-  line-height: var(--text-heading-3-leading);
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
 .intro p {
-  max-width: var(--ix-measure);
   margin-block-start: var(--spacing-1);
 }
 
-/* A 2px ink rule opens the list, as it does every list in the family. */
-#messages {
-  padding-block: var(--spacing-6) var(--spacing-8);
-  border-block-start: var(--ix-rule-section);
+/* Japanese is never blackletter (brand.css gives it Spectral and Zen Antique),
+   and Zen Antique has one weight: Heading 2's size, unbolded. */
+.intro h1:lang(ja) {
+  font-size: var(--text-heading-2-size);
+  line-height: 1.4;
+  font-weight: 400;
 }
 
-/* The square sits on the first line of the reply. */
+/* "Try asking" over its chips: after the last message, and no higher than
+   the foot of the scroller. */
+#quick-topics {
+  display: grid;
+  gap: var(--spacing-2);
+  margin-block-start: auto;
+  padding-block-end: var(--spacing-5);
+}
+
+/* A 1px rule under the header opens the conversation. */
+#messages {
+  padding-block: var(--spacing-8);
+  border-block-start: var(--ix-rule);
+}
+
+/* The ember sits on the first line of the reply. */
 .ix-msg > .ix-mark {
-  margin-block-start: calc((1lh - 1.5rem) / 2);
+  margin-block-start: calc((1lh - 1.75rem) / 2);
 }
 
 /* The visitor's words wrap inside their box, however long the word. */
@@ -206,18 +182,25 @@ button.ix-navlink[aria-pressed="true"] {
   overflow-wrap: anywhere;
 }
 
-/* An error: no square, the theme's error colour, and a label in words. */
+/* An error: no ember, the error colour (brand.css `.ix-error`), a label in
+   words and a written message. Labels and paragraphs set their own colour,
+   so they are told to take the line's. */
 .msg.is-error > .ix-msg__body {
   grid-column: 2;
 }
 
-.msg.is-error :is(.ix-label, .txt, .txt p) {
-  color: var(--color-text-error);
+.ix-error :is(.ix-label, .txt p) {
+  color: inherit;
 }
 
-/* Replies are markdown, set as .ix-prose, a little tighter than an article
-   (as in arda.tr's chat). Their headings stay in the body face and near the
-   body size: a reply is not a page. */
+/* Replies are markdown, set as .ix-prose at the body size: a reply is not an
+   article. Their headings stay in Spectral and near the body size; blackletter
+   is for the page's heading only. */
+.txt {
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-leading);
+}
+
 .txt > * + * {
   margin-block-start: 0.75em;
 }
@@ -239,6 +222,13 @@ button.ix-navlink[aria-pressed="true"] {
   margin-block-start: 1.25em;
 }
 
+/* Code in a reply is the theme's code size and never under its small size
+   (on touch screens the theme's code size drops below it): nothing on the
+   family's sites is set below 18px. */
+.txt :where(code, kbd, samp) {
+  font-size: max(var(--text-code-size), var(--text-supporting-size));
+}
+
 /* A wide table scrolls inside the reply, never the page. */
 .txt table {
   display: block;
@@ -246,11 +236,42 @@ button.ix-navlink[aria-pressed="true"] {
   overflow-x: auto;
 }
 
+/* -- The wisp ------------------------------------------------------------
+   A wisp of smoke in the far right margin, its right edge on the bar's, and
+   only where the margin has room for it. It stays put while the conversation
+   scrolls, and it covers nothing: the column ends at least 32px before it.
+   Its plate (brand.css `.ix-plate`) is soot, so on bone paper the bone lines
+   keep their ground. The picture is mostly empty at its sides: the plate
+   shows the middle half of its width. */
+.wisp {
+  display: none;
+}
+
+@media (min-width: 75rem) and (min-height: 40em) {
+  .wisp {
+    display: block;
+    position: absolute;
+    inset-block-start: var(--spacing-8);
+    inset-inline-end: max(var(--ix-margin), 50% - var(--ix-max) / 2);
+    inline-size: clamp(6rem, 50vw - var(--ix-measure) / 2 - var(--ix-margin) - var(--spacing-8), 8rem);
+    aspect-ratio: 5 / 21;
+    max-block-size: calc(100% - 2 * var(--spacing-8));
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .wisp > img {
+    inline-size: 100%;
+    block-size: 100%;
+    max-width: none;
+    object-fit: cover;
+  }
+}
+
 /* -- The composer -------------------------------------------------------- */
 
 .composer {
-  padding-block: var(--spacing-4);
-  border-block-start: var(--ix-rule);
+  padding-block-end: var(--spacing-4);
 }
 
 .composer > .ix-wrap {
@@ -258,9 +279,16 @@ button.ix-navlink[aria-pressed="true"] {
   gap: var(--spacing-3);
 }
 
+/* A hairline across the column, between the conversation and the input. */
+.composer > .ix-wrap::before {
+  content: "";
+  border-block-start: var(--ix-hairline);
+  margin-block-end: var(--spacing-1);
+}
+
 #input-wrapper {
   display: flex;
-  gap: var(--spacing-2);
+  gap: var(--spacing-3);
 }
 
 #user-input {
@@ -270,58 +298,122 @@ button.ix-navlink[aria-pressed="true"] {
 
 #send-btn {
   flex: none;
-  min-height: 2.75rem;
 }
 
-/* The voice toggle, then the disclaimer. */
-.composer-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-2) var(--spacing-4);
-}
-
-/* -- The footer ---------------------------------------------------------- */
+/* -- The footer ----------------------------------------------------------
+   The family's other sites, right under the disclaimer: no rule of its own
+   and no gap (brand.css gives a page's footer both). */
 
 .ix-foot {
-  padding-block: var(--spacing-2) max(var(--spacing-3), env(safe-area-inset-bottom, 0px));
+  margin-block-start: 0;
+  padding-block: 0 max(var(--spacing-3), env(safe-area-inset-bottom, 0px));
 }
 
-/* The family's links are a row of targets, not words in a sentence: each is
-   at least 24px high. */
+.ix-foot__in {
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+
+/* A row of targets, not words in a sentence: each is at least 24px high.
+   They are quiet: the secondary colour, underlined. */
 .family a {
   display: inline-block;
   padding-block: var(--spacing-1);
+  color: inherit;
 }
 
+.family a:hover {
+  color: var(--color-text-primary);
+}
 
 /* -- Narrow screens ------------------------------------------------------
-   One column, 24px side margins (the .ix-wrap gutter). The bar keeps the
-   wordmark, the languages and the scheme switch on one line; the sibling
-   sites are in the footer's family line. */
-@media (max-width: 40em) {
+   One column, 20px side margins (the guide's phone margin; brand.css's
+   `--ix-margin` only reaches it below 240px). The bar keeps the emblem, the
+   wordmark, the voice toggle, the languages and the scheme switch; the
+   sibling sites are in the footer's family line. The heading takes Heading
+   1's phone size (the theme only gives it to touch screens). */
+@media (max-width: 45rem) {
+  :root {
+    --ix-margin: 1.25rem;
+  }
+
   .bar-sites {
     display: none;
   }
 
-  button.ix-navlink {
-    padding-inline: 0;
+  .ix-bar__in {
+    gap: 0 var(--spacing-4);
   }
 
   .intro {
+    gap: var(--spacing-4);
     padding-block: var(--spacing-6) var(--spacing-5);
   }
 
+  .intro h1:not(:lang(ja)) {
+    font-size: min(var(--text-heading-1-size), 2.75rem);
+  }
+
+  .intro h1:lang(ja) {
+    font-size: min(var(--text-heading-2-size), 2rem);
+  }
+
+  #messages {
+    padding-block: var(--spacing-6);
+  }
+
   .composer {
-    padding-block: var(--spacing-3);
+    padding-block-end: var(--spacing-3);
+  }
+}
+
+/* On a phone the bar is two lines: the brand and the voice toggle, then the
+   languages and the scheme switch. The nav's box is dropped so its controls
+   lay out with the brand; their order is the same. */
+@media (max-width: 30rem) {
+  .ix-bar__in {
+    column-gap: var(--spacing-3);
+  }
+
+  .ix-bar__nav {
+    display: contents;
+  }
+
+  button.voice-toggle,
+  button.ix-scheme {
+    margin-inline-start: auto;
+  }
+
+  /* The first language's letters start on the column's edge. */
+  .language-toggle {
+    margin-inline-start: calc(-1 * var(--spacing-2));
+  }
+
+  /* The family line wraps here: spaced as a row of links, without the dots
+     that would open its second line. */
+  .family {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--spacing-4);
+  }
+
+  .family > span {
+    display: none;
+  }
+}
+
+/* The narrowest phones: the brand and the voice toggle fill the first line,
+   and the heading under the bar says the rest. */
+@media (max-width: 23rem) {
+  .ix-bar__site {
+    display: none;
   }
 }
 
 /* -- Short screens (phone landscape, a zoomed desktop) -------------------
    The shell is pinned to the viewport, so what is not needed to ask a
-   question gives its room to the conversation: first the footer (its family
-   line wraps to two lines on a small phone), then the quick prompts. */
+   question gives its room to the conversation: the footer goes (its family
+   line wraps to two lines on a small phone), and the rest draws in. */
 @media (max-height: 40em) {
   .ix-foot {
     display: none;
@@ -332,13 +424,17 @@ button.ix-navlink[aria-pressed="true"] {
   }
 }
 
-@media (max-height: 36em) {
-  #quick-topics {
+/* Phone landscape: the bar is one line, without the sibling sites (the
+   wordmark still leads to arda.tr). */
+@media (max-height: 36em) and (max-width: 60rem) {
+  .bar-sites {
     display: none;
   }
+}
 
+@media (max-height: 36em) {
   .ix-bar__in {
-    min-height: 2.75rem;
+    min-height: 3rem;
   }
 
   .intro {
@@ -350,7 +446,7 @@ button.ix-navlink[aria-pressed="true"] {
   }
 
   .composer {
-    padding-block: var(--spacing-2) max(var(--spacing-2), env(safe-area-inset-bottom, 0px));
+    padding-block-end: max(var(--spacing-2), env(safe-area-inset-bottom, 0px));
   }
 
   .composer > .ix-wrap {

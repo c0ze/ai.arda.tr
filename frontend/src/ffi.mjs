@@ -157,6 +157,16 @@ export function scroll_to_bottom(selector) {
   });
 }
 
+// A fresh conversation starts at its top, where the page's heading is: on a
+// small phone the heading, the welcome and the quick prompts do not all fit.
+export function scroll_to_top(selector) {
+  if (typeof document === "undefined") return;
+  requestAnimationFrame(() => {
+    const el = document.querySelector(selector);
+    if (el) el.scrollTop = 0;
+  });
+}
+
 export function is_localhost() {
   if (typeof window === "undefined" || !window.location) return false;
   const h = window.location.hostname;
@@ -278,7 +288,7 @@ export function stream_chat(url, body_json, on_event) {
 // Voice: the assistant reads its replies aloud through voice.mjs (a verbatim
 // copy of design-previews/onebit/voice.js; do not fork). One speaker per
 // reply; it gates how much of the reply is visible so the text appears as it
-// is spoken, and its loudness is shown by the reply's square (set_mark_level).
+// is spoken, and its loudness is shown by the reply's ember (set_mark_level).
 // ---------------------------------------------------------------------------
 
 export function voice_enabled() {
@@ -300,10 +310,10 @@ let speaker = null;
 let leveled = null;
 
 // Show the voice's loudness (0 to 1) on the element matched by `selector`: the
-// square of the reply being spoken. It is set as the custom property
-// `--ix-level`; brand.css (`.ix-mark`) makes the square swell with it, and not
-// at all under prefers-reduced-motion. Silence removes the property, and so
-// does a reply that is no longer the one speaking, so no square stays swollen.
+// ember of the reply being spoken. It is set as the custom property
+// `--ix-level`; brand.css (`.ix-mark`) makes the ember glow with it. Silence
+// removes the property, and so does a reply that is no longer the one
+// speaking, so no ember stays lit.
 export function set_mark_level(selector, level) {
   if (typeof document === "undefined") return;
   const quiet = !(level > 0);

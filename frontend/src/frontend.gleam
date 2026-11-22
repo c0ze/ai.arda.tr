@@ -13,15 +13,15 @@
 ////
 //// Streaming: The frontend POSTs to `/api/chat/stream` and receives SSE
 //// events: `thinking` → `chunk`* → `done`. Chunks are appended progressively
-//// with markdown rendered live. The assistant is the square dot of the arda.tr
-//// wordmark (`.ix-mark` in brand.css): it blinks while a reply is awaited or
-//// written, and that is all the motion there is.
+//// with markdown rendered live. The assistant is the ember (`.ix-mark` in
+//// brand.css): it glows while a reply is awaited or written, and that is all
+//// the motion there is.
 ////
 //// Voice: unless muted (the voice toggle, persisted by voice.mjs), requests
 //// ask for speech too. The speaker in `ffi.mjs` / `voice.mjs` plays it through
 //// a robot filter and reports how far the voice has got; the reply is shown
 //// only up to there (`Speaking`), so it is written as it is spoken, and the
-//// square swells with the voice's loudness.
+//// ember glows with the voice's loudness.
 
 import frontend/i18n.{type Language, type Strings, En, Jp, Tr}
 import frontend/wordmark
@@ -53,7 +53,7 @@ const cloud_run_base = "https://ai-arda-tr-api-599610058688.asia-northeast1.run.
 /// re-applies the same cap on untrusted input.
 const max_history_messages = shared.default_max_history
 
-/// The square of the reply being written or spoken. While the voice speaks,
+/// The ember of the reply being written or spoken. While the voice speaks,
 /// `ffi.mjs` sets its loudness on it as `--ix-level` (see brand.css).
 const speaking_mark = ".msg.is-streaming .ix-mark"
 
@@ -218,7 +218,7 @@ fn handle_stream_event(model: Model, json_str: String) -> #(Model, Effect(Msg)) 
       case evt {
         shared.StreamThinking -> {
           // Add a placeholder bot message; until its first chunk it shows
-          // only the blinking square.
+          // only the glowing ember.
           let #(model, bot_id) = push(model, Bot, "")
           #(
             Model(..model, stream_state: Streaming(bot_msg_id: bot_id)),
@@ -317,10 +317,11 @@ fn reset_with_welcome(model: Model, lang: Language) -> #(Model, Effect(Msg)) {
       announcement: "",
     )
   let #(with_welcome, _) = push(cleared, Bot, s.welcome_msg)
-  // A language switch mid-reply drops the stream, and its voice with it.
+  // A language switch mid-reply drops the stream, and its voice with it. The
+  // new conversation is shown from its top: the page's heading, the welcome.
   #(
     with_welcome,
-    effect.batch([stream_abort(), speech_stop(), scroll_to_bottom()]),
+    effect.batch([stream_abort(), speech_stop(), scroll_to_top()]),
   )
 }
 
@@ -503,6 +504,10 @@ fn scroll_to_bottom() -> Effect(Msg) {
   effect.from(fn(_dispatch) { do_scroll_to_bottom("#messages-container") })
 }
 
+fn scroll_to_top() -> Effect(Msg) {
+  effect.from(fn(_dispatch) { do_scroll_to_top("#messages-container") })
+}
+
 /// Follow a scheme pinned or unpinned in another tab.
 fn scheme_watch() -> Effect(Msg) {
   effect.from(fn(_dispatch) { do_scheme_watch() })
@@ -521,37 +526,50 @@ fn speech_stop() -> Effect(Msg) {
 // View
 // ---------------------------------------------------------------------------
 
-/// One column (see `--ix-max` in style.css): the bar, the conversation, the
-/// composer, the footer. The shell is pinned to the viewport and only the
-/// conversation scrolls, so the input is always within reach.
+/// The bar across the page; under it one 720px column (`.ix-wrap--read`): the
+/// conversation (with the quick prompts at its end), the composer, the footer. The shell is pinned to the viewport
+/// and only the conversation scrolls, so the input is always within reach.
 pub fn view(model: Model) -> Element(Msg) {
   let s = i18n.strings(model.language)
 
   html.div([attribute.class("shell")], [
-    bar(model.language, s),
+    bar(model, s),
     html.main([attribute.id("chat-area")], [
       messages_container(model, s),
       composer(model, s),
+      wisp(),
     ]),
     footer(s),
   ])
 }
 
-/// The family bar: the wordmark and `/ ask` at left; the sibling sites, the
-/// language switch and the scheme switch at right. The link labels are the
-/// family's own names for its sites, the same in every language.
-fn bar(language: Language, s: Strings) -> Element(Msg) {
+/// The family bar: the emblem, the wordmark and `ask` at left; at right the
+/// sibling sites, the voice toggle, the language switch and the scheme switch.
+/// The link labels are the family's own names for its sites, the same in
+/// every language.
+fn bar(model: Model, s: Strings) -> Element(Msg) {
   html.header([attribute.class("ix-bar")], [
     html.div([attribute.class("ix-wrap ix-bar__in")], [
-      html.div([attribute.class("ix-bar__brand")], [
-        html.a([attribute.href("https://arda.tr")], [wordmark.view()]),
-        html.span([attribute.class("ix-label")], [html.text("/ ask")]),
-      ]),
-      html.div([attribute.class("ix-bar__nav")], [
+      // One link: the emblem is decoration beside the wordmark, which names it.
+      html.a(
+        [attribute.class("ix-bar__brand"), attribute.href("https://arda.tr")],
+        [
+          html.img([
+            attribute.class("ix-emblem"),
+            attribute.src("/brand/art/emblem.webp"),
+            attribute.alt(""),
+            attribute.width(40),
+            attribute.height(40),
+          ]),
+          wordmark.view(),
+        ],
+      ),
+      html.span([attribute.class("ix-bar__site")], [html.text("ask")]),
+      html.div([attribute.class("ix-bar__nav ix-bar__nav--end")], [
         html.nav(
           [attribute.class("bar-sites"), attribute.aria_label(s.nav_label)],
           [
-            html.a([attribute.href("https://arda.tr")], [html.text("index")]),
+            html.a([attribute.href("https://arda.tr")], [html.text("works")]),
             html.a([attribute.href("https://blog.arda.tr")], [
               html.text("blog"),
             ]),
@@ -560,9 +578,27 @@ fn bar(language: Language, s: Strings) -> Element(Msg) {
             ]),
           ],
         ),
-        language_toggle(language, s),
+        voice_toggle(model.voice_on, s),
+        language_toggle(model.language, s),
         scheme_toggle(s),
       ]),
+    ]),
+  ])
+}
+
+/// A wisp of smoke in the far right margin, on wide screens only (style.css).
+/// It is bone lines, so it sits on a soot plate: unseen on the dark page, a
+/// plate on bone paper. Decoration: nothing is said about it.
+fn wisp() -> Element(Msg) {
+  html.div([attribute.class("wisp ix-plate"), attribute.aria_hidden(True)], [
+    html.img([
+      attribute.class("ix-art"),
+      attribute.src("/brand/art/wisp.webp"),
+      attribute.alt(""),
+      attribute.width(400),
+      attribute.height(840),
+      // Not fetched where it is not shown.
+      attribute.attribute("loading", "lazy"),
     ]),
   ])
 }
@@ -604,12 +640,14 @@ fn hidden_text(text: String) -> Element(Msg) {
 }
 
 /// Mute / unmute the spoken replies. `aria-pressed` carries the state (the
-/// chip fills when it is on), and the label says it in words too.
+/// chip fills when it is on), and the label says it in words too. The bar has
+/// room for one word; the title says what the voice does.
 fn voice_toggle(on: Bool, s: Strings) -> Element(Msg) {
   html.button(
     [
       attribute.type_("button"),
       attribute.class("ix-chip voice-toggle"),
+      attribute.title(s.voice_label),
       attribute.aria_pressed(case on {
         True -> "true"
         False -> "false"
@@ -618,7 +656,7 @@ fn voice_toggle(on: Bool, s: Strings) -> Element(Msg) {
     ],
     [
       html.text(
-        s.voice_label
+        s.voice_short
         <> ": "
         <> case on {
           True -> s.voice_on
@@ -684,12 +722,18 @@ fn status(model: Model, s: Strings) -> String {
   }
 }
 
-/// The page's one heading. It scrolls away with the conversation.
+/// The page's one heading, beside the large ember. The theme sets an h1 in
+/// blackletter, and this is the only blackletter on the page. It scrolls away
+/// with the conversation.
 fn intro(s: Strings) -> Element(Msg) {
   html.header([attribute.class("intro")], [
-    html.h1([], [html.text(s.construct_title)]),
-    html.p([attribute.class("ix-small ix-muted")], [
-      html.text(s.construct_subline),
+    html.span(
+      [attribute.class("ix-mark ix-mark--lg"), attribute.aria_hidden(True)],
+      [],
+    ),
+    html.div([], [
+      html.h1([], [html.text(s.construct_title)]),
+      html.p([attribute.class("ix-muted")], [html.text(s.construct_subline)]),
     ]),
   ])
 }
@@ -708,7 +752,7 @@ fn messages_container(model: Model, s: Strings) -> Element(Msg) {
       attribute.aria_label(s.conversation_label),
     ],
     [
-      html.div([attribute.class("ix-wrap")], [
+      html.div([attribute.class("ix-wrap ix-wrap--read")], [
         intro(s),
         // The transcript is a log, but it does not announce itself: it
         // changes on every chunk. The finished reply goes to
@@ -727,6 +771,9 @@ fn messages_container(model: Model, s: Strings) -> Element(Msg) {
             tail,
           ),
         ),
+        // After the transcript, and at the foot of the scroller while the
+        // conversation is short (style.css): just above the input.
+        quick_topics(s),
         html.div(
           [
             attribute.id("reply-announcer"),
@@ -758,8 +805,8 @@ fn view_message(
     _, Speaking(msg_id: id, ..) if id == msg.id -> True
     _, _ -> False
   }
-  // Once the voice has started on a reply, the square follows its loudness
-  // instead of blinking.
+  // Once the voice has started on a reply, the ember follows its loudness
+  // instead of pulsing.
   let is_voiced = case speech {
     Speaking(msg_id: id, shown: n) if id == msg.id -> n > 0
     _ -> False
@@ -787,17 +834,17 @@ fn view_message(
     ]
   }
   case msg.sender, msg.is_error {
-    // The visitor's words: right-aligned, in a sunken box.
+    // The visitor's words: right-aligned, on the surface colour.
     User, _ ->
       html.div(attributes("ix-msg ix-msg--you msg user"), [
         hidden_text(s.who_you),
         text,
       ])
-    // An error is not the assistant's words, so it has no square. It is told
-    // by its label, not by its colour alone.
+    // An error is not the assistant's words, so it has no ember. It is told
+    // by its label and its written message, not by its colour alone.
     Bot, True ->
       html.div(attributes("ix-msg msg bot is-error"), [
-        html.div([attribute.class("ix-msg__body")], [
+        html.div([attribute.class("ix-msg__body ix-error")], [
           html.p([attribute.class("ix-label")], [html.text(s.error_label)]),
           text,
         ]),
@@ -824,8 +871,8 @@ fn view_pending(s: Strings) -> Element(Msg) {
   ])
 }
 
-/// "Thinking…" beside the blinking square, so the wait is said in words too
-/// (the square does not blink under reduced motion). Screen readers hear it
+/// "Thinking…" beside the glowing ember, so the wait is said in words too
+/// (the ember does not pulse under reduced motion). Screen readers hear it
 /// from the status line instead.
 fn thinking(s: Strings) -> Element(Msg) {
   html.p([attribute.class("txt ix-muted"), attribute.aria_hidden(True)], [
@@ -850,8 +897,9 @@ fn message_lang(text: String) -> List(attribute.Attribute(Msg)) {
   }
 }
 
-/// The assistant: the square dot of the wordmark, and nothing else. `busy`
-/// (a reply is awaited or being written) makes it blink; see brand.css.
+/// The assistant: the ember, and nothing else (brand.css draws `.ix-mark`
+/// from `--ix-ember-art`, which style.css sets). `busy` (a reply is awaited or
+/// being written) makes it glow.
 fn mark(busy: Bool) -> Element(Msg) {
   let attributes = [attribute.class("ix-mark"), attribute.aria_hidden(True)]
   html.span(
@@ -863,13 +911,26 @@ fn mark(busy: Bool) -> Element(Msg) {
   )
 }
 
+/// "Try asking": a label over the quick prompts, which it names as a group.
 fn quick_topics(s: Strings) -> Element(Msg) {
-  html.div([attribute.id("quick-topics"), attribute.class("ix-chips")], [
-    topic_button(s.btn_experience, s.prompt_experience),
-    topic_button(s.btn_education, s.prompt_education),
-    topic_button(s.btn_skills, s.prompt_skills),
-    topic_button(s.btn_visa, s.prompt_visa),
-    topic_button(s.btn_about_bot, s.prompt_about_bot),
+  html.div([attribute.id("quick-topics")], [
+    html.p([attribute.id("try-asking"), attribute.class("ix-label")], [
+      html.text(s.try_asking),
+    ]),
+    html.div(
+      [
+        attribute.class("ix-chips"),
+        attribute.role("group"),
+        attribute.aria_labelledby("try-asking"),
+      ],
+      [
+        topic_button(s.btn_experience, s.prompt_experience),
+        topic_button(s.btn_education, s.prompt_education),
+        topic_button(s.btn_skills, s.prompt_skills),
+        topic_button(s.btn_visa, s.prompt_visa),
+        topic_button(s.btn_about_bot, s.prompt_about_bot),
+      ],
+    ),
   ])
 }
 
@@ -884,13 +945,12 @@ fn topic_button(label: String, prompt: String) -> Element(Msg) {
   )
 }
 
-/// Quick prompts, the question field and its button, then the voice toggle
-/// beside the disclaimer. The status line is for screen readers: on screen the
-/// square and the reply itself show what is happening.
+/// The question field and its button, then the disclaimer. The status line is
+/// for screen readers: on screen the ember and the reply itself show what is
+/// happening.
 fn composer(model: Model, s: Strings) -> Element(Msg) {
   html.div([attribute.class("composer")], [
-    html.div([attribute.class("ix-wrap")], [
-      quick_topics(s),
+    html.div([attribute.class("ix-wrap ix-wrap--read")], [
       html.div([attribute.id("input-wrapper")], [
         html.input([
           attribute.type_("text"),
@@ -923,10 +983,7 @@ fn composer(model: Model, s: Strings) -> Element(Msg) {
           [html.text(s.send)],
         ),
       ]),
-      html.div([attribute.class("composer-meta")], [
-        voice_toggle(model.voice_on, s),
-        html.p([attribute.class("ix-small ix-muted")], [html.text(s.disclaimer)]),
-      ]),
+      html.p([attribute.class("ix-small ix-muted")], [html.text(s.disclaimer)]),
       html.p(
         [
           attribute.class("ix-sr"),
@@ -943,7 +1000,7 @@ fn composer(model: Model, s: Strings) -> Element(Msg) {
 /// hostnames in every language.
 fn footer(s: Strings) -> Element(Msg) {
   html.footer([attribute.class("ix-foot")], [
-    html.div([attribute.class("ix-wrap ix-foot__in")], [
+    html.div([attribute.class("ix-wrap ix-wrap--read ix-foot__in")], [
       html.nav(
         [
           attribute.class("family ix-small ix-muted"),
@@ -1047,6 +1104,9 @@ fn plain_text(markdown: String) -> String
 
 @external(javascript, "./ffi.mjs", "scroll_to_bottom")
 fn do_scroll_to_bottom(selector: String) -> Nil
+
+@external(javascript, "./ffi.mjs", "scroll_to_top")
+fn do_scroll_to_top(selector: String) -> Nil
 
 @external(javascript, "./ffi.mjs", "is_localhost")
 fn is_localhost() -> Bool
