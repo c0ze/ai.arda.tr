@@ -1,0 +1,706 @@
+/*
+  arda.tr family: The Index
+  ------------------------------------------------------------------------
+  "Everything he makes gets the same line in the same list." The shared
+  patterns of arda.tr, blog.arda.tr, resume.arda.tr and ai.arda.tr: the bar,
+  the numbered row, the section rule, the plate, the label, the dot.
+
+  Built on the Astryx `arda` theme (arda.css, built from themes/arda/). Every
+  colour, size and font here is one of its tokens.
+
+  Source of truth: brand/ in the arda.tr repository. The sibling sites carry
+  verbatim copies of arda.css, brand.css and scheme.js, and their CI checks the
+  copies against the hashes in arda.tr's config/themes.json. Change the files
+  here first, then copy them out.
+
+  A page needs:
+    <html data-astryx-theme="arda">        the theme scope
+    data-theme="light" | "dark" on <html>  only when the scheme is pinned
+    arda.css loaded before this file, and the layer order
+      @layer reset, astryx-base, astryx-theme, brand;
+    declared before either.
+*/
+
+@layer brand {
+  :root {
+    --ix-max: 75rem; /* 1200px: 12 columns, 24px gutters */
+    --ix-gutter: 1.5rem;
+    --ix-measure: 68ch;
+    --ix-row: 3rem; /* 48px */
+    --ix-section-gap: 6rem; /* 96px; the résumé and ai tighten it */
+    --ix-rule: 1px solid var(--color-border);
+    --ix-rule-section: 2px solid var(--color-text-primary);
+    --ix-sunken: var(--color-background-muted);
+    --ix-link: var(--color-text-accent);
+    --ix-mono: var(--font-family-code);
+
+    background: var(--color-background-body);
+    color: var(--color-text-primary);
+    accent-color: var(--color-accent);
+    scrollbar-color: var(--color-border-emphasized) var(--color-background-body);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Hairlines and secondary text gain contrast when the visitor asks for it. */
+  @media (prefers-contrast: more) {
+    :root {
+      --color-border: var(--color-border-emphasized);
+      --color-text-secondary: var(--color-text-primary);
+    }
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-family-body);
+    font-size: var(--text-body-size);
+    line-height: var(--text-body-leading);
+    /* A fallback face keeps the x-height of IBM Plex Sans while it loads. */
+    font-size-adjust: from-font;
+    text-wrap: pretty;
+  }
+
+  :where(h1, h2, h3, h4) {
+    margin: 0;
+    text-wrap: balance;
+  }
+  :where(h1) {
+    letter-spacing: -0.03em;
+  }
+  :where(h2) {
+    letter-spacing: -0.02em;
+  }
+  :where(h3, h4) {
+    font-family: var(--font-family-body);
+    letter-spacing: 0;
+  }
+  :where(p) {
+    margin: 0;
+  }
+
+  /* Bare links only: a component's link (an Astryx Button with an href, say)
+     keeps its own colour. */
+  :where(a:not([class])) {
+    color: var(--ix-link);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+  }
+
+  :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+    outline: var(--focus-outline-width) solid var(--focus-outline-color);
+    outline-offset: var(--focus-outline-offset);
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  /* -- Layout ---------------------------------------------------------- */
+
+  .ix-wrap {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: calc(var(--ix-max) + 2 * var(--ix-gutter));
+    margin-inline: auto;
+    padding-inline: var(--ix-gutter);
+  }
+
+  .ix-stack > * + * {
+    margin-block-start: var(--spacing-4);
+  }
+
+  .ix-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* -- Type ------------------------------------------------------------ */
+
+  /* Mono label: entry numbers, kind codes, dates, nav. */
+  .ix-label {
+    font-family: var(--ix-mono);
+    font-size: var(--text-label-size);
+    line-height: var(--text-label-leading);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+
+  /* The entry number: the one place vermilion always appears. */
+  .ix-num {
+    font-family: var(--ix-mono);
+    font-size: var(--text-label-size);
+    line-height: var(--text-label-leading);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-accent);
+  }
+
+  /* Display headline: 72/76, and up to 120px on the landing page. */
+  .ix-display {
+    font-family: var(--font-family-heading);
+    font-weight: 800;
+    font-size: clamp(2.75rem, 1.2rem + 6.2vw, var(--ix-display-max, 4.5rem));
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+
+  /* The full stop that closes a headline, in vermilion. */
+  .ix-dot {
+    color: var(--color-accent);
+  }
+
+  .ix-lede {
+    font-size: var(--text-large-size);
+    line-height: var(--text-large-leading);
+    max-width: var(--ix-measure);
+  }
+
+  .ix-muted {
+    color: var(--color-text-secondary);
+  }
+
+  .ix-small {
+    font-size: var(--text-supporting-size);
+    line-height: var(--text-supporting-leading);
+  }
+
+  /* -- The bar --------------------------------------------------------- */
+
+  .ix-bar {
+    border-block-end: var(--ix-rule);
+  }
+  .ix-bar__in {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-4);
+    min-height: 3.5rem;
+    flex-wrap: wrap;
+  }
+  .ix-bar__brand {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-2);
+    color: var(--color-text-primary);
+    text-decoration: none;
+  }
+  .ix-wordmark {
+    display: block;
+    height: 1.25rem;
+    width: auto;
+    color: var(--color-text-primary);
+  }
+  .ix-bar__nav {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-5);
+    flex-wrap: wrap;
+  }
+  .ix-bar__nav a,
+  .ix-navlink {
+    font-family: var(--ix-mono);
+    font-size: var(--text-label-size);
+    line-height: var(--text-label-leading);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ix-link);
+    text-decoration: none;
+  }
+  .ix-bar__nav a:hover,
+  .ix-navlink:hover {
+    text-decoration: underline;
+  }
+  @media (max-width: 45rem) {
+    .ix-bar__in {
+      padding-block: var(--spacing-2);
+    }
+    .ix-bar__nav {
+      gap: var(--spacing-1) var(--spacing-4);
+    }
+  }
+  button.ix-navlink {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+  .ix-bar__nav a[aria-current="page"] {
+    color: var(--color-text-primary);
+    text-decoration: underline;
+  }
+
+  /* -- Sections -------------------------------------------------------- */
+
+  .ix-section {
+    margin-block-start: var(--ix-section-gap);
+  }
+  .ix-section__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--spacing-4);
+    flex-wrap: wrap;
+    padding-block-end: var(--spacing-4);
+  }
+
+  /* -- The row ---------------------------------------------------------
+     One entry, one line: number, kind, title, meta. 12 columns: 1 / 1 / 7 / 3.
+     A 2px ink rule opens the list; a 1px rule closes each row.            */
+
+  .ix-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-block-start: var(--ix-rule-section);
+  }
+  .ix-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr 7fr 3fr;
+    column-gap: var(--ix-gutter);
+    align-items: baseline;
+    min-height: var(--ix-row);
+    box-sizing: border-box;
+    padding-block: 0.6875rem;
+    border-block-end: var(--ix-rule);
+  }
+  .ix-row__title {
+    font-family: var(--font-family-body);
+    font-size: var(--text-body-size);
+    line-height: var(--text-body-leading);
+    font-weight: 500;
+    color: var(--color-text-primary);
+    margin: 0;
+  }
+  .ix-row__title a {
+    color: inherit;
+    text-decoration: none;
+  }
+  /* The title's link covers the row, so the whole line is the target. */
+  .ix-row__title a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  .ix-row:has(.ix-row__title a:hover) {
+    background: var(--ix-sunken);
+  }
+  .ix-row:has(.ix-row__title a:hover) .ix-row__title a {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+  }
+  .ix-row__desc {
+    grid-column: 3;
+    font-size: var(--text-supporting-size);
+    line-height: var(--text-supporting-leading);
+    color: var(--color-text-secondary);
+    max-width: var(--ix-measure);
+  }
+  .ix-row__meta {
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: end;
+    text-align: end;
+  }
+  /* Links other than the title sit above the row-wide target. */
+  .ix-row a:not(.ix-row__title a) {
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (max-width: 45rem) {
+    /* Below 720px a row stacks to two lines: codes above, title below. */
+    .ix-row {
+      grid-template-columns: auto auto 1fr;
+      column-gap: var(--spacing-3);
+      row-gap: var(--spacing-1);
+    }
+    .ix-row__meta {
+      grid-column: 3;
+    }
+    .ix-row__title,
+    .ix-row__desc {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* -- Key and value: the résumé's table, the landing's record ---------- */
+
+  .ix-kv {
+    margin: 0;
+    border-block-start: var(--ix-rule-section);
+  }
+  .ix-kv > div {
+    display: grid;
+    grid-template-columns: 2fr 10fr;
+    column-gap: var(--ix-gutter);
+    align-items: baseline;
+    min-height: var(--ix-row);
+    box-sizing: border-box;
+    padding-block: 0.6875rem;
+    border-block-end: var(--ix-rule);
+  }
+  .ix-kv dt {
+    font-family: var(--ix-mono);
+    font-size: var(--text-label-size);
+    line-height: var(--text-label-leading);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+  .ix-kv dd {
+    margin: 0;
+  }
+  @media (max-width: 45rem) {
+    .ix-kv > div {
+      grid-template-columns: 1fr;
+      row-gap: var(--spacing-1);
+    }
+  }
+
+  /* -- The plate: a flat tile, the entry number, one artefact ----------- */
+
+  .ix-plates {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+    gap: var(--ix-gutter);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .ix-plate {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--ix-sunken);
+    color: var(--color-text-primary);
+  }
+  .ix-plate--ink {
+    background: var(--color-background-inverted);
+    color: var(--color-background-body);
+  }
+  .ix-plate__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: var(--spacing-3) var(--spacing-4) 0;
+  }
+  .ix-plate--ink .ix-label {
+    color: inherit;
+    opacity: 0.72;
+  }
+  .ix-plate__num {
+    font-family: var(--font-family-heading);
+    font-weight: 800;
+    font-size: 2.5rem;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .ix-plate__art {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: contain; /* screenshots stay uncropped */
+    margin-block-start: var(--spacing-3);
+  }
+  .ix-plate__body {
+    padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
+  }
+  .ix-plate__title {
+    font-size: var(--text-heading-3-size);
+    line-height: var(--text-heading-3-leading);
+    font-weight: 600;
+    margin: 0;
+  }
+  .ix-plate__title a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .ix-plate__title a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  .ix-plate:has(.ix-plate__title a:hover) .ix-plate__title a {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+  }
+
+  /* -- Controls for pages without Astryx components --------------------- */
+
+  .ix-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+  }
+  .ix-chip {
+    font-family: var(--ix-mono);
+    font-size: var(--text-label-size);
+    line-height: var(--text-label-leading);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-primary);
+    background: transparent;
+    border: 1px solid var(--color-border-emphasized);
+    border-radius: 0;
+    padding: 0.3125rem 0.75rem;
+    min-height: 2rem;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .ix-chip:hover {
+    background: var(--ix-sunken);
+  }
+  .ix-chip[aria-pressed="true"],
+  .ix-chip[aria-current="true"],
+  .ix-chip[aria-current="page"] {
+    background: var(--color-background-inverted);
+    border-color: var(--color-background-inverted);
+    color: var(--color-background-body);
+  }
+
+  .ix-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    box-sizing: border-box;
+    min-height: 2.5rem;
+    padding: 0 var(--spacing-4);
+    font: inherit;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    background: transparent;
+    border: 1px solid var(--color-border-emphasized);
+    border-radius: 2px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .ix-btn:hover {
+    background: var(--ix-sunken);
+  }
+  .ix-btn--primary {
+    color: var(--color-on-accent);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+  .ix-btn--primary:hover {
+    background: color-mix(in oklab, var(--color-accent) 88%, var(--color-text-primary));
+  }
+  .ix-btn:disabled,
+  .ix-btn[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .ix-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: var(--spacing-2) var(--spacing-3);
+    font: inherit;
+    color: var(--color-text-primary);
+    background: var(--color-background-surface);
+    border: 1px solid var(--color-border-emphasized);
+    border-radius: 2px;
+  }
+  .ix-input::placeholder {
+    color: var(--color-text-secondary);
+  }
+
+  /* The scheme switch shows the scheme it would switch to. Both labels are in
+     the markup; CSS shows one, so it is right before any script runs. */
+  .ix-scheme [data-when] {
+    display: none;
+  }
+  :root:not([data-theme]) .ix-scheme [data-when="light"],
+  :root[data-theme="light"] .ix-scheme [data-when="light"],
+  :root[data-theme="dark"] .ix-scheme [data-when="dark"] {
+    display: inline;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .ix-scheme [data-when="light"] {
+      display: none;
+    }
+    :root:not([data-theme]) .ix-scheme [data-when="dark"] {
+      display: inline;
+    }
+  }
+
+  /* -- The assistant: the square dot, nothing else ---------------------- */
+
+  .ix-mark {
+    display: inline-block;
+    flex: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    background: var(--color-accent);
+    /* --ix-level (0 to 1) is the voice's loudness; the dot swells with it. */
+    transform: scale(calc(1 + 0.35 * var(--ix-level, 0)));
+    transition: transform 80ms linear;
+  }
+  .ix-mark--sm {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+  @keyframes ix-think {
+    50% {
+      opacity: 0.35;
+    }
+  }
+  .ix-mark[data-busy="true"] {
+    animation: ix-think 1.2s steps(2, jump-none) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ix-mark {
+      transform: none;
+      transition: none;
+    }
+    .ix-mark[data-busy="true"] {
+      animation: none;
+      opacity: 0.6;
+    }
+  }
+
+  .ix-thread {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-5);
+  }
+  .ix-msg {
+    display: grid;
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+    column-gap: var(--spacing-3);
+    align-items: start;
+  }
+  .ix-msg__body {
+    min-width: 0;
+    max-width: var(--ix-measure);
+    overflow-wrap: anywhere;
+  }
+  .ix-msg--you {
+    display: block;
+    align-self: flex-end;
+    max-width: min(100%, 34rem);
+    padding: var(--spacing-3) var(--spacing-4);
+    background: var(--ix-sunken);
+  }
+  .ix-cites {
+    margin-block-start: var(--spacing-2);
+    font-family: var(--ix-mono);
+    font-size: var(--text-label-size);
+    line-height: var(--text-label-leading);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  /* -- Long-form text: one 68-character column -------------------------- */
+
+  .ix-prose {
+    max-width: var(--ix-measure);
+  }
+  .ix-prose > * + * {
+    margin-block-start: 1.25em;
+  }
+  .ix-prose :where(h2) {
+    margin-block-start: 2em;
+  }
+  .ix-prose :where(h3) {
+    margin-block-start: 1.75em;
+    font-size: var(--text-heading-3-size);
+    line-height: var(--text-heading-3-leading);
+    font-weight: 600;
+  }
+  .ix-prose :where(a) {
+    text-decoration: underline;
+  }
+  .ix-prose :where(ul, ol) {
+    padding-inline-start: 1.25em;
+  }
+  .ix-prose :where(li + li) {
+    margin-block-start: 0.4em;
+  }
+  .ix-prose :where(blockquote) {
+    margin-inline: 0;
+    padding-inline-start: var(--spacing-4);
+    border-inline-start: 2px solid var(--color-text-primary);
+    color: var(--color-text-secondary);
+  }
+  .ix-prose :where(code, kbd, samp) {
+    font-family: var(--ix-mono);
+    font-size: 0.875em;
+  }
+  .ix-prose :where(:not(pre) > code) {
+    background: var(--ix-sunken);
+    padding: 0.1em 0.3em;
+  }
+  .ix-prose :where(pre) {
+    background: var(--ix-sunken);
+    padding: var(--spacing-4);
+    overflow-x: auto;
+    font-size: var(--text-supporting-size);
+    line-height: 1.6;
+    max-width: calc(var(--ix-measure) + 12ch);
+  }
+  .ix-prose :where(img, video, svg) {
+    max-width: 100%;
+    height: auto;
+  }
+  .ix-prose :where(hr) {
+    border: 0;
+    border-block-start: var(--ix-rule);
+    margin-block: 2.5em;
+  }
+  .ix-prose :where(table) {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: var(--text-supporting-size);
+    border-block-start: var(--ix-rule-section);
+  }
+  .ix-prose :where(th, td) {
+    text-align: start;
+    padding: var(--spacing-2) var(--spacing-3) var(--spacing-2) 0;
+    border-block-end: var(--ix-rule);
+    vertical-align: baseline;
+  }
+  .ix-prose :where(th) {
+    font-family: var(--ix-mono);
+    font-size: var(--text-label-size);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+
+  /* -- Footer ----------------------------------------------------------- */
+
+  .ix-foot {
+    margin-block-start: var(--ix-section-gap);
+    border-block-start: var(--ix-rule);
+    padding-block: var(--spacing-5) var(--spacing-8);
+  }
+  .ix-foot__in {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--spacing-3) var(--spacing-5);
+  }
+}

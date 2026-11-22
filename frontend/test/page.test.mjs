@@ -105,3 +105,28 @@ const built = new URL('../../public/index.html', import.meta.url);
 test('the built public/index.html is the page checked above', { skip: !existsSync(built) && 'no Lustre build in ../public' }, () => {
   assert.equal(readFileSync(built, 'utf8'), html);
 });
+
+// ---------------------------------------------------------------------------
+// The family brand ("The Index"). arda.css (the theme's tokens), brand.css
+// (the shared patterns), scheme.js (the light/dark pin) and the logo files are
+// verbatim copies from the arda.tr repository's brand/ folder: a copy edited
+// here would drift from the other three sites. Checked against the sibling
+// checkout where there is one (CI has none).
+// ---------------------------------------------------------------------------
+
+const publicDir = new URL('../../public/', import.meta.url);
+const brandSource = new URL('../../../arda.tr/brand/', import.meta.url);
+const BRAND_COPIES = [
+  ['brand/arda.css', 'arda.css'],
+  ['brand/brand.css', 'brand.css'],
+  ['brand/scheme.js', 'scheme.js'],
+  ['brand/logo/wordmark.svg', 'logo/wordmark.svg'],
+  ['favicon.svg', 'logo/favicon.svg'],
+];
+
+test('the brand files are verbatim copies of arda.tr/brand', { skip: !existsSync(brandSource) && 'no ../arda.tr checkout beside this one' }, () => {
+  for (const [copy, source] of BRAND_COPIES) {
+    assert.ok(readFileSync(new URL(copy, publicDir)).equals(readFileSync(new URL(source, brandSource))),
+      `public/${copy} differs from arda.tr/brand/${source}: copy it again, do not edit it here`);
+  }
+});
