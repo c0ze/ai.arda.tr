@@ -69,7 +69,7 @@ The ember is the only thing that moves.
 - While the voice speaks, it glows with the loudness (`--ix-level`, 0 to 1), and the reply
   appears as it is spoken.
 - Under `prefers-reduced-motion` it does not pulse: it is only brighter while busy, and the
-  words carry the state. The wisp is still.
+  words carry the state. The wisp moves: the family's `smoke.js` plays its film (`public/brand/art/wisp-smoke.mp4`) over the image, never under reduced motion.
 
 ## Scheme
 

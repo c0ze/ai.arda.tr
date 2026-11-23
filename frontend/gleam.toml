@@ -81,6 +81,9 @@ scripts = [
   # The scheme switch after load (ffi.mjs: scheme_toggle, scheme_watch). A
   # module script runs before the app's own, which follows it in <head>.
   { type = "module", content = "import * as scheme from '/brand/scheme.js?v=1';window.ardaScheme=scheme;" },
+  # The wisp moves: the family's smoke.js plays its film over the image. The
+  # app draws the wisp after this runs, so wait for it (a few seconds at most).
+  { type = "module", content = "import{startSmoke}from'/brand/smoke.js?v=1';let n=0;const go=()=>{if(document.querySelector('.ix-smoke>img[data-smoke-video]'))startSmoke();else if(++n<600)requestAnimationFrame(go)};go();" },
 ]
 # The CF Web Analytics beacon lives in `body` (raw HTML) because Lustre's
 # `scripts` config can't express the required data-cf-beacon attribute.

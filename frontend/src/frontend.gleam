@@ -590,9 +590,11 @@ fn bar(model: Model, s: Strings) -> Element(Msg) {
 /// It is bone lines, so it sits on a soot plate: unseen on the dark page, a
 /// plate on bone paper. Decoration: nothing is said about it.
 fn wisp() -> Element(Msg) {
-  html.div([attribute.class("wisp ix-plate"), attribute.aria_hidden(True)], [
+  html.div([attribute.class("wisp ix-plate ix-smoke"), attribute.aria_hidden(True)], [
     html.img([
       attribute.class("ix-art ix-art--drift"),
+      // The film the family's smoke.js plays over the image (gleam.toml).
+      attribute.attribute("data-smoke-video", "/brand/art/wisp-smoke.mp4"),
       attribute.src("/brand/art/wisp.webp"),
       attribute.alt(""),
       attribute.width(400),

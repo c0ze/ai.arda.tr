@@ -165,9 +165,11 @@ test('scheme.js is loaded for the switch before the app starts', () => {
   // ffi.mjs reads window.ardaScheme. Module scripts run in document order, so
   // this one must come before the app's.
   const modules = [...head.matchAll(/<script([^>]*)>(.*?)<\/script>/gs)].filter((m) => /type="module"/.test(m[1]));
-  assert.equal(modules.length, 2);
+  assert.equal(modules.length, 3);
   assert.match(modules[0][2], /^import \* as scheme from '\/brand\/scheme\.js\?v=\d+';window\.ardaScheme=scheme;$/);
-  assert.match(modules[1][1], /src="\/frontend\.js"/);
+  // the wisp's film: the family's smoke.js, started once the app has drawn the wisp
+  assert.match(modules[1][2], /^import\{startSmoke\}from'\/brand\/smoke\.js\?v=\d+';/);
+  assert.match(modules[2][1], /src="\/frontend\.js"/);
 });
 
 // ---------------------------------------------------------------------------
@@ -252,6 +254,8 @@ const BRAND_COPIES = [
   ['brand/arda.css', 'arda.css'],
   ['brand/brand.css', 'brand.css'],
   ['brand/scheme.js', 'scheme.js'],
+  ['brand/smoke.js', 'smoke.js'],
+  ['brand/art/wisp-smoke.mp4', 'art/wisp-smoke.mp4'],
   ['brand/art/emblem.webp', 'art/emblem.webp'],
   ['brand/art/ember.webp', 'art/ember.webp'],
   ['brand/art/wisp.webp', 'art/wisp.webp'],

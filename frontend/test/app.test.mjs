@@ -456,7 +456,7 @@ test('the quick prompts are a group named "Try asking", at the end of the conver
 test('the wisp is decoration, on a soot plate', () => {
   // Bone lines: on bone paper they need the plate's soot ground. It says
   // nothing, so it is hidden from screen readers and has an empty alt.
-  const wisp = to_string(view(start())).match(/<div aria-hidden="true" class="wisp ix-plate"><img([^>]*)><\/div>/);
+  const wisp = to_string(view(start())).match(/<div aria-hidden="true" class="wisp ix-plate ix-smoke"><img([^>]*)><\/div>/);
   assert.ok(wisp, 'a plate with one picture');
   assert.match(wisp[1], /^ alt class="ix-art ix-art--drift"/);
   assert.match(wisp[1], /src="\/brand\/art\/wisp\.webp"/);
