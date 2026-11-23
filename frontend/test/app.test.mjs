@@ -3,7 +3,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   init, update, UserTypedInput, UserClickedSend, UserPickedLanguage, UserToggledVoice, StreamEventReceived,
-  SpeechRevealed, SpeechEnded,
+  SpeechRevealed, SpeechEnded, UserToggledNatural, NaturalProgressed, NaturalLoaded, NaturalBroke,
+  voice_for, NoVoice, ServerVoice, NaturalVoice,
 } from '../build/dev/javascript/frontend/frontend.mjs';
 import { Jp, Tr } from '../build/dev/javascript/frontend/frontend/i18n.mjs';
 
@@ -157,11 +158,51 @@ test('the send and voice buttons are named by what they show', () => {
   const off = voiceToggle(step(start(), new UserToggledVoice()));
   assert.equal(off[1], 'Voice: Off');
   assert.equal(attr(off[0], 'aria-pressed'), 'false');
-  for (const [lang, shown, title] of [[new Jp(), '音声: オン', '返答を読み上げる'], [new Tr(), 'Ses: Açık', 'Yanıtları sesli oku']]) {
-    const toggle = voiceToggle(step(start(), new UserPickedLanguage(lang)));
-    assert.equal(toggle[1], shown);
-    assert.equal(attr(toggle[0], 'title'), title);
+  // Only English is spoken, so the other languages show no voice control at all.
+  for (const lang of [new Jp(), new Tr()]) {
+    assert.equal(voiceToggle(step(start(), new UserPickedLanguage(lang))), null);
   }
+});
+
+// Who speaks: nobody outside English or when muted; the server until the
+// visitor's own model is loaded; then that model, and the request is text-only.
+test('only English is spoken, by the server until the natural voice is loaded', () => {
+  assert.ok(voice_for(start()) instanceof ServerVoice);
+  assert.ok(voice_for(step(start(), new UserToggledVoice())) instanceof NoVoice);
+  for (const lang of [new Jp(), new Tr()]) {
+    assert.ok(voice_for(step(start(), new UserPickedLanguage(lang))) instanceof NoVoice);
+  }
+  let model = step(start(), new UserToggledNatural());
+  assert.ok(voice_for(model) instanceof ServerVoice, 'still loading: the server speaks');
+  model = step(model, new NaturalLoaded());
+  assert.ok(voice_for(model) instanceof NaturalVoice);
+  assert.ok(voice_for(step(model, new UserPickedLanguage(new Jp()))) instanceof NoVoice);
+  assert.ok(voice_for(step(model, new UserToggledVoice())) instanceof NoVoice);
+});
+
+// The natural voice is a 67 MB download, so it is offered, never started for
+// the visitor: the button says its size, then the progress, then that it is on.
+test('the natural voice is offered with its size, shows its download, and can be turned off', () => {
+  const natural = (model) => [...to_string(view(model)).matchAll(/<button[^>]*class="ix-chip voice-toggle"[^>]*>(.*?)<\/button>/g)][1];
+  let model = start();
+  assert.equal(natural(model)[1], 'Natural voice · 67 MB');
+  assert.equal(attr(natural(model)[0], 'aria-pressed'), 'false');
+  model = step(model, new UserToggledNatural());
+  assert.equal(natural(model)[1], 'Loading voice 0%');
+  model = step(model, new NaturalProgressed(42));
+  assert.equal(natural(model)[1], 'Loading voice 42%');
+  // a second click while it loads does nothing
+  assert.equal(natural(step(model, new UserToggledNatural()))[1], 'Loading voice 42%');
+  const on = step(model, new NaturalLoaded());
+  assert.equal(natural(on)[1], 'Natural voice: On');
+  assert.equal(attr(natural(on)[0], 'aria-pressed'), 'true');
+  assert.equal(natural(step(on, new UserToggledNatural()))[1], 'Natural voice · 67 MB');
+  // a failed download says so and can be tried again
+  const failed = step(model, new NaturalBroke());
+  assert.match(natural(failed)[1], /unavailable/);
+  assert.equal(natural(step(failed, new UserToggledNatural()))[1], 'Loading voice 0%');
+  // muted: there is nothing to choose a voice for
+  assert.equal(natural(step(start(), new UserToggledVoice())), undefined);
 });
 
 test('labels follow the UI language', () => {
@@ -388,13 +429,18 @@ test('the bar links arda.tr from the emblem and wordmark, then the works, the bl
   });
 });
 
-test('after the sites, pushed to the right: the voice toggle, the languages, the scheme switch', () => {
-  eachLanguage((html) => {
+test('after the sites, pushed to the right: the voice toggle (in English), the languages, the scheme switch', () => {
+  for (const [lang, parts] of [
+    [null, ['class="bar-sites"', 'class="ix-chip voice-toggle"', 'class="language-toggle"', 'class="ix-scheme ix-navlink"']],
+    [new Jp(), ['class="bar-sites"', 'class="language-toggle"', 'class="ix-scheme ix-navlink"']],
+    [new Tr(), ['class="bar-sites"', 'class="language-toggle"', 'class="ix-scheme ix-navlink"']],
+  ]) {
+    const html = to_string(view(lang ? step(start(), new UserPickedLanguage(lang)) : start()));
     const nav = barOf(html).match(/<div class="ix-bar__nav ix-bar__nav--end">(.*)$/s)[1];
-    const order = ['class="bar-sites"', 'class="ix-chip voice-toggle"', 'class="language-toggle"', 'class="ix-scheme ix-navlink"'].map((part) => nav.indexOf(part));
-    assert.ok(order.every((at) => at >= 0), 'all four are in the bar');
+    const order = parts.map((part) => nav.indexOf(part));
+    assert.ok(order.every((at) => at >= 0), 'each is in the bar');
     assert.deepEqual(order, [...order].sort((a, b) => a - b));
-  });
+  }
 });
 
 test('the inline wordmark is the family logo, in one colour: the text\'s', () => {

@@ -29,7 +29,8 @@
  *   voiceEnabled()           The visitor's choice, localStorage "voice" = "on" | "off"; default on.
  *   setVoiceEnabled(on)      Persist it and notify subscribers (a muting speaker stops at once).
  *   onVoiceChange(fn)        fn(on) on every change; returns an unsubscribe function.
- *   requestFields(lang)      {voice: true, lang} when voice is on, else {}: spread into the body.
+ *   requestFields(lang)      {voice: true, lang} when voice is on and lang is "en", else {}: spread
+ *                            into the body. Only English is spoken (since 2026-11).
  *   createSpeaker({onReveal, onLevel, onEnd}) → {handle(event), stop()}   one per reply:
  *     handle(event)          feed EVERY parsed SSE event (thinking/voice/chunk/speech/speech_end/done/error)
  *     stop()                 new message, language switch or reset: silence it and reveal everything
@@ -37,7 +38,9 @@
  *                            Called only when the value grows. Starts at 0 once the server says voice on.
  *     onLevel(level)         0..1 loudness each animation frame while speaking (for an orb, meter, ...)
  *     onEnd()                once, when the speaker has nothing more to do (always after onReveal(Infinity))
- *   robotChain(ctx)          → {input, output, analyser}: the voice effect, exported for offline tests.
+ *   voiceChain(ctx)          → {input, output, analyser}: the path to the speakers (no effect), with a meter.
+ *   speechInput()            the chain's input, for speech made in the browser; null before unlockAudio().
+ *   speechLevel()            0..1 loudness of what is playing now.
  *
  * Behaviour: text is gated only while voice is on, the server said voice on, and audio can play.
  * Otherwise (muted, voice:false, an old server, no Web Audio, a context that will not start) the
@@ -79,7 +82,7 @@ export function onVoiceChange(fn) {
 }
 
 export function requestFields(lang) {
-  return voiceEnabled() ? { voice: true, lang } : {};
+  return voiceEnabled() && lang === "en" ? { voice: true, lang } : {};
 }
 
 /* ---------------------------------------------------------------- audio context */
@@ -107,80 +110,35 @@ export function unlockAudio() {
 }
 
 /*
- * The robot: decoded speech → ring modulator (a gain driven by a 58 Hz sine, 55% wet / 45% dry so
- * words stay intelligible) → gentle bit-crush (a 16-step staircase blended 40% into the straight
- * line) → 5.2 kHz low-pass to take the fizz off → short metallic comb (4.5 ms delay, 0.42
- * feedback, 35% mix) → 0.95 gain → limiter (−6 dB, 12:1) → meter → speakers. The classic 80s synth robot: mechanical, not harsh.
+ * The voice goes to the speakers as it is: a gain, then a meter for the loudness. (Until
+ * 2026-11 a "robot" effect sat here: ring modulator, bit-crush, comb. It was too much.)
  */
-export function robotChain(ac) {
+export function voiceChain(ac) {
   const input = ac.createGain();
-
-  const osc = ac.createOscillator();
-  osc.type = "sine";
-  osc.frequency.value = 58;
-  const ring = ac.createGain();
-  ring.gain.value = 0; // the oscillator alone drives it: output = input × sin(2π·58·t)
-  osc.connect(ring.gain);
-  osc.start();
-  const dry = ac.createGain();
-  dry.gain.value = 0.45;
-  const wet = ac.createGain();
-  wet.gain.value = 0.55;
-  input.connect(dry);
-  input.connect(ring).connect(wet);
-  const mix = ac.createGain();
-  dry.connect(mix);
-  wet.connect(mix);
-
-  const crush = ac.createWaveShaper();
-  const N = 4096, steps = 16, blend = 0.4, curve = new Float32Array(N);
-  for (let i = 0; i < N; i++) {
-    const x = (i / (N - 1)) * 2 - 1;
-    curve[i] = (1 - blend) * x + blend * (Math.round(x * steps) / steps);
-  }
-  crush.curve = curve;
-  mix.connect(crush);
-  const lowpass = ac.createBiquadFilter();
-  lowpass.type = "lowpass";
-  lowpass.frequency.value = 5200;
-  lowpass.Q.value = 0.5;
-  crush.connect(lowpass);
-
-  const comb = ac.createDelay(0.05);
-  comb.delayTime.value = 0.0045;
-  const feedback = ac.createGain();
-  feedback.gain.value = 0.42;
-  const combMix = ac.createGain();
-  combMix.gain.value = 0.35;
-  lowpass.connect(comb);
-  comb.connect(feedback).connect(comb);
-  comb.connect(combMix);
-  const sum = ac.createGain();
-  sum.gain.value = 0.95;
-  lowpass.connect(sum);
-  combMix.connect(sum);
-
-  const limiter = ac.createDynamicsCompressor();
-  limiter.threshold.value = -6;
-  limiter.knee.value = 4;
-  limiter.ratio.value = 12;
-  limiter.attack.value = 0.002;
-  limiter.release.value = 0.15;
-  sum.connect(limiter);
   const analyser = ac.createAnalyser();
   analyser.fftSize = 1024;
-  limiter.connect(analyser);
+  input.connect(analyser);
   return { input, output: analyser, analyser };
 }
 
 function ensureChain() {
   if (!ctx) return null;
   if (!chain) {
-    chain = robotChain(ctx);
+    chain = voiceChain(ctx);
     chain.output.connect(ctx.destination);
     chain.samples = new Float32Array(chain.analyser.fftSize);
   }
   return chain;
+}
+
+/** Where another source of speech (a voice made in the browser) plugs in; null before unlockAudio(). */
+export function speechInput() {
+  return ensureChain()?.input ?? null;
+}
+
+/** The loudness of what is playing now, 0..1. */
+export function speechLevel() {
+  return level();
 }
 
 function level() {

@@ -174,12 +174,20 @@ function fakeWindow(t) {
 test('voice defaults on, persists a mute, and a muted request has no voice fields', (t) => {
   fakeWindow(t);
   assert.equal(voiceEnabled(), true);
-  assert.deepEqual(requestFields('ja'), { voice: true, lang: 'ja' });
+  assert.deepEqual(requestFields('en'), { voice: true, lang: 'en' });
   setVoiceEnabled(false);
   assert.equal(window.localStorage.getItem('voice'), 'off');
   assert.equal(voiceEnabled(), false);
-  assert.deepEqual(requestFields('ja'), {});
+  assert.deepEqual(requestFields('en'), {});
   setVoiceEnabled(true);
+});
+
+// Only English is spoken: a Japanese or Turkish reply never asks the server for audio.
+test('only an English request asks for voice', (t) => {
+  fakeWindow(t);
+  assert.equal(voiceEnabled(), true);
+  assert.deepEqual(requestFields('ja'), {});
+  assert.deepEqual(requestFields('tr'), {});
 });
 
 test('without Web Audio a voiced reply is shown at once, like text-only', (t) => {

@@ -36,7 +36,7 @@ Pinned to the viewport. Only the conversation scrolls.
 
 1. **The bar.** The round emblem and the `arda.tr` wordmark (inline SVG in the text colour),
    one link to arda.tr, then `ask` in secondary text. Pushed right, in Spectral: `works`,
-   `blog`, `résumé`; the voice toggle (a chip that fills when voice is on, and says so in
+   `blog`, `résumé`; in English only (the one language that is spoken), the voice toggle and, while voice is on, the natural-voice chip (its size, then its download, then "On"); the voice toggle is a chip that fills when voice is on, and says so in
    words); the language switch `EN / JP / TR` (the one in use is ember and underlined); the
    scheme switch, which names the scheme it would switch to. No rule beneath.
 2. **The header.** The large ember (64px) beside the `h1` in Grenze Gotisch (64px; 44px on a

@@ -98,6 +98,7 @@ pub type Model {
     next_id: Int,
     stream_state: StreamState,
     voice_on: Bool,
+    natural: Natural,
     speech: Speech,
     // Bumped by every send and every reset; stream events carry the value
     // they were started with, and events from an older request are dropped.
@@ -108,9 +109,21 @@ pub type Model {
   )
 }
 
+/// The natural English voice: a model that runs in the visitor's browser
+/// (natural.mjs). They opt in to its download; until it is `NaturalOn`,
+/// English replies are spoken by the server's voice.
+pub type Natural {
+  NaturalOff
+  /// Downloading or starting, with the download's percentage.
+  NaturalLoading(Int)
+  NaturalOn
+  NaturalFailed
+}
+
 pub fn init(_flags) -> #(Model, Effect(Msg)) {
   let language = load_language()
   apply_language(language)
+  let wanted = do_natural_wanted()
   let model =
     Model(
       language: language,
@@ -119,12 +132,22 @@ pub fn init(_flags) -> #(Model, Effect(Msg)) {
       next_id: 0,
       stream_state: Idle,
       voice_on: do_voice_enabled(),
+      natural: case wanted {
+        True -> NaturalLoading(0)
+        False -> NaturalOff
+      },
       speech: Silent,
       generation: 0,
       announcement: "",
     )
   let #(model, effects) = reset_with_welcome(model, language)
-  #(model, effect.batch([effects, scheme_watch()]))
+  // A visitor who chose the natural voice before gets it back: from the
+  // browser's cache, so no download.
+  let natural = case wanted {
+    True -> natural_load()
+    False -> effect.none()
+  }
+  #(model, effect.batch([effects, scheme_watch(), natural]))
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +162,10 @@ pub type Msg {
   UserClickedSend
   UserPickedPrompt(String)
   UserToggledVoice
+  UserToggledNatural
+  NaturalProgressed(Int)
+  NaturalLoaded
+  NaturalBroke
   /// An SSE event of the request started with `generation`.
   StreamEventReceived(generation: Int, json: String)
   SpeechRevealed(Int)
@@ -182,6 +209,47 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         effect.from(fn(_dispatch) { do_set_voice_enabled(on) }),
       )
     }
+
+    UserToggledNatural ->
+      case model.natural {
+        NaturalOff | NaturalFailed -> #(
+          Model(..model, natural: NaturalLoading(0)),
+          natural_load(),
+        )
+        // Turning it off keeps the download in the browser's cache.
+        NaturalOn -> #(
+          Model(..model, natural: NaturalOff),
+          effect.from(fn(_dispatch) { do_natural_drop() }),
+        )
+        NaturalLoading(_) -> #(model, effect.none())
+      }
+
+    NaturalProgressed(percent) ->
+      case model.natural {
+        NaturalLoading(_) -> #(
+          Model(..model, natural: NaturalLoading(percent)),
+          effect.none(),
+        )
+        _ -> #(model, effect.none())
+      }
+
+    NaturalLoaded ->
+      case model.natural {
+        NaturalLoading(_) -> #(
+          Model(..model, natural: NaturalOn),
+          effect.none(),
+        )
+        _ -> #(model, effect.none())
+      }
+
+    NaturalBroke ->
+      case model.natural {
+        NaturalLoading(_) -> #(
+          Model(..model, natural: NaturalFailed),
+          effect.none(),
+        )
+        _ -> #(model, effect.none())
+      }
 
     // A reply to a request that was replaced or reset (a language switch
     // mid-reply) must not land in the current conversation.
@@ -340,7 +408,7 @@ fn send_current(model: Model) -> #(Model, Effect(Msg)) {
         call_api_stream(
           text,
           history_before_user,
-          model.voice_on,
+          voice_for(model),
           lang_code(model.language),
           generation,
         )
@@ -433,35 +501,67 @@ fn split_last(items: List(a)) -> #(List(a), Bool) {
 // Effects
 // ---------------------------------------------------------------------------
 
+/// Who speaks a reply.
+pub type Voice {
+  /// Nobody: voice is off, or the reply is not in English.
+  NoVoice
+  /// The server sends audio with the reply.
+  ServerVoice
+  /// The reply is text-only and the model in the browser speaks it.
+  NaturalVoice
+}
+
+/// Only English is spoken. The natural voice takes over once it is loaded;
+/// while it is not, the server's voice speaks.
+pub fn voice_for(model: Model) -> Voice {
+  case model.voice_on, model.language, model.natural {
+    True, En, NaturalOn -> NaturalVoice
+    True, En, _ -> ServerVoice
+    _, _, _ -> NoVoice
+  }
+}
+
+fn natural_load() -> Effect(Msg) {
+  effect.from(fn(dispatch) {
+    do_natural_load(
+      fn(percent) { dispatch(NaturalProgressed(percent)) },
+      fn() { dispatch(NaturalLoaded) },
+      fn() { dispatch(NaturalBroke) },
+    )
+  })
+}
+
 fn call_api_stream(
   text: String,
   history: List(ChatMessage),
-  voice_on: Bool,
+  voice: Voice,
   lang: String,
   generation: Int,
 ) -> Effect(Msg) {
   let wire_history = wire_history(history)
-  // Muted: no voice fields at all, exactly the text-only request.
+  // Only the server's voice is asked for in the request; otherwise no voice
+  // fields at all, exactly the text-only request.
   let body =
     shared.stream_request_to_json(
       shared.ChatRequest(message: text, history: wire_history),
-      shared.VoiceOptions(on: voice_on, lang: lang),
+      shared.VoiceOptions(on: voice == ServerVoice, lang: lang),
     )
     |> json.to_string
 
   // Synchronous effect: runs inside the send gesture, so audio may start.
   effect.from(fn(dispatch) {
     do_speech_stop()
-    case voice_on {
-      True -> {
+    case voice {
+      NoVoice -> Nil
+      _ -> {
         do_unlock_audio()
         do_speech_begin(
           speaking_mark,
+          voice == NaturalVoice,
           fn(shown) { dispatch(SpeechRevealed(shown)) },
           fn() { dispatch(SpeechEnded) },
         )
       }
-      False -> Nil
     }
     do_stream_chat(stream_endpoint(), body, fn(json_str) {
       do_speech_feed(json_str)
@@ -578,7 +678,18 @@ fn bar(model: Model, s: Strings) -> Element(Msg) {
             ]),
           ],
         ),
-        voice_toggle(model.voice_on, s),
+        // Only English is spoken: the voice controls are shown there only.
+        case model.language {
+          En ->
+            element.fragment([
+              voice_toggle(model.voice_on, s),
+              case model.voice_on {
+                True -> natural_toggle(model.natural)
+                False -> element.none()
+              },
+            ])
+          _ -> element.none()
+        },
         language_toggle(model.language, s),
         scheme_toggle(s),
       ]),
@@ -669,6 +780,34 @@ fn voice_toggle(on: Bool, s: Strings) -> Element(Msg) {
         },
       ),
     ],
+  )
+}
+
+/// The natural voice: offered with its size, then the download's progress,
+/// then on. Shown in English only, so its words are not in `Strings`.
+fn natural_toggle(natural: Natural) -> Element(Msg) {
+  let #(label, pressed, busy) = case natural {
+    NaturalOff -> #("Natural voice · 67 MB", "false", False)
+    NaturalLoading(percent) -> #(
+      "Loading voice " <> int.to_string(percent) <> "%",
+      "false",
+      True,
+    )
+    NaturalOn -> #("Natural voice: On", "true", False)
+    NaturalFailed -> #("Natural voice unavailable · retry", "false", False)
+  }
+  html.button(
+    [
+      attribute.type_("button"),
+      attribute.class("ix-chip voice-toggle"),
+      attribute.title(
+        "A natural English voice that runs in your browser. One 67 MB download, kept in the browser's cache.",
+      ),
+      attribute.aria_pressed(pressed),
+      attribute.aria_busy(busy),
+      event.on_click(UserToggledNatural),
+    ],
+    [html.text(label)],
   )
 }
 
@@ -1131,9 +1270,23 @@ fn do_set_voice_enabled(on: Bool) -> Nil
 @external(javascript, "./ffi.mjs", "unlock_audio")
 fn do_unlock_audio() -> Nil
 
+@external(javascript, "./ffi.mjs", "natural_wanted")
+fn do_natural_wanted() -> Bool
+
+@external(javascript, "./ffi.mjs", "natural_load")
+fn do_natural_load(
+  on_progress: fn(Int) -> Nil,
+  on_ready: fn() -> Nil,
+  on_failed: fn() -> Nil,
+) -> Nil
+
+@external(javascript, "./ffi.mjs", "natural_drop")
+fn do_natural_drop() -> Nil
+
 @external(javascript, "./ffi.mjs", "speech_begin")
 fn do_speech_begin(
   mark_selector: String,
+  natural: Bool,
   on_reveal: fn(Int) -> Nil,
   on_end: fn() -> Nil,
 ) -> Nil

@@ -10,6 +10,7 @@
 
 import { Ok, Error } from "./gleam.mjs";
 import { unlockAudio, voiceEnabled, setVoiceEnabled, createSpeaker } from "./voice.mjs";
+import { createNaturalSpeaker, dropNatural, loadNatural, naturalLoaded, naturalWanted } from "./natural.mjs";
 
 export function storage_get(key) {
   try {
@@ -285,10 +286,10 @@ export function stream_chat(url, body_json, on_event) {
 }
 
 // ---------------------------------------------------------------------------
-// Voice: the assistant reads its replies aloud through voice.mjs (a verbatim
-// copy of design-previews/onebit/voice.js; do not fork). One speaker per
-// reply; it gates how much of the reply is visible so the text appears as it
-// is spoken, and its loudness is shown by the reply's ember (set_mark_level).
+// Voice: the assistant reads its English replies aloud through voice.mjs (a
+// verbatim copy of design-previews/onebit/voice.js; do not fork). One speaker
+// per reply; it gates how much of the reply is visible so the text appears as
+// it is spoken, and its loudness is shown by the reply's ember (set_mark_level).
 // ---------------------------------------------------------------------------
 
 export function voice_enabled() {
@@ -323,11 +324,29 @@ export function set_mark_level(selector, level) {
   if (el) el.style.setProperty("--ix-level", Math.min(1, level).toFixed(2));
 }
 
+// The natural English voice (natural.mjs): Phonon, running in the browser. The
+// visitor opts in; the model is downloaded once and kept in the browser's cache.
+export function natural_wanted() {
+  return naturalWanted();
+}
+
+// `on_progress(0..100)` follows the download; then `on_ready()` or `on_failed()`.
+export function natural_load(on_progress, on_ready, on_failed) {
+  loadNatural(on_progress).then(() => on_ready(), () => on_failed());
+}
+
+export function natural_drop() {
+  dropNatural();
+}
+
 // `on_reveal(n)`: show the first n UTF-16 units of the raw reply; -1 = all.
 // Callbacks from a speaker that has since been replaced are dropped.
-export function speech_begin(mark_selector, on_reveal, on_end) {
+// `natural`: the reply is text-only and the browser's own model speaks it;
+// otherwise the audio comes with the reply, from the server.
+export function speech_begin(mark_selector, natural, on_reveal, on_end) {
   speech_stop();
-  const s = createSpeaker({
+  const create = natural ? (callbacks) => createNaturalSpeaker({ tts: naturalLoaded(), ...callbacks }) : createSpeaker;
+  const s = create({
     onReveal: (n) => { if (speaker === s) on_reveal(n === Infinity ? -1 : n); },
     // Each animation frame while speaking, and 0 when the voice stops.
     onLevel: (level) => { if (speaker === s) set_mark_level(mark_selector, level); },

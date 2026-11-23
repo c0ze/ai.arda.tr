@@ -11,7 +11,7 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 - **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist)
 - **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript in [frontend/](frontend/); build output lands in [public/](public/), served by the Gleam backend locally and by GitHub Pages in production
 - **AI**: Google Gemini (`gemini-3.5-flash` by default, configurable via `GEMINI_MODEL`)
-- **Voice**: Google Cloud Text-to-Speech (Standard voices), streamed alongside the text on request (see [Voice replies](#voice-replies))
+- **Voice**: English replies only. Google Cloud Text-to-Speech (Standard voices), streamed alongside the text on request; or, when the visitor opts in, Phonon running in their browser (see [Voice replies](#voice-replies))
 - **Deployment**: Docker container on Google Cloud Run (backend), GitHub Pages (frontend)
 
 ## Project Structure
@@ -62,10 +62,11 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │       ├── frontend/i18n.gleam    # EN/JP/TR translations + quick-prompt strings
 │       ├── frontend/wordmark.gleam # The arda.tr wordmark as inline SVG (the outline of public/brand/logo/wordmark.svg, one colour)
 │       ├── ffi.mjs         # localStorage, scheme switch (window.ardaScheme), marked+DOMPurify, scroll, SSE client, speaker glue, the ember's --ix-level
-│       └── voice.mjs       # Verbatim copy of design-previews/onebit/voice.js (speech playback + reveal); do not fork
+│       ├── voice.mjs       # Verbatim copy of design-previews/onebit/voice.js (speech playback + reveal); do not fork
+│       └── natural.mjs     # The natural English voice: Phonon in the browser (opt-in), sentence by sentence
 ├── public/                 # Hand-written style.css + favicon + CNAME + built Lustre bundle (frontend.js, index.html: generated, not committed)
 │   ├── brand/              # Verbatim copies from arda.tr's brand/: arda.css (theme tokens), brand.css (ix- patterns), scheme.js, art/ (emblem, ember, wisp), logo/wordmark.svg
-│   └── vendor/             # marked 18.0.5, DOMPurify 3.4.8
+│   └── vendor/             # marked 18.0.5, DOMPurify 3.4.8, phonon-tts 0.7.1 (the engine only: single-threaded wasm + WebGPU; no model)
 ├── data/                   # Resume JSON fetched from c0ze/resume
 ├── Dockerfile              # BEAM release on erlang:28-alpine
 ├── cloud_deploy.sh         # gcloud run deploy wrapper, reads .env
@@ -209,7 +210,15 @@ Server pipeline ([stream_handler.gleam](src/ai_resume_bot/stream_handler.gleam) 
 - Startup logs `Voice on: TTS reachable, voices …` or a warning (checked via the voices API).
 - Voices: the lowest male Standard voice per language by measured f0 at −4 st. en-US-Standard-D (~99 Hz), tr-TR-Standard-E (~92 Hz), ja-JP-Standard-C (~120 Hz). All return mark timepoints. Change them via the `TTS_VOICE_*` env vars (a new deploy or `gcloud run services update --update-env-vars`). Free tier: 4M Standard chars/month; replies cap at `VOICE_MAX_CHARS`.
 
-Client ([voice.mjs](frontend/src/voice.mjs), master copy `design-previews/onebit/voice.js`, reused by the arda.tr / resume.arda.tr widgets): `unlockAudio()` in the send gesture; `createSpeaker({onReveal, onLevel, onEnd})` per reply, fed every SSE event. The robot chain: ring modulator (58 Hz sine, 55% wet / 45% dry) → bit-crush (16-step staircase blended 40%) → 5.2 kHz low-pass → metallic comb (4.5 ms, 0.42 feedback, 35% mix) → 0.95 gain → limiter (−6 dB, 12:1) → analyser. Offline renders of real clips peak at 0.86–0.92, with RMS within ~2 dB of the dry voice. Voice is on by default; the voice toggle under the input mutes it (localStorage `voice` = `on`/`off`). A muted request carries no voice fields.
+Client ([voice.mjs](frontend/src/voice.mjs), master copy `design-previews/onebit/voice.js`, reused by the arda.tr / resume.arda.tr widgets): `unlockAudio()` in the send gesture; `createSpeaker({onReveal, onLevel, onEnd})` per reply, fed every SSE event. The audio goes to the speakers as it is, through a gain and an analyser for the loudness (`voiceChain`); the "robot" effect (ring modulator, bit-crush, comb) was removed on 2026-11-23. Voice is on by default; the voice toggle under the input mutes it (localStorage `voice` = `on`/`off`). A muted request carries no voice fields.
+
+**Only English is spoken** (since 2026-11-23). `voice_for(model)` in `frontend.gleam` decides who speaks a reply: nobody when voice is off or the language is Japanese or Turkish (the request is then text-only, and the bar shows no voice controls); the server's voice in English; the natural voice in English once it is loaded. `requestFields(lang)` in `voice.mjs` applies the same rule for the arda.tr and résumé widgets. The server still accepts `lang: ja|tr`; no client asks for it.
+
+**The natural voice** ([natural.mjs](frontend/src/natural.mjs)) is [Phonon](https://github.com/gradium-ai/xn-ptts) by Gradium, running in the visitor's browser in a worker: the engine is vendored in `public/vendor/phonon-tts/` (npm `phonon-tts` 0.7.1; plain ES modules, loaded with a dynamic `import()` only when asked for), the model is Phonon 31m English (`DEFAULT_MODEL`, a Hugging Face repo pinned to a commit, about 67 MB, Apache-2.0) and the voice is Preston from `gradium/phonon-voices` (pinned to a commit; the lowest of the catalogue's male English voices, about 122 Hz measured). The files are kept in the browser's Cache API.
+- It is an opt-in: the second chip in the bar ("Natural voice · 67 MB" → "Loading voice N%" → "Natural voice: On"). The choice is `localStorage["natural-voice"] = "on"`; a returning visitor's model is loaded at startup from the cache. Turning it off frees the model and keeps the cache.
+- With it on, the request is text-only and `createNaturalSpeaker` (same `{handle, stop}` shape as voice.mjs's speaker, fed the same SSE events) cuts the streamed text into sentences (`sentenceEnds`), strips the markdown (`speakable`), synthesises them in order and plays them through voice.mjs's chain (`speechInput()`), so the ember's loudness works the same. A sentence is shown when its audio starts; the reveal is by sentence, not by word (Phonon gives no word timings). At most 1200 characters are spoken.
+- Text never waits long for the voice: if a sentence's audio is not ready 2.5 s after the one before ended, the sentence is shown and the voice follows. On one CPU thread generation ran at 1.3 to 1.7 times real time on a ThinkPad (GitHub Pages cannot send the headers wasm threads need); with WebGPU (`device: "auto"`) it runs on the GPU.
+- The speaker starts reporting on the first `chunk`, not on `thinking`: the app only follows a voice once the stream state is `Streaming`.
 
 Local end-to-end: `TTS_BACKEND=mock gleam run` (real Gemini, fake audio), or against the real API with `TTS_ACCESS_TOKEN` / `TTS_QUOTA_PROJECT` as above.
 
