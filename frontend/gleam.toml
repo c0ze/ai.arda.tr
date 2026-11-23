@@ -63,7 +63,7 @@ stylesheets = [
   { content = "@layer reset, astryx-base, astryx-theme, brand;" },
   { href = "https://fonts.googleapis.com/css2?family=Grenze+Gotisch:wght@700;800;900&family=JetBrains+Mono:wght@400;700&family=Spectral:ital,wght@0,400;0,600;1,400&family=Zen+Antique&display=swap" },
   { href = "/brand/arda.css?v=3" },
-  { href = "/brand/brand.css?v=3" },
+  { href = "/brand/brand.css?v=4" },
   { href = "/style.css?v=23" },
 ]
 scripts = [

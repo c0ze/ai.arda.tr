@@ -425,7 +425,7 @@ test('the page has one heading, in every language, beside the large ember', () =
     assert.equal(headings(html).length, 1);
     const intro = html.match(/<header class="intro">(.*?)<\/header>/)[1];
     // The ember is the assistant's picture, not content: screen readers skip it.
-    assert.match(intro, /^<span aria-hidden="true" class="ix-mark ix-mark--lg"><\/span><div><h1>/);
+    assert.match(intro, /^<span aria-hidden="true" class="ix-mark ix-mark--lg"><\/span><div><h1 class="ix-emerge">/);
     // One secondary line under the heading.
     assert.equal([...intro.matchAll(/<p class="ix-muted">[^<]+<\/p>/g)].length, 1);
   });
@@ -458,7 +458,7 @@ test('the wisp is decoration, on a soot plate', () => {
   // nothing, so it is hidden from screen readers and has an empty alt.
   const wisp = to_string(view(start())).match(/<div aria-hidden="true" class="wisp ix-plate"><img([^>]*)><\/div>/);
   assert.ok(wisp, 'a plate with one picture');
-  assert.match(wisp[1], /^ alt class="ix-art"/);
+  assert.match(wisp[1], /^ alt class="ix-art ix-art--drift"/);
   assert.match(wisp[1], /src="\/brand\/art\/wisp\.webp"/);
 });
 

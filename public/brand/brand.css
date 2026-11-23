@@ -552,6 +552,11 @@
   .ix-entry__desc {
     color: var(--color-text-secondary);
   }
+  /* A work that has ended says so before its description. */
+  .ix-entry__ended {
+    font-style: italic;
+    color: var(--color-text-primary);
+  }
   @media (max-width: 45rem) {
     .ix-entry {
       grid-template-columns: 1fr;
@@ -724,16 +729,140 @@
     background: var(--ix-soot);
     border-radius: 2px;
   }
-  /* The plume drifts, slowly, and not at all for reduced motion. */
+  /* -- Motion: the smoke is alive ----------------------------------------
+     Everything here is decoration and is still under reduced motion. It
+     animates transform, opacity and filter only.
+
+     .ix-smoke         wraps a piece of artwork that moves (position context)
+     .ix-art--drift    the artwork sways from its base, as a column of smoke
+     .ix-smoke__film   a looping film of the artwork, laid over the image
+                       by brand/smoke.js when the image names one
+                       (data-smoke-video); without script it is the image
+     .ix-embers        nine <i>: sparks that rise through the artwork
+     .ix-emerge        a title that forms out of smoke when the page opens
+     .ix-reveal        a block that rises into place as it scrolls into view */
+
+  .ix-smoke {
+    position: relative;
+    display: block;
+  }
+  /* The film is the artwork on black: lighten lets only its lines through,
+     so the ground under it (the page, or the soot plate) stays exact. */
+  .ix-smoke__film {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    mix-blend-mode: lighten;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 600ms ease;
+  }
+  .ix-smoke[data-smoke="on"] > .ix-smoke__film {
+    opacity: 1;
+  }
+  /* The still image keeps the layout while the film plays over it. */
+  .ix-smoke[data-smoke="on"] > img {
+    opacity: 0;
+    transition: opacity 600ms ease;
+  }
   @keyframes ix-drift {
-    50% {
-      transform: translate3d(0, -0.75%, 0) scale(1.012);
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) skewX(0deg) scale(1);
+    }
+    30% {
+      transform: translate3d(0, -0.8%, 0) skewX(-1.4deg) scale(1.015);
+    }
+    65% {
+      transform: translate3d(0, -0.3%, 0) skewX(1.1deg) scale(1.006);
     }
   }
+  @keyframes ix-ember-rise {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    12% {
+      opacity: 0.95;
+    }
+    60% {
+      opacity: 0.6;
+    }
+    100% {
+      opacity: 0;
+      transform: translate3d(var(--dx, 1rem), calc(-1 * var(--rise, 16rem)), 0) scale(0.4);
+    }
+  }
+  @keyframes ix-emerge {
+    from {
+      opacity: 0;
+      filter: blur(0.35em);
+      transform: translate3d(0, 0.08em, 0);
+    }
+  }
+  @keyframes ix-reveal {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 1.25rem, 0);
+    }
+  }
+  @keyframes ix-breathe {
+    50% {
+      filter: brightness(1.28);
+    }
+  }
+  .ix-embers {
+    position: absolute;
+    inset: auto 8% 14% 8%;
+    height: 1px;
+    pointer-events: none;
+  }
+  .ix-embers i {
+    position: absolute;
+    bottom: 0;
+    left: var(--x, 50%);
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--ix-ember);
+    box-shadow: 0 0 6px 1px color-mix(in srgb, var(--ix-ember) 70%, transparent);
+    opacity: 0;
+  }
+  .ix-embers i:nth-child(1) { --x: 12%; --dx: 1.5rem; --rise: 15rem; --d: 9s; --t: -1s; }
+  .ix-embers i:nth-child(2) { --x: 27%; --dx: -1rem; --rise: 19rem; --d: 12s; --t: -7s; }
+  .ix-embers i:nth-child(3) { --x: 38%; --dx: 2.2rem; --rise: 12rem; --d: 8s; --t: -3.5s; }
+  .ix-embers i:nth-child(4) { --x: 49%; --dx: -0.6rem; --rise: 22rem; --d: 14s; --t: -10s; }
+  .ix-embers i:nth-child(5) { --x: 58%; --dx: 1.1rem; --rise: 14rem; --d: 10s; --t: -5s; }
+  .ix-embers i:nth-child(6) { --x: 67%; --dx: -1.8rem; --rise: 18rem; --d: 11s; --t: -8.5s; }
+  .ix-embers i:nth-child(7) { --x: 76%; --dx: 0.4rem; --rise: 11rem; --d: 7.5s; --t: -2s; }
+  .ix-embers i:nth-child(8) { --x: 86%; --dx: -1.2rem; --rise: 20rem; --d: 13s; --t: -6s; }
+  .ix-embers i:nth-child(9) { --x: 44%; --dx: 0.8rem; --rise: 9rem; --d: 6.5s; --t: -4.2s; }
+
   @media (prefers-reduced-motion: no-preference) {
-    .ix-art--drift {
-      animation: ix-drift 16s ease-in-out infinite;
+    .ix-art--drift,
+    .ix-smoke__film {
+      animation: ix-drift 19s ease-in-out infinite;
       transform-origin: 50% 100%;
+      will-change: transform;
+    }
+    .ix-embers i {
+      animation: ix-ember-rise var(--d, 10s) linear var(--t, 0s) infinite;
+    }
+    .ix-emerge {
+      animation: ix-emerge 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+    /* The ember is never quite still. */
+    .ix-mark:not([data-busy="true"]) {
+      animation: ix-breathe 5.5s ease-in-out infinite;
+    }
+    @supports ((animation-timeline: view()) and (animation-range: entry)) {
+      .ix-reveal {
+        animation: ix-reveal auto linear backwards;
+        animation-timeline: view();
+        animation-range: entry 0% entry 70%;
+      }
     }
   }
 
@@ -914,6 +1043,8 @@
 
   @media print {
     .ix-art,
+    .ix-embers,
+    .ix-smoke__film,
     .ix-scheme {
       display: none;
     }

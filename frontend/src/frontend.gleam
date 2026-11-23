@@ -592,7 +592,7 @@ fn bar(model: Model, s: Strings) -> Element(Msg) {
 fn wisp() -> Element(Msg) {
   html.div([attribute.class("wisp ix-plate"), attribute.aria_hidden(True)], [
     html.img([
-      attribute.class("ix-art"),
+      attribute.class("ix-art ix-art--drift"),
       attribute.src("/brand/art/wisp.webp"),
       attribute.alt(""),
       attribute.width(400),
@@ -732,7 +732,7 @@ fn intro(s: Strings) -> Element(Msg) {
       [],
     ),
     html.div([], [
-      html.h1([], [html.text(s.construct_title)]),
+      html.h1([attribute.class("ix-emerge")], [html.text(s.construct_title)]),
       html.p([attribute.class("ix-muted")], [html.text(s.construct_subline)]),
     ]),
   ])
