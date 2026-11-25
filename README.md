@@ -5,7 +5,7 @@ A chatbot that answers questions about Arda's career and personal interests (inc
 ## Architecture
 
 - **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist), hosted on **Google Cloud Run** (Tokyo).
-- **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript, sources in [frontend/](frontend/). The build emits a minified bundle into [public/](public/) (alongside the hand-written [public/style.css](public/style.css)), which is served by the Gleam backend locally and by **GitHub Pages** in production.
+- **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript, sources in [frontend/](frontend/). The build emits a minified bundle into [public/](public/) (alongside the hand-written [public/style.css](public/style.css)), which is served by the Gleam backend locally and by a **Cloudflare Worker** (static assets) in production.
 - **Design**: the arda.tr family brand, Kara Duman: see [DESIGN.md](DESIGN.md). The theme, the shared patterns, the scheme switch, the artwork and the logo under [public/brand/](public/brand/) are verbatim copies from the arda.tr repository; site styles on their tokens are in [public/style.css](public/style.css).
 - **AI Model**: Google Gemini (`gemini-3.5-flash` by default, configurable via `GEMINI_MODEL`).
 
@@ -66,9 +66,17 @@ The resume JSON is fetched at build time and baked into the image. The built fro
 
 [.github/workflows/deploy-backend.yml](.github/workflows/deploy-backend.yml) deploys on pushes to `main` that touch the backend, and also once a day (`17 3 * * *`, 12:17 JST; GitHub often starts scheduled runs late) so résumé edits reach the bot without a push. To refresh at once: `gh workflow run deploy-backend.yml --repo c0ze/ai.arda.tr`. See [DEPLOYMENT_OPTIONS.md](DEPLOYMENT_OPTIONS.md).
 
-### Frontend — GitHub Pages
+### Frontend — Cloudflare Worker
 
-[.github/workflows/deploy-ui.yml](.github/workflows/deploy-ui.yml) installs the Gleam toolchain, runs `lustre/dev build --minify --outdir=../public` from [frontend/](frontend/), and publishes [public/](public/) to GitHub Pages. In production the frontend hits the hard-coded Cloud Run URL (see `cloud_run_base` in [frontend/src/frontend.gleam](frontend/src/frontend.gleam)).
+Hosted on a Cloudflare Worker with static assets (`ai-arda-tr`, custom domain `ai.arda.tr`, see [wrangler.jsonc](wrangler.jsonc)), deployed **by hand**:
+
+```sh
+./scripts/deploy_cloudflare.sh
+```
+
+[scripts/build_site.sh](scripts/build_site.sh) builds the **committed** tree (commit first): `lustre/dev build --minify --outdir=../public` from [frontend/](frontend/), then the browser-boundary tests, and copies `public/` to `_site/`. Then `wrangler deploy` uploads it with your local wrangler login. [ci.yml](.github/workflows/ci.yml) runs the same build and tests on every push. In production the frontend hits the hard-coded Cloud Run URL (see `cloud_run_base` in [frontend/src/frontend.gleam](frontend/src/frontend.gleam)).
+
+Until 2026-11-25 the frontend was on GitHub Pages; GitHub could not renew its certificate behind the Cloudflare proxy.
 
 ## Environment Variables
 

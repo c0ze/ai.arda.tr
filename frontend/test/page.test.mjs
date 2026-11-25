@@ -234,7 +234,7 @@ test('style.css is written on the theme\'s tokens: no colour and no font size of
   assert.match(css, /@layer astryx-base\s*\{/);
 });
 
-// After a Lustre build (deploy-ui.yml builds before it tests), the file that
+// After a Lustre build (scripts/build_site.sh builds before it tests), the file that
 // is published must be exactly what these tests checked.
 const built = new URL('../../public/index.html', import.meta.url);
 test('the built public/index.html is the page checked above', { skip: !existsSync(built) && 'no Lustre build in ../public' }, () => {

@@ -1,5 +1,7 @@
 # DNS Configuration for GitHub Pages
 
+> **Obsolete since 2026-11-25:** the frontend moved to the Cloudflare Worker `ai-arda-tr`, which owns `ai.arda.tr` as a custom domain (see [wrangler.jsonc](wrangler.jsonc) and the README). Kept for history.
+
 To make `ai.arda.tr` work, you need to update your DNS records at your domain registrar (where you managed `arda.tr`).
 
 ## Required Record

@@ -14,3 +14,7 @@ erl_crash.dump
 public/frontend.js
 public/frontend.js.map
 public/index.html
+
+# Cloudflare deploy: build output (scripts/build_site.sh) and wrangler state
+/_site/
+.wrangler/

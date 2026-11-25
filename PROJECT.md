@@ -9,10 +9,10 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 ## Architecture
 
 - **Backend**: Gleam on the Erlang/OTP BEAM runtime (Wisp + Mist)
-- **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript in [frontend/](frontend/); build output lands in [public/](public/), served by the Gleam backend locally and by GitHub Pages in production
+- **Frontend**: Gleam + [Lustre](https://lustre.build/) targeting JavaScript in [frontend/](frontend/); build output lands in [public/](public/), served by the Gleam backend locally and by a Cloudflare Worker (static assets) in production
 - **AI**: Google Gemini (`gemini-3.5-flash` by default, configurable via `GEMINI_MODEL`)
 - **Voice**: English replies only. Google Cloud Text-to-Speech (Standard voices), streamed alongside the text on request; or, when the visitor opts in, Phonon running in their browser (see [Voice replies](#voice-replies))
-- **Deployment**: Docker container on Google Cloud Run (backend), GitHub Pages (frontend)
+- **Deployment**: Docker container on Google Cloud Run (backend), Cloudflare Worker `ai-arda-tr` (frontend, deployed by hand)
 
 ## Project Structure
 
@@ -64,7 +64,7 @@ AI Resume Bot - A personal AI-powered resume chatbot for ai.arda.tr. The bot ans
 │       ├── ffi.mjs         # localStorage, scheme switch (window.ardaScheme), marked+DOMPurify, scroll, SSE client, speaker glue, the ember's --ix-level
 │       ├── voice.mjs       # Verbatim copy of design-previews/onebit/voice.js (speech playback + reveal); do not fork
 │       └── natural.mjs     # The natural English voice: Phonon in the browser (opt-in), sentence by sentence
-├── public/                 # Hand-written style.css + favicon + CNAME + built Lustre bundle (frontend.js, index.html: generated, not committed)
+├── public/                 # Hand-written style.css + favicon + built Lustre bundle (frontend.js, index.html: generated, not committed)
 │   ├── brand/              # Verbatim copies from arda.tr's brand/: arda.css (theme tokens), brand.css (ix- patterns), scheme.js, art/ (emblem, ember, wisp), logo/wordmark.svg
 │   └── vendor/             # marked 18.0.5, DOMPurify 3.4.8, phonon-tts 0.7.1 (the engine only: single-threaded wasm + WebGPU; no model)
 ├── data/                   # Resume JSON fetched from c0ze/resume
@@ -231,6 +231,6 @@ Local end-to-end: `TTS_BACKEND=mock gleam run` (real Gemini, fake audio), or aga
 
 - **Backend**: `./cloud_deploy.sh` or `.github/workflows/deploy-backend.yml` → Cloud Run (`ai-arda-tr-api`, asia-northeast1)
   - The workflow also runs **daily** (`17 3 * * *`, 12:17 JST, though GitHub often starts it hours late) to rebuild with the current résumé, which is baked in at build time; `gh workflow run deploy-backend.yml --repo c0ze/ai.arda.tr` refreshes at once. Its `keepalive` job re-enables the workflow on each scheduled run so GitHub's 60-day inactivity rule never switches the schedule off. See [DEPLOYMENT_OPTIONS.md](DEPLOYMENT_OPTIONS.md#auto-refresh-on-résumé-changes).
-- **Frontend**: Push to `main` triggers `.github/workflows/deploy-ui.yml` → GitHub Pages
+- **Frontend**: `./scripts/deploy_cloudflare.sh` (by hand) → Cloudflare Worker `ai-arda-tr` on `ai.arda.tr` (until 2026-11-25: GitHub Pages)
 - Cloud Run URL: `https://ai-arda-tr-api-599610058688.asia-northeast1.run.app`
 
