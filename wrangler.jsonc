@@ -1,4 +1,6 @@
-// Cloudflare Worker serving the frontend (assets only, no script). The backend
+// Cloudflare Worker serving the frontend: static assets, plus worker/ranges.js
+// for byte ranges on the .mp4 background (static assets ignore Range; Safari
+// needs 206 to play video). The backend
 // stays on Cloud Run (deploy-backend.yml); the page calls it cross-origin.
 // Deploy by hand: scripts/deploy_cloudflare.sh (scripts/build_site.sh, then wrangler deploy).
 // Hosting moved here from GitHub Pages on 2026-11-25: GitHub could not renew
@@ -6,12 +8,16 @@
 {
   "name": "ai-arda-tr",
   "account_id": "d0feb402fe8057e9050fce7450d85049", // personal
+  "main": "worker/ranges.js",
   "compatibility_date": "2026-11-01",
   "workers_dev": false,
   "preview_urls": false,
   "routes": [{ "pattern": "ai.arda.tr", "custom_domain": true }],
   "assets": {
     "directory": "./_site",
+    "binding": "ASSETS",
+    // Media paths run the script first; everything else is plain static assets.
+    "run_worker_first": ["/*.mp4"],
     "html_handling": "auto-trailing-slash"
   }
 }
