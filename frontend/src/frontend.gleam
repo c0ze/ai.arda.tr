@@ -786,20 +786,27 @@ fn voice_toggle(on: Bool, s: Strings) -> Element(Msg) {
 /// The natural voice: offered with its size, then the download's progress,
 /// then on. Shown in English only, so its words are not in `Strings`.
 fn natural_toggle(natural: Natural) -> Element(Msg) {
-  let #(label, pressed, busy) = case natural {
-    NaturalOff -> #("Natural voice · 67 MB", "false", False)
+  // The long label, and the short one a phone's bar has room for.
+  let #(label, short, pressed, busy) = case natural {
+    NaturalOff -> #("Natural voice · 67 MB", "Natural voice", "false", False)
     NaturalLoading(percent) -> #(
       "Loading voice " <> int.to_string(percent) <> "%",
+      "Voice " <> int.to_string(percent) <> "%",
       "false",
       True,
     )
-    NaturalOn -> #("Natural voice: On", "true", False)
-    NaturalFailed -> #("Natural voice unavailable · retry", "false", False)
+    NaturalOn -> #("Natural voice: On", "Natural: On", "true", False)
+    NaturalFailed -> #(
+      "Natural voice unavailable · retry",
+      "Retry voice",
+      "false",
+      False,
+    )
   }
   html.button(
     [
       attribute.type_("button"),
-      attribute.class("ix-chip voice-toggle"),
+      attribute.class("ix-chip voice-toggle natural-toggle"),
       attribute.title(
         "A natural English voice that runs in your browser. One 67 MB download, kept in the browser's cache.",
       ),
@@ -807,7 +814,10 @@ fn natural_toggle(natural: Natural) -> Element(Msg) {
       attribute.aria_busy(busy),
       event.on_click(UserToggledNatural),
     ],
-    [html.text(label)],
+    [
+      html.span([attribute.class("label-long")], [html.text(label)]),
+      html.span([attribute.class("label-short")], [html.text(short)]),
+    ],
   )
 }
 

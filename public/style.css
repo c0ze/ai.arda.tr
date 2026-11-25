@@ -367,10 +367,25 @@ button.ix-navlink[aria-pressed="true"] {
   }
 }
 
+/* The natural-voice chip says its size and progress in full; a phone's bar
+   has room for the short label only (both are in the button, one shown, so
+   the button's name is always what it shows). */
+.natural-toggle .label-short {
+  display: none;
+}
+
 /* On a phone the bar is two lines: the brand and the voice toggle, then the
-   languages and the scheme switch. The nav's box is dropped so its controls
-   lay out with the brand; their order is the same. */
+   natural-voice chip, the languages and the scheme switch. The nav's box is
+   dropped so its controls lay out with the brand; their order is the same. */
 @media (max-width: 30rem) {
+  .natural-toggle .label-long {
+    display: none;
+  }
+
+  .natural-toggle .label-short {
+    display: inline;
+  }
+
   .ix-bar__in {
     column-gap: var(--spacing-3);
   }
@@ -384,9 +399,26 @@ button.ix-navlink[aria-pressed="true"] {
     margin-inline-start: auto;
   }
 
-  /* The first language's letters start on the column's edge. */
+  /* The natural-voice chip opens the second line. */
+  button.natural-toggle {
+    margin-inline-start: 0;
+  }
+
+  /* The languages take less room between them (each still a target wider
+     than 24px), so the second line holds the natural-voice chip, the
+     languages and the scheme switch at 375px. */
+  .language-toggle .ix-navlink {
+    padding-inline: var(--spacing-1);
+  }
+
+  /* The first language's letters start on the column's edge, unless the
+     natural-voice chip comes first on that line. */
   .language-toggle {
-    margin-inline-start: calc(-1 * var(--spacing-2));
+    margin-inline-start: calc(-1 * var(--spacing-1));
+  }
+
+  .natural-toggle + .language-toggle {
+    margin-inline-start: 0;
   }
 
   /* The family line wraps here: spaced as a row of links, without the dots

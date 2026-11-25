@@ -183,9 +183,11 @@ test('only English is spoken, by the server until the natural voice is loaded', 
 // The natural voice is a 67 MB download, so it is offered, never started for
 // the visitor: the button says its size, then the progress, then that it is on.
 test('the natural voice is offered with its size, shows its download, and can be turned off', () => {
-  const natural = (model) => [...to_string(view(model)).matchAll(/<button[^>]*class="ix-chip voice-toggle"[^>]*>(.*?)<\/button>/g)][1];
+  // [button, long label, short label]: a phone shows the short one (style.css).
+  const natural = (model) => to_string(view(model)).match(/<button[^>]*class="ix-chip voice-toggle natural-toggle"[^>]*><span class="label-long">(.*?)<\/span><span class="label-short">(.*?)<\/span><\/button>/) ?? undefined;
   let model = start();
   assert.equal(natural(model)[1], 'Natural voice · 67 MB');
+  assert.equal(natural(model)[2], 'Natural voice', 'the short label for a phone');
   assert.equal(attr(natural(model)[0], 'aria-pressed'), 'false');
   model = step(model, new UserToggledNatural());
   assert.equal(natural(model)[1], 'Loading voice 0%');
@@ -195,6 +197,7 @@ test('the natural voice is offered with its size, shows its download, and can be
   assert.equal(natural(step(model, new UserToggledNatural()))[1], 'Loading voice 42%');
   const on = step(model, new NaturalLoaded());
   assert.equal(natural(on)[1], 'Natural voice: On');
+  assert.equal(natural(on)[2], 'Natural: On');
   assert.equal(attr(natural(on)[0], 'aria-pressed'), 'true');
   assert.equal(natural(step(on, new UserToggledNatural()))[1], 'Natural voice · 67 MB');
   // a failed download says so and can be tried again

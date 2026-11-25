@@ -88,6 +88,16 @@
     --font-family-body: Spectral, "Zen Antique", Georgia, serif;
     --font-family-heading: "Grenze Gotisch", "Zen Antique", Spectral, Georgia, serif;
   }
+  /* Zen Antique has one weight and no italic: never fake them. A bold or
+     italic run in Japanese is set as it is (the Latin faces have their own). */
+  :lang(ja) {
+    font-synthesis: none;
+  }
+  /* A Japanese heading breaks between phrases, not inside a word ("Ardaについ
+     / て質問する"), where the browser can. */
+  :lang(ja):is(h1, h2, h3) {
+    word-break: auto-phrase;
+  }
   /* The face and the looser line start where the Japanese starts (the page,
      or an element marked lang="ja"); headings and code keep their own. */
   :lang(ja):where(html, body, [lang]):not(h1, h2, h3, h4, h5, h6, code, pre) {
@@ -952,8 +962,14 @@
   .ix-prose > * + * {
     margin-block-start: 1.2em;
   }
+  /* Blackletter names things: in long text a subheading is a sentence, so
+     it is Spectral, a step above h3. */
   .ix-prose :where(h2) {
     margin-block-start: 1.8em;
+    font-family: var(--font-family-body);
+    font-weight: 600;
+    font-size: clamp(1.75rem, 1.5rem + 0.6vw, 2rem);
+    line-height: 1.25;
   }
   .ix-prose :where(h3) {
     margin-block-start: 1.6em;
